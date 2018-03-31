@@ -29,7 +29,7 @@ echo '**************************************************************************
 
 gdal_merge.py -init "0" -o $mosaic -of GTiff -ps 0.00027 0.00027 -ot Float32 ${files[*]}
 gdal_translate -of GTiff -co COMPRESS=LZW -co BIGTIFF=YES $mosaic $compmosaic
-gdaladdo -ro $compmosaic 2 4 8 16 32 64 128 256 --config COMPRESS_OVERVIEW LZW
+gdaladdo -ro $compmosaic 2 4 8 16 32 64 128 256 --config COMPRESS_OVERVIEW LZW --config BIGTIFF_OVERVIEW YES
 
 echo '********************************************************************************************'
 echo 'Done!~~~~~~~~~~'

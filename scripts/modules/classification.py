@@ -119,12 +119,12 @@ class Classifier:
     def classify_raster(self, raster_obj, outfile=None, outdir=None,
                         array_multiplier=0.0001, data_type=gdal.GDT_Float32):
         """Model predictions from the RF classifier
-        :param raster_obj object with a 3d array
-        :param outfile is the name of output classification file
-        :param array_multiplier
-        :param data_type
-        :param outdir
-        :returns classification as raster object
+        :param raster_obj: Raster object with a 3d array
+        :param outfile: Name of output classification file
+        :param array_multiplier: Rescale data using this value
+        :param data_type: Raster output data type
+        :param outdir: output folder
+        :returns: classification as raster object
         """
         # resolving output name
         if outdir is None:
@@ -146,15 +146,12 @@ class Classifier:
         nrows = raster_obj.shape[1]
         ncols = raster_obj.shape[2]
 
-        # define out array
-        out_arr = np.zeros((nrows * ncols),
-                           dtype=gdal_array.GDALTypeCodeToNumericTypeCode(data_type))
-
         # reshape into a long 2d array (nband, nrow * ncol) for classification,
         new_shape = [nbands, nrows * ncols]
         temp_arr = raster_obj.array
         temp_arr = temp_arr.reshape(new_shape) * array_multiplier
         temp_arr = temp_arr.swapaxes(0, 1)
+
         out_arr = self.classifier.predict(temp_arr)
 
         # output raster
@@ -182,14 +179,15 @@ class Classifier:
                  for feat in dataarray['features']]
 
         # calculate mean of tree predictions
-        # y = [np.mean([tree.predict(np.array(feat).reshape(1, -1)) for tree in self.classifier.estimators_])
-        #     for feat in dataarray['features']]
         y = [self.classifier.predict(np.array(feat).reshape(1, -1)).item() for feat in dataarray['features']]
 
+        # rms error of the predicted versus actual
         rmse = sqrt(mean_squared_error(dataarray['labels'], y))
 
+        # r-squared of predicted versus actual
         rsq = r2_score(dataarray['labels'], y)
 
+        # write to file
         if (outfile is not None) != (picklefile is not None):
             raise ValueError("Missing outfile or picklefile")
         elif outfile is not None:
@@ -213,15 +211,15 @@ class Classifier:
         }
 
     def tree_variance_raster(self, raster_obj, outfile=None, outdir=None, sd=True,
-                             array_multiplier=0.0001, data_type=gdal.GDT_Float32):
+                             array_multiplier=1.0, data_type=gdal.GDT_Float32):
         """Tree variance from the RF classifier
-        :param raster_obj object with a 3d array
-        :param outfile is the name of output classification file
-        :param array_multiplier
-        :param data_type
-        :param outdir
-        :param sd: flag for standard deviation
-        :returns classification as raster object
+        :param raster_obj: object with a 3d array
+        :param outfile: name of output classification file
+        :param array_multiplier: rescale data using this value
+        :param data_type: output raster data type
+        :param outdir: output folder
+        :param sd: (bool) flag for standard deviation
+        :returns: classification as raster object
         """
         # resolving output name
         if outdir is None:
@@ -258,7 +256,7 @@ class Classifier:
         temp_arr = temp_arr.swapaxes(0, 1)
 
         # apply the variance calculating function on the array
-        out_arr = self.calc_var_arr(temp_arr)
+        out_arr = self.calc_var_arr(temp_arr, sd=sd)
 
         # output raster and metadata
         out_ras.dtype = data_type
