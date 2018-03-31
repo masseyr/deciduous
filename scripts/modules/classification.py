@@ -139,9 +139,10 @@ class Classifier:
         else:
             outfile = outdir + os.path.sep + os.path.basename(outfile)
 
+        # initialize raster object
         out_ras = Raster(outfile)
 
-        # classify by line
+        # get shape of raster array
         nbands = raster_obj.shape[0]
         nrows = raster_obj.shape[1]
         ncols = raster_obj.shape[2]
@@ -152,13 +153,13 @@ class Classifier:
         temp_arr = temp_arr.reshape(new_shape) * array_multiplier
         temp_arr = temp_arr.swapaxes(0, 1)
 
+        # output 1d array after prediction
         out_arr = self.classifier.predict(temp_arr)
 
         # output raster
         out_ras.dtype = data_type
         out_ras.transform = raster_obj.transform
         out_ras.crs_string = raster_obj.crs_string
-
         out_ras.array = out_arr.reshape([nrows, ncols])
         out_ras.shape = [1, nrows, ncols]
         out_ras.bnames = [self.data['label_name']]
