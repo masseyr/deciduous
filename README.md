@@ -1,4 +1,4 @@
-# Mapping deciduous fraction
+# Deciduous fraction
 
 This repository houses python scripts and codes used in mapping deciduous forest fraction of forest cover for the ABoVE domain in North America.
 
