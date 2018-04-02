@@ -43,9 +43,9 @@ if __name__ == '__main__':
         # y_hat_bar[0:n_temp_samp] = temp_dict['mean_y']
 
         # calculate the 95 percentile tau value for each sample set
-        tau_hat[i] = np.percentile(np.sqrt(((temp_dict['obs_y'] -
-                                            temp_dict['mean_y'])*(temp_dict['obs_y'] -
-                                           temp_dict['mean_y'])) / temp_dict['var_y']),
+        tau_hat[i] = np.percentile(np.sqrt(((np.array(temp_dict['obs_y']) -
+                                            np.array(temp_dict['mean_y']))*(np.array(temp_dict['obs_y']) -
+                                           np.array(temp_dict['mean_y']))) / np.array(temp_dict['var_y'])),
                                    95, interpolation='nearest')
 
     # calculate the overall tau value
