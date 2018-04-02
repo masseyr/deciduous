@@ -154,7 +154,7 @@ class Classifier:
         temp_arr = temp_arr.swapaxes(0, 1)
 
         # output 1d array after prediction
-        out_arr = self.classifier.predict(temp_arr)
+        out_arr = self.calc_arr(temp_arr, output='pred')
 
         # output raster
         out_ras.dtype = data_type
@@ -257,7 +257,10 @@ class Classifier:
         temp_arr = temp_arr.swapaxes(0, 1)
 
         # apply the variance calculating function on the array
-        out_arr = self.calc_var_arr(temp_arr, sd=sd)
+        if sd:
+            out_arr = self.calc_arr(temp_arr, output='sd')
+        else:
+            out_arr = self.calc_arr(temp_arr, output='var')
 
         # output raster and metadata
         out_ras.dtype = data_type
@@ -271,7 +274,7 @@ class Classifier:
         # return raster object
         return out_ras
 
-    def calc_var_arr(self, arr, ntile_max=4, ntile_size=64, sd=True):
+    def calc_arr(self, arr, ntile_max=4, ntile_size=64, output='pred'):
         """
         Calculate random forest tree variance. Tiling is necessary in this step because
         large numpy arrays can cause memory issues leading to large memory usage during
@@ -282,9 +285,14 @@ class Classifier:
                           input image is processed without tiling (default = 4).
                           You can choose any (small) number that suits the available memory.
         :param ntile_size: Size of each square tile (default = 64)
-        :param sd: (bool, default = True) Calculate standard deviation instead of variance
-        :return: 1d image array (that will need reshaping)
+        :param output: which output to produce,
+                       choices: ['sd', 'var', 'pred']
+                       where 'sd' is for standard deviation,
+                       'var' is for variance
+                       'pred' is for prediction
+        :return: 1d image array (that will need reshaping for image output)
         """
+
         # define output array
         out_arr = arr[:, 0] * 0.0
 
@@ -311,24 +319,30 @@ class Classifier:
                     temp = tree.predict(arr[i * npx_tile:(i + 1) * npx_tile, :])
                     tile_arr[j, :] = temp
 
-                # calculate variance (or standard deviation) for each tree
-                if sd:
+                # calculate standard dev or variance or prediction for each tree
+                if output == 'sd':
                     out_arr[i * npx_tile:(i + 1) * npx_tile] = np.sqrt(np.var(tile_arr, axis=0))
-                else:
+                elif output == 'var':
                     out_arr[i * npx_tile:(i + 1) * npx_tile] = np.var(tile_arr, axis=0)
+                else:
+                    out_arr[i * npx_tile:(i + 1) * npx_tile] = np.mean(tile_arr, axis=0)
 
             if npx_last > 0:  # number of total pixels for the last tile
+
+                i = ntiles - 1
 
                 # calculate tree predictions for each pixel in a 2d array
                 for j, tree in enumerate(self.classifier.estimators_):
                     temp = tree.predict(arr[i * npx_last:(i + 1) * npx_last, :])
                     tile_arr[j, :] = temp
 
-                # calculate variance (or standard deviation) for each tree
-                if sd:
+                # calculate standard dev or variance or prediction for each tree
+                if output == 'sd':
                     out_arr[i * npx_last:(i + 1) * npx_last] = np.sqrt(np.var(tile_arr, axis=0))
-                else:
+                elif output == 'var':
                     out_arr[i * npx_last:(i + 1) * npx_last] = np.var(tile_arr, axis=0)
+                else:
+                    out_arr[i * npx_last:(i + 1) * npx_last] = np.mean(tile_arr, axis=0)
 
         else:
 
@@ -339,11 +353,13 @@ class Classifier:
             for i, tree in enumerate(self.classifier.estimators_):
                 tree_pred_arr[i, :] = tree.predict(arr)
 
-            # calculate variance (or standard deviation) for each tree
-            if sd:
+            # calculate standard dev or variance or prediction for each tree
+            if output == 'sd':
                 out_arr = np.sqrt(np.var(tree_pred_arr, axis=0))
-            else:
+            elif output == 'var':
                 out_arr = np.var(tree_pred_arr, axis=0)
+            else:
+                out_arr = np.mean(tree_pred_arr, axis=0)
 
         return out_arr
 
