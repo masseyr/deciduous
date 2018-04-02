@@ -326,7 +326,7 @@ class Classifier:
 
             if npx_last > 0:  # number of total pixels for the last tile
 
-                i = ntiles - 1
+                i = ntiles - 2
 
                 # calculate tree predictions for each pixel in a 2d array
                 for j, tree in enumerate(self.classifier.estimators_):
