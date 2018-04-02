@@ -5,15 +5,10 @@ import os
 import pickle
 import numpy as np
 import pandas as pd
-from osgeo import gdal, gdal_array
 from math import sqrt
-
-# to make var processing faster
-import threading
+from osgeo import gdal, gdal_array
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score
-from sklearn.externals.joblib import Parallel, delayed
-from sklearn.ensemble.base import _partition_estimators
 
 
 class Classifier:
@@ -117,11 +112,12 @@ class Classifier:
                 zip(self.data['feature_names'], self.classifier.feature_importances_)]
 
     def classify_raster(self, raster_obj, outfile=None, outdir=None,
-                        array_multiplier=0.0001, data_type=gdal.GDT_Float32):
+                        array_multiplier=1.0, array_additive=0.0, data_type=gdal.GDT_Float32):
         """Model predictions from the RF classifier
         :param raster_obj: Raster object with a 3d array
         :param outfile: Name of output classification file
         :param array_multiplier: Rescale data using this value
+        :param array_additive: Rescale data using this value
         :param data_type: Raster output data type
         :param outdir: output folder
         :returns: classification as raster object
@@ -150,7 +146,7 @@ class Classifier:
         # reshape into a long 2d array (nband, nrow * ncol) for classification,
         new_shape = [nbands, nrows * ncols]
         temp_arr = raster_obj.array
-        temp_arr = temp_arr.reshape(new_shape) * array_multiplier
+        temp_arr = temp_arr.reshape(new_shape) * array_multiplier + array_additive
         temp_arr = temp_arr.swapaxes(0, 1)
 
         # output 1d array after prediction
@@ -212,11 +208,12 @@ class Classifier:
         }
 
     def tree_variance_raster(self, raster_obj, outfile=None, outdir=None, sd=True,
-                             array_multiplier=1.0, data_type=gdal.GDT_Float32):
+                             array_multiplier=1.0, array_additive=0.0, data_type=gdal.GDT_Float32):
         """Tree variance from the RF classifier
         :param raster_obj: object with a 3d array
         :param outfile: name of output classification file
         :param array_multiplier: rescale data using this value
+        :param array_additive: Rescale data using this value
         :param data_type: output raster data type
         :param outdir: output folder
         :param sd: (bool) flag for standard deviation
@@ -253,7 +250,7 @@ class Classifier:
 
         print('New Shape: ' + ', '.join([str(elem) for elem in new_shape]))
         temp_arr = raster_obj.array
-        temp_arr = temp_arr.reshape(new_shape) * array_multiplier
+        temp_arr = temp_arr.reshape(new_shape) * array_multiplier + array_additive
         temp_arr = temp_arr.swapaxes(0, 1)
 
         # apply the variance calculating function on the array
