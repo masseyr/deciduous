@@ -39,7 +39,7 @@ def get_rfpickle_info(infile):
     :return:
     """
     jumble = pd.read_csv(infile)
-    return {'name': jumble.iloc[4,0], 'rsq': jumble.iloc[3,0], 'rmse': jumble.iloc[2,0]}
+    return {'name': jumble.iloc[4, 0], 'rsq': jumble.iloc[3,0], 'rmse': jumble.iloc[2,0]}
 
 
 def read_y_param_from_summary(csv_file):
@@ -49,7 +49,7 @@ def read_y_param_from_summary(csv_file):
     :return:
     """
     # read lines
-    with open(csv_file, 'w') as fileptr:
+    with open(csv_file, 'r') as fileptr:
             lines = fileptr.readlines()
 
     # y observed
