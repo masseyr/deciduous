@@ -249,3 +249,11 @@ def print_memory_usage():
     print('*******************************************')
     print('')
 
+
+def list_size(query_list):
+    """Find size of a list object"""
+
+    if isinstance(query_list, list):
+        return len(query_list)
+    else:
+        return 1

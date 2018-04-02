@@ -26,6 +26,6 @@ outshpfile='/scratch/rm885/gdrive/sync/decid/alaska_data/tiles_extentV2.shp'
 date
 
 #make tiles
-python '/home/rm885/projects/decid/get_tile_extents.py' $tiffilesfolder $boundaryfile $tiledir $outshpfile
+python '/home/rm885/projects/decid/src/get_tile_extents.py' $tiffilesfolder $boundaryfile $tiledir $outshpfile
 
 date
