@@ -11,10 +11,10 @@ from sklearn.metrics import mean_squared_error, r2_score
 
 
 class Classifier:
-    """Classifier object to be used with scikit-learn Random Forest classifier"""
+    """Classifier object to be used with scikit-learn Random Forest regressor"""
 
     def __init__(self,
-                 trees=1,
+                 trees=10,
                  samp_split=2,
                  oob_score=True,
                  criterion='mse'):
