@@ -365,7 +365,10 @@ class Samples:
     """
     Class to read and arrange sample data for RF classifier.
     Stores label and label names in y and y_names
-    Stores feature and feature names in x and x_names
+    Stores feature and feature names in x and x_names.
+    Currently the user has to provide sample csv files with one column as label (output)
+    and the rest of the columns as feature attributes. There should be no index number column.
+    All columns should be data only.
     """
 
     def __init__(self, csv_file=None, label_colname=None,
