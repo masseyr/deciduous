@@ -164,7 +164,7 @@ class Classifier:
         temp_arr = temp_arr.swapaxes(0, 1)
 
         # output 1d array after prediction
-        out_arr = self.calc_arr(temp_arr, output='pred')
+        out_arr = self.calc_arr(temp_arr)
 
         # output raster
         out_ras.dtype = data_type
@@ -389,7 +389,10 @@ class Samples:
     """
     Class to read and arrange sample data for RF classifier.
     Stores label and label names in y and y_names
-    Stores feature and feature names in x and x_names
+    Stores feature and feature names in x and x_names.
+    Currently the user has to provide sample csv files with one column as label (output)
+    and the rest of the columns as feature attributes. There should be no index number column.
+    All columns should be data only.
     """
 
     def __init__(self,
