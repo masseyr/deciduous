@@ -197,16 +197,19 @@ class Raster:
         check the tile for empty bands, return true if one exists
         :return: bool
         """
-        fileptr = gdal.Open(self.name)
+        if os.path.isfile(self.name):
+            fileptr = gdal.Open(self.name)
 
-        filearr = fileptr.ReadAsArray()
-        nb, ns, nl = filearr.shape
+            filearr = fileptr.ReadAsArray()
+            nb, ns, nl = filearr.shape
 
-        truth_about_empty_bands = [np.isfinite(filearr[i, :, :]).any() for i in range(0, nb)]
+            truth_about_empty_bands = [np.isfinite(filearr[i, :, :]).any() for i in range(0, nb)]
 
-        fileptr = None
+            fileptr = None
 
-        return any([not x for x in truth_about_empty_bands])
+            return any([not x for x in truth_about_empty_bands])
+        else:
+            raise ValueError("File does not exist.")
 
     def make_tiles(self,
                    tile_size_x,
