@@ -19,5 +19,5 @@ if __name__ == '__main__':
     proj = raster_obj.crs_string
 
     # make tiles
-    raster_obj.make_tile(int(tile_size_x), int(tile_size_y), outdir)
+    raster_obj.make_tiles(int(tile_size_x), int(tile_size_y), outdir)
 

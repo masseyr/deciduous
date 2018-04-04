@@ -208,10 +208,10 @@ class Raster:
 
         return any([not x for x in truth_about_empty_bands])
 
-    def make_tile(self,
-                  tile_size_x,
-                  tile_size_y,
-                  out_path):
+    def make_tiles(self,
+                   tile_size_x,
+                   tile_size_y,
+                   out_path):
 
         """
         Make tiles from the tif file
