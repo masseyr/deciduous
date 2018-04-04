@@ -150,7 +150,7 @@ class Classifier:
         temp_arr = temp_arr.swapaxes(0, 1)
 
         # output 1d array after prediction
-        out_arr = self.calc_arr(temp_arr, output='pred')
+        out_arr = self.calc_arr(temp_arr)
 
         # output raster
         out_ras.dtype = data_type
