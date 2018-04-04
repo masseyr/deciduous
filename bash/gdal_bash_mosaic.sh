@@ -12,9 +12,10 @@ module load gdal/2.2.1
 
 date
 echo 'Begin!~~~~~~~~~~'
-datadir='/scratch/rm885/gdrive/sync/decid/alaska_data/classifV1/'
+datadir='/scratch/rm885/gdrive/sync/decid/alaska_data/uncert_uncomp/'
 
 files=(${datadir}*.tif)
+echo files
 
 mosaic=$datadir'uncert_mosaic.tif'
 compmosaic=$datadir'uncert_mosaic_vis.tif'
@@ -27,9 +28,9 @@ echo 'Compressed mosaic: '$compmosaic
 
 echo '********************************************************************************************'
 
-gdal_merge.py -init "0" -o $mosaic -of GTiff -ps 0.00027 0.00027 -ot Float32 ${files[*]}
+gdal_merge.py -init 0 -o $mosaic -of GTiff -ps 30 30 -ot Byte ${files[*]}
 gdal_translate -of GTiff -co COMPRESS=LZW -co BIGTIFF=YES $mosaic $compmosaic
-gdaladdo -ro $compmosaic 2 4 8 16 32 64 128 256 --config COMPRESS_OVERVIEW LZW --config BIGTIFF_OVERVIEW YES
+gdaladdo -ro $compmosaic 2 4 8 16 32 64 128 256 --config COMPRESS_OVERVIEW LZW
 
 echo '********************************************************************************************'
 echo 'Done!~~~~~~~~~~'

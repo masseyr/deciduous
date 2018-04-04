@@ -7,5 +7,5 @@
 #SBATCH --array=1-2000
 #SBATCH --output=/scratch/rm885/support/out/slurm-jobs/iter_%A_%a.out
 date
-python /home/rm885/projects/decid/src/y_param_predict.py "/scratch/rm885/gdrive/sync/decid/excel/pred_uncert_temp/temp_data_iter_"$SLURM_ARRAY_TASK_ID".csv" "/scratch/rm885/gdrive/sync/decid/excel/pred_uncert_temp/temp_Cdata_iter_"$SLURM_ARRAY_TASK_ID".csv" "/scratch/rm885/gdrive/sync/decid/excel/pred_uncert_outRF_pred_y_data_"$SLURM_ARRAY_TASK_ID".csv" /scratch/rm885/gdrive/sync/decid/pypickle
+python "/home/rm885/projects/decid/src/y_param_predict.py" "/scratch/rm885/gdrive/sync/decid/excel/pred_uncert_temp/temp_data_iter_"$SLURM_ARRAY_TASK_ID".csv" "/scratch/rm885/gdrive/sync/decid/excel/pred_uncert_temp/temp_Cdata_iter_"$SLURM_ARRAY_TASK_ID".csv" "/scratch/rm885/gdrive/sync/decid/excel/pred_uncert_out/RF_pred_y_data_"$SLURM_ARRAY_TASK_ID".csv" "/scratch/rm885/gdrive/sync/decid/pypickle"
 date

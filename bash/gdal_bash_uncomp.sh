@@ -2,8 +2,8 @@
 #SBATCH --job-name=gdal_tif
 #SBATCH --time=1:00:00
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=12000
-#SBATCH --array=1-132
+#SBATCH --mem=54000
+#SBATCH --array=1-9
 #SBATCH --partition=all
 #SBATCH --output=/home/rm885/slurm-jobs/gdal_tif_slurm_%A_%a.out
 
@@ -14,33 +14,26 @@
 module load gdal/2.2.1
 
 #input folder that contains tif files, dont forget the '/' at the end
-geefiles='/scratch/rm885/gdrive/sync/decid/alaska_data/LZW/data/'
+datadir='/scratch/rm885/gdrive/sync/decid/alaska_data/uncert/'
+files=(${datadir}*.tif)
 
 #output folder, dont forget the '/' at the end
-outfolder='/scratch/rm885/gdrive/sync/decid/alaska_data/uncomp/'
+outfolder='/scratch/rm885/gdrive/sync/decid/alaska_data/uncert_uncomp/'
 
 #if output folder doesn't exist
 mkdir $outfolder
 
-#make filelist array
-declare -a FILELIST
-for f in $geefiles*; do
-    FILELIST[${#FILELIST[@]}+1]=$(echo "$f");
-done
-
 #what this statement does: for this element in job array, pick filename based on task ID
-f=${FILELIST[$SLURM_ARRAY_TASK_ID]}
-
+f=${files[$SLURM_ARRAY_TASK_ID - 1]}
+echo $f
 #get basename and extension from picked filename
 bname=$(basename $f)
 extension="${bname##*.}"
 filename="${bname%.*}"
 
-#print input file
-echo $f
-
 #output filename
 outf=$outfolder""$filename"_uncomp."$extension
+echo $outf
 
 # if output file exists then remove
 if [ -f $outf ] ; then
@@ -48,5 +41,5 @@ if [ -f $outf ] ; then
 fi
 
 #gdal to uncompress specified filename with given options
-gdal_translate -of GTiff -ot FLOAT32 -co TILED=YES -co BLOCKXSIZE=256 -co BLOCKYSIZE=256 -co INTERLEAVE=PIXEL -co COMPRESS=NONE $f $outf
+gdal_translate -of GTiff -ot BYTE -co TILED=YES -co BLOCKXSIZE=256 -co BLOCKYSIZE=256 -co INTERLEAVE=PIXEL -co COMPRESS=NONE $f $outf
 

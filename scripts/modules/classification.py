@@ -4,9 +4,8 @@ from raster import Raster
 import os
 import pickle
 import numpy as np
-import pandas as pd
 from math import sqrt
-from osgeo import gdal, gdal_array
+from osgeo import gdal
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 
@@ -14,7 +13,13 @@ from sklearn.metrics import mean_squared_error, r2_score
 class Classifier:
     """Classifier object to be used with scikit-learn Random Forest classifier"""
 
-    def __init__(self, trees=1, samp_split=2, oob_score=True, criterion='mse', classifier=None):
+    def __init__(self,
+                 trees=1,
+                 samp_split=2,
+                 oob_score=True,
+                 criterion='mse',
+                 classifier=None):
+
         """
         Initialize RF classifier using class parameters
         :param trees: Number of trees
@@ -68,7 +73,8 @@ class Classifier:
             # if empty return empty
             return "<Random Forest Regressor: __empty__>"
 
-    def fit_data(self, data):
+    def fit_data(self,
+                 data):
         """
         Train the classifier
         :param data: dictionary with values (generated using Samples.format_data())
@@ -77,14 +83,16 @@ class Classifier:
         self.data = data
         self.classifier.fit(data['features'], data['labels'])
 
-    def predict_from_feat(self, data):
+    def predict_from_feat(self,
+                          data):
         """Predict using classifier
         :param data: a feature (sample) with attribures (bands)
         """
         data['labels'] = self.classifier.predict(data['features'])
         return data
 
-    def pickle_it(self, outfile):
+    def pickle_it(self,
+                  outfile):
         """
         Save classifier
         :param outfile: File to save the classifier to
@@ -111,8 +119,14 @@ class Classifier:
         return [(band, importance) for band, importance in
                 zip(self.data['feature_names'], self.classifier.feature_importances_)]
 
-    def classify_raster(self, raster_obj, outfile=None, outdir=None,
-                        array_multiplier=1.0, array_additive=0.0, data_type=gdal.GDT_Float32):
+    def classify_raster(self,
+                        raster_obj,
+                        outfile=None,
+                        outdir=None,
+                        array_multiplier=1.0,
+                        array_additive=0.0,
+                        data_type=gdal.GDT_Float32):
+
         """Model predictions from the RF classifier
         :param raster_obj: Raster object with a 3d array
         :param outfile: Name of output classification file
@@ -163,7 +177,10 @@ class Classifier:
         # return raster object
         return out_ras
 
-    def tree_predictions(self, dataarray, picklefile=None, outfile=None):
+    def tree_predictions(self,
+                         dataarray,
+                         picklefile=None,
+                         outfile=None):
         """
         Get tree predictions from the RF classifier
         :param dataarray: input 2d data array
@@ -207,8 +224,15 @@ class Classifier:
             'rsq': rsq
         }
 
-    def tree_variance_raster(self, raster_obj, outfile=None, outdir=None, sd=True,
-                             array_multiplier=1.0, array_additive=0.0, data_type=gdal.GDT_Float32):
+    def tree_variance_raster(self,
+                             raster_obj,
+                             outfile=None,
+                             outdir=None,
+                             sd=True,
+                             array_multiplier=1.0,
+                             array_additive=0.0,
+                             data_type=gdal.GDT_Float32):
+
         """Tree variance from the RF classifier
         :param raster_obj: object with a 3d array
         :param outfile: name of output classification file
@@ -241,10 +265,6 @@ class Classifier:
 
         print('Shape: ' + ', '.join([str(elem) for elem in raster_obj.shape]))
 
-        # define out array
-        out_arr = np.zeros((nrows * ncols),
-                           dtype=gdal_array.GDALTypeCodeToNumericTypeCode(data_type))
-
         # reshape into a long 2d array (nband, nrow * ncol) for classification,
         new_shape = [nbands, nrows * ncols]
 
@@ -271,7 +291,11 @@ class Classifier:
         # return raster object
         return out_ras
 
-    def calc_arr(self, arr, ntile_max=4, ntile_size=64, output='pred'):
+    def calc_arr(self,
+                 arr,
+                 ntile_max=4,
+                 ntile_size=64,
+                 output='pred'):
         """
         Calculate random forest tree variance. Tiling is necessary in this step because
         large numpy arrays can cause memory issues leading to large memory usage during
@@ -368,8 +392,15 @@ class Samples:
     Stores feature and feature names in x and x_names
     """
 
-    def __init__(self, csv_file=None, label_colname=None,
-                 x=None, y=None, x_name=None, y_name=None, use_dict=None):
+    def __init__(self,
+                 csv_file=None,
+                 label_colname=None,
+                 x=None,
+                 y=None,
+                 x_name=None,
+                 y_name=None,
+                 use_band_dict=None):
+
         """
         :param csv_file: csv file that contains the features (training or validation samples)
         :param label_colname: column in csv file that contains the feature label (output value)
@@ -385,7 +416,7 @@ class Samples:
         self.x_name = x_name
         self.y = y
         self.y_name = y_name
-        self.use_dict = use_dict
+        self.use_band_dict = use_band_dict
 
         # either of label name or csv file is provided without the other
         if (label_colname is not None) != (csv_file is not None):
@@ -409,8 +440,8 @@ class Samples:
             self.y_name = temp['name'][loc].strip()
 
             # if band name dictionary is provided
-            if use_dict is not None:
-                self.y_name = [use_dict[b] for b in self.y_name]
+            if use_band_dict is not None:
+                self.y_name = [use_band_dict[b] for b in self.y_name]
 
         # no label name or csv file, but either feature or label list is provided without the other
         elif (x is not None) != (y is not None):
@@ -429,7 +460,7 @@ class Samples:
         else:
             "<Samples object: __empty__>"
 
-    def format_data(self, use_dict=None):
+    def format_data(self):
         """
         Method to format the samples to the RF model fit method
         :param self
@@ -442,7 +473,8 @@ class Samples:
             'feature_names': self.x_name
         }
 
-    def merge_data(self, samp):
+    def merge_data(self,
+                   samp):
         """
         Merge two sample sets together
         :param self, samp:

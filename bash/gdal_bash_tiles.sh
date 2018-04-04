@@ -21,11 +21,7 @@ outfolder='/scratch/rm885/gdrive/sync/decid/alaska_data/tiles/'
 #if output folder doesn't exist
 mkdir $outfolder
 
-#make filelist array
-declare -a FILELIST
-for f in $tiffiles*; do
-    FILELIST[${#FILELIST[@]}+1]=$(echo "$f");
-done
+FILELIST=(${datadir}*.tif)
 
 #what this statement does: for this element in job array, pick filename based on task ID
 f=${FILELIST[$SLURM_ARRAY_TASK_ID]}
