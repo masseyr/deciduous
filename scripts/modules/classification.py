@@ -17,8 +17,7 @@ class Classifier:
                  trees=1,
                  samp_split=2,
                  oob_score=True,
-                 criterion='mse',
-                 classifier=None):
+                 criterion='mse'):
 
         """
         Initialize RF classifier using class parameters
