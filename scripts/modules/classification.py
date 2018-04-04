@@ -292,8 +292,8 @@ class Classifier:
 
     def calc_arr(self,
                  arr,
-                 ntile_max=4,
-                 ntile_size=64,
+                 ntile_max=8,
+                 tile_size=128,
                  output='pred'):
         """
         Calculate random forest tree variance. Tiling is necessary in this step because
@@ -302,9 +302,9 @@ class Classifier:
 
         :param arr: inout image reshaped to 2d array (axis 0: all pixels, axis 1: all bands)
         :param ntile_max: Maximum number of tiles upto which the
-                          input image is processed without tiling (default = 4).
+                          input image is processed without tiling (default = 8).
                           You can choose any (small) number that suits the available memory.
-        :param ntile_size: Size of each square tile (default = 64)
+        :param tile_size: Size of each square tile (default = 128)
         :param output: which output to produce,
                        choices: ['sd', 'var', 'pred']
                        where 'sd' is for standard deviation,
@@ -321,7 +321,7 @@ class Classifier:
         nb_inp = long(arr.shape[1])  # number of bands in input image
 
         # size of tiles
-        npx_tile = long(ntile_size * ntile_size)  # pixels in each tile
+        npx_tile = long(tile_size * tile_size)  # pixels in each tile
         npx_last = npx_inp % npx_tile  # pixels in last tile
         ntiles = long(npx_inp) / long(npx_tile) + 1  # total tiles
 
