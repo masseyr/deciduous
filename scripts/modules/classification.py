@@ -460,7 +460,7 @@ class Samples:
         elif self.csv_file is None and self.x is not None:
             return "<Samples object with {n} samples>".format(n=len(self.x))
         else:
-            "<Samples object: __empty__>"
+            return "<Samples object: __empty__>"
 
     def format_data(self):
         """
