@@ -12,10 +12,10 @@ if __name__ == '__main__':
     print('')
 
     # find all y value files
-    filenames = find_all('.csv', y_files_dir)
+    filenames = Handler(dirname=y_files_dir).find_all('.csv')
 
     # number of files
-    n = list_size(filenames)
+    n = Sublist.list_size(filenames)
 
     print('{} Files found'.format(n))
     print('')
@@ -35,7 +35,7 @@ if __name__ == '__main__':
         temp_dict = read_y_param_from_summary(filenames[i])
 
         # number of samples
-        n_temp_samp = list_size(temp_dict['obs_y'])
+        n_temp_samp = Sublist.list_size(temp_dict['obs_y'])
 
         # assign samples to array
         # y[0:n_temp_samp] = temp_dict['obs_y']
@@ -58,7 +58,7 @@ if __name__ == '__main__':
     outlist = ['tau', str(tau)]
 
     # write to out file
-    write_list_to_file(tau_outfile, outlist)
+    Handler(filename=tau_outfile).write_list_to_file(outlist)
 
     print('Done!')
 

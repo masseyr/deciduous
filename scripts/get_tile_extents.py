@@ -45,8 +45,7 @@ if __name__ == '__main__':
     print('Creating shapefile: ' + outshpfile)
 
     # get meta data from the first raster and make feature geojson
-    raster_obj = Raster(filelist[0])
-    raster_metaDict = raster_obj.get_raster_metadict()
+    raster_metaDict = Raster.get_raster_metadict(filelist[0])
 
     # get projection information
     spref = osr.SpatialReference(raster_metaDict['projection'])

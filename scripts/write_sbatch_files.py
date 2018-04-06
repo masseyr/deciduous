@@ -22,7 +22,7 @@ if __name__ == '__main__':
     # run all sbatch files
     runsh = outshfolder + sep + 'runallsbatch.sh'
 
-    filelist = find_all('.tif', datadir)
+    filelist = Handler(dirname=datadir).find_all('.tif')
 
     shfilenamelist = list()
 
@@ -33,12 +33,15 @@ if __name__ == '__main__':
         shfilenamelist.append(' '.join(['sbatch', rf_sbatch]))
 
         script1_line1 = 'python "' + '" "'.join([pyfile, rf_picklefile, file_, outdir]) + '"'
-        write_slurm_script(rf_sbatch, job_name='rf_class', time_in_mins=1439,
-                           cpus=1, ntasks=1, mem_per_cpu=48000,
-                           script_line1=script1_line1)
+        Handler(filename=rf_sbatch).write_slurm_script(job_name='rf_class',
+                                                       time_in_mins=1439,
+                                                       cpus=1,
+                                                       ntasks=1,
+                                                       mem_per_cpu=48000,
+                                                       script_line1=script1_line1)
 
     print(shfilenamelist)
 
-    write_list_to_file(runsh, shfilenamelist)
+    Handler(filename=runsh).write_list_to_file(shfilenamelist)
 
     os.system('sh ' + runsh)

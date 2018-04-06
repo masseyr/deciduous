@@ -50,7 +50,7 @@ class Raster:
         """
         if outfile is None:
             outfile = self.name
-            outfile = file_rename_check(outfile)
+            outfile = Handler(filename=outfile).file_rename_check()
 
         print('')
         print('Writing ' + outfile)
@@ -264,7 +264,7 @@ class Raster:
                                             "_" + str(i + 1) + "_" + str(j + 1) + ".tif"
 
                             # check if file already exists
-                            out_file_name = file_remove_check(out_file_name)
+                            out_file_name = Handler(filename=out_file_name).file_remove_check()
 
                             # get/calculate spatial parameters
                             new_ul = [ulx + i * px, uly + j * py]

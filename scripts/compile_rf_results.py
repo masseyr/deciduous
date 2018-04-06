@@ -8,7 +8,7 @@ if __name__ == '__main__':
 
     outfile = '/scratch/rm885/gdrive/sync/decid/excel/rf_info.csv'
 
-    filelist = find_all(pattern, indir)
+    filelist = Handler(dirname=indir).find_all(pattern)
 
     listdict = [get_rfpickle_info(file_) for file_ in filelist]
 
@@ -20,4 +20,4 @@ if __name__ == '__main__':
 
     outlist = ['name, rsq, rmse'] + outlist
 
-    write_list_to_file(outfile, outlist)
+    Handler(filename=outfile).write_list_to_file(outlist)

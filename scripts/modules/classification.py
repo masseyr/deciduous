@@ -25,8 +25,7 @@ class Classifier:
         :param samp_split: Minimum number of samples for split
         :param oob_score: (bool) calculate out of bag score
         :param criterion: criterion to be used (default: 'mse', options: 'mse', 'mae')
-        :param classifier: Random forest classifier object
-        (as detailed in http://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestRegressor.html)
+        (some parameters are as detailed in http://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestRegressor.html)
         """
         self.trees = trees
         self.samp_split = samp_split
@@ -96,7 +95,7 @@ class Classifier:
         Save classifier
         :param outfile: File to save the classifier to
         """
-        outfile = file_remove_check(outfile)
+        outfile = Handler(filename=outfile).file_remove_check()
         with open(outfile, 'wb') as fileptr:
             pickle.dump(self, fileptr)
 
@@ -213,7 +212,7 @@ class Classifier:
                         'rf_file,' + picklefile]
 
             # write the list to file
-            write_list_to_file(outfile, out_list)
+            Handler(filename=outfile).write_list_to_file(out_list)
 
         return {
             'var_y': var_y,
@@ -410,7 +409,7 @@ class Samples:
         :param y: 1d array of feature labels (same order as x)
         :param x_name: 1d array of feature attributes (bands)
         :param y_name: name of label
-        :param use_dict: list of attribute (band) names
+        :param use_band_dict: list of attribute (band) names
         """
         self.csv_file = csv_file
         self.label_colname = label_colname
@@ -427,7 +426,7 @@ class Samples:
         # label name or csv file are provided
         elif (label_colname is not None and
               csv_file is not None):
-            temp = read_from_csv(csv_file)
+            temp = Handler(filename=csv_file).read_from_csv()
 
             # label name doesn't match
             if any(label_colname in s for s in temp['name']):

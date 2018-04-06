@@ -1,4 +1,5 @@
 from modules import *
+import random
 from sys import argv
 
 # main program
@@ -16,19 +17,19 @@ if __name__ == '__main__':
 
     # create folder to write temp data to
     outtempfolder = work_dir + sep + 'pred_uncert_temp'
-    dir_create(outtempfolder)
+    Handler(dirname=outtempfolder).dir_create()
 
     # create folder to write out data to
     outfilefolder = work_dir + sep + 'pred_uncert_out'
-    dir_create(outfilefolder)
+    Handler(dirname=outfilefolder).dir_create()
 
     # create folder for shell scripts
     outshfolder = support_dir + sep + 'sh'
-    dir_create(outshfolder)
+    Handler(dirname=outshfolder).dir_create()
 
     # create out folder
     outoutfolder = support_dir + sep + 'out'
-    dir_create(outoutfolder)
+    Handler(dirname=outoutfolder).dir_create()
 
     # bash script to run everything
     final_bash_file = outshfolder + sep + 'y_param_tau_submit.sh'
@@ -49,7 +50,7 @@ if __name__ == '__main__':
     rf_sbatch = outshfolder + sep + 'run_saved_rf_model.sh'
 
     # get data
-    colnames, inData = read_csv_as_array(samp_file)
+    colnames, inData = Handler(filename=samp_file).read_csv_as_array()
 
     # number of iterations
     iter = 2000
@@ -86,12 +87,12 @@ if __name__ == '__main__':
         outCfile = outtempfolder + sep + 'temp_Cdata_iter_' + str(i) + '.csv'
 
         # remove files if already exist
-        outfile = file_remove_check(outfile)
-        outCfile = file_remove_check(outCfile)
+        outfile = Handler(filename=outfile).file_remove_check()
+        outCfile = Handler(filename=outCfile).file_remove_check()
 
         # save data to file
-        write_numpy_array_to_file(outfile, tempData)
-        write_numpy_array_to_file(outCfile, tempCData)
+        Handler(filename=outfile).write_numpy_array_to_file(tempData)
+        Handler(filename=outCfile).write_numpy_array_to_file(tempCData)
 
     print(str(datetime.datetime.now()))
 
@@ -102,15 +103,24 @@ if __name__ == '__main__':
 
     # write slurm array script
     script1_line1 = 'python ' + ' '.join([rf_prog, file_data, file_Cdata, outfile, '"' + pickle_dir + '"'])
-    write_slurm_script(array_bash_file, job_name='RFP', time_in_mins=60,
-                       cpus=1, ntasks=1, mem_per_cpu=1024,
-                       array=True, iterations=iter, script_line1=script1_line1)
+    Handler(filename=array_bash_file).write_slurm_script(job_name='RFP',
+                                                         time_in_mins=60,
+                                                         cpus=1,
+                                                         ntasks=1,
+                                                         mem_per_cpu=1024,
+                                                         array=True,
+                                                         iterations=iter,
+                                                         script_line1=script1_line1)
 
     # write array for result collection
     script2_line1 = 'python ' + ' '.join([compile_prog, outfilefolder])
-    write_slurm_script(res_coll_sh, job_name='RFPr', time_in_mins=60,
-                       cpus=1, ntasks=1, mem_per_cpu=1024,
-                       array=False, script_line1=script2_line1)
+    Handler(filename=res_coll_sh).write_slurm_script(job_name='RFPr',
+                                                     time_in_mins=60,
+                                                     cpus=1,
+                                                     ntasks=1,
+                                                     mem_per_cpu=1024,
+                                                     array=False,
+                                                     script_line1=script2_line1)
 
     # write job submission script
     script_lines = [
@@ -119,7 +129,7 @@ if __name__ == '__main__':
     ]
 
     # write to file
-    write_list_to_file(final_bash_file, script_lines)
+    Handler(filename=final_bash_file).write_list_to_file(script_lines)
 
     # run the final file
     # os.system('sh ' + final_bash_file)

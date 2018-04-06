@@ -34,14 +34,14 @@ if __name__ == '__main__':
     # predict using held out samples and print to file
     outfile1 = os.path.dirname(outfile) + os.path.sep + \
         'val' + os.path.sep + 'val_samp_' + os.path.basename(outfile)
-    outfile1 = file_remove_check(outfile1)
+    outfile1 = Handler(filename=outfile1).file_remove_check()
     pred = rf_model.tree_predictions(trn_Csamp.format_data(), outfile=outfile1, picklefile=picklefile)
     print(pred)
 
     # check training samples for fit
     outfile2 = os.path.dirname(outfile) + os.path.sep + \
         'trn' + os.path.sep + 'trn_samp_' + os.path.basename(outfile)
-    outfile2 = file_remove_check(outfile2)
+    outfile2 = Handler(filename=outfile2).file_remove_check()
     pred3 = rf_model.tree_predictions(trn_samp.format_data(), outfile=outfile2, picklefile=picklefile)
     print(pred3)
 
@@ -52,6 +52,6 @@ if __name__ == '__main__':
     # check all samples for fit
     outfile3 = os.path.dirname(outfile) + os.path.sep + \
         'all' + os.path.sep + 'all_samp_' + os.path.basename(outfile)
-    outfile3 = file_remove_check(outfile3)
+    outfile3 = Handler(filename=outfile3).file_remove_check()
     pred3 = rf_model.tree_predictions(trn_Csamp.format_data(), outfile=outfile3, picklefile=picklefile)
     print(pred3)

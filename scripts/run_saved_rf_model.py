@@ -30,7 +30,7 @@ if __name__ == '__main__':
     print(ras)
     bandnames = ras.bnames
     print('Raster bands: ' + ' '.join(bandnames))
-    band_order = sublistfinder(bandnames, classif_bandnames)
+    band_order = Sublist(bandnames).sublistfinder(classif_bandnames)
     print('Band order: ' + ', '.join([str(b) for b in band_order]))
 
     # re-initialize raster
@@ -54,7 +54,7 @@ if __name__ == '__main__':
     print(varfile)
     varfile.write_to_file()
     
-    print_memory_usage()
+    Opt.print_memory_usage()
     gc.collect()
 
     print('Done!')
