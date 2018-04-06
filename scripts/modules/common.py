@@ -9,7 +9,9 @@ np.set_printoptions(suppress=True)
 
 
 class Sublist(list):
-
+    """
+    Class to handle list operations
+    """
     @staticmethod
     def list_size(query_list):
         """Find size of a list object"""
@@ -29,7 +31,9 @@ class Sublist(list):
 
 
 class Handler:
-
+    """
+    Class to handle file and folder operations
+    """
     def __init__(self,
                  filename=None,
                  basename=None,
@@ -249,6 +253,9 @@ class Handler:
 
 
 class Opt:
+    """
+    Class to handle memory operations
+    """
 
     @staticmethod
     def print_memory_usage():
