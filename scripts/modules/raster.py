@@ -228,7 +228,7 @@ class Raster:
         in_file = self.name
         bands, rows, cols = self.shape
 
-        if 0 < tile_size_x <=cols and 0 < tile_size_y <=rows:
+        if 0 < tile_size_x <= cols and 0 < tile_size_y <= rows:
 
             if self.metadict is not None:
 

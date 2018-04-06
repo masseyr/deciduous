@@ -19,5 +19,11 @@ if __name__ == '__main__':
     proj = raster_obj.crs_string
 
     # make tiles
-    raster_obj.make_tiles(int(tile_size_x), int(tile_size_y), outdir)
+    try:
+        raster_obj.make_tiles(int(tile_size_x), int(tile_size_y), outdir)
+    except AttributeError:
+        print('Initialize the raster using Raster.initialize() or ' +
+              'get metadata using Raster.get_raster_metadict()')
+    except ValueError:
+        print('Tile size should be smaller than original raster {}x{}.'.format(rows, cols))
 
