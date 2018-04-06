@@ -40,15 +40,26 @@ class Handler:
                  dirname=None):
 
         self.filename = filename
-        if basename is not None:
-            self.basename = basename
-        else:
-            self.basename = os.path.basename(filename)
 
-        if dirname is not None:
-            self.dirname = dirname
-        else:
+        try:
+            self.basename = os.path.basename(filename)
+        except TypeError:
+            self.basename = basename
+
+        try:
             self.dirname = os.path.dirname(filename)
+        except TypeError:
+            self.dirname = dirname
+
+    def __repr__(self):
+        if self.filename is not None:
+            return '<Handler for {}>'.format(self.filename)
+        elif self.dirname is not None:
+            return '<Handler for {}>'.format(self.dirname)
+        elif self.basename is not None:
+            return '<Handler for {}>'.format(self.basename)
+        else:
+            return '<Handler ______>'
 
     def dir_create(self):
         """
