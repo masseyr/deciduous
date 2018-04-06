@@ -28,8 +28,13 @@ echo 'Compressed mosaic: '$compmosaic
 
 echo '********************************************************************************************'
 
+# make mosaic
 gdal_merge.py -init 0 -o $mosaic -of GTiff -ps 30 30 -ot Byte ${files[*]}
+
+# compress large tif file using LZW compression
 gdal_translate -of GTiff -co COMPRESS=LZW -co BIGTIFF=YES $mosaic $compmosaic
+
+# make overview (pyramid) file: gdaladdo -> gdal add overview
 gdaladdo -ro $compmosaic 2 4 8 16 32 64 128 256 --config COMPRESS_OVERVIEW LZW
 
 echo '********************************************************************************************'
