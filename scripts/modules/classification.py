@@ -310,11 +310,10 @@ class Classifier:
                  output='pred'):
         """
         Calculate random forest tree variance. Tiling is necessary in this step because
-        large numpy arrays can cause memory issues leading to large memory usage during
-        creation.
+        large numpy arrays can cause memory issues during creation.
 
-        :param arr: inout image reshaped to 2d array (axis 0: all pixels, axis 1: all bands)
-        :param ntile_max: Maximum number of tiles upto which the
+        :param arr: input image reshaped to 2d array (axis 0: all pixels, axis 1: all bands)
+        :param ntile_max: Maximum number of tiles up to which the
                           input image is processed without tiling (default = 8).
                           You can choose any (small) number that suits the available memory.
         :param tile_size: Size of each square tile (default = 128)
