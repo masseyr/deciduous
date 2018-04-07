@@ -5,6 +5,11 @@ from osgeo import ogr, osr
 from shutil import copyfile
 from modules import *
 
+"""
+This script goes through a folder of tif files and compiles 
+their boundaries. Each boundary is then saved as a feature in 
+a shapefile.
+"""
 
 # main program
 if __name__ == '__main__':

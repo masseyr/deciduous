@@ -1,6 +1,11 @@
 from modules import *
 import os
 
+"""
+This script is used to generate SLURM sbatch files for running multiple 
+RF classification jobs.
+"""
+
 sep = os.path.sep
 
 if __name__ == '__main__':

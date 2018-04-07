@@ -1,5 +1,10 @@
 from modules import *
 
+"""
+This script is used to compile RF model r-squared and RMSE values
+for plotting.
+"""
+
 if __name__ == '__main__':
 
     pattern = 'all'

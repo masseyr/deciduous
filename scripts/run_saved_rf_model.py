@@ -5,6 +5,12 @@ import time
 import psutil
 import gc
 
+
+"""
+This script is used to classify a raster using a selected RF model.
+This script also generates the uncertainty raster.
+"""
+
 #main program
 if __name__ == '__main__':
 

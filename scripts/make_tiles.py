@@ -1,10 +1,11 @@
 from sys import argv
 from modules import *
 
-
-""" This script makes tiles of given size tile_size_x, tile_size_y
-    from the given raster file. The tiles are stored in GeoTiff
-    format with inherited attributes from the parent raster """
+"""
+This script makes tiles of given size tile_size_x, tile_size_y
+from the given raster file. The tiles are stored in GeoTiff
+format with inherited attributes from the parent raster.
+"""
 
 # main program
 if __name__ == '__main__':
