@@ -8,6 +8,10 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 
 
+__all__ = ['Classifier',
+           'Samples']
+
+
 class Classifier:
     """Classifier object to be used with scikit-learn Random Forest regressor"""
 

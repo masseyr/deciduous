@@ -8,6 +8,9 @@ gdal.UseExceptions()
 gdal.AllRegister()
 
 
+__all__ = ['Raster']
+
+
 class Raster:
     """
     Raster class to read and write raster from/to files and numpy arrays
