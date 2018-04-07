@@ -1,6 +1,13 @@
 from modules import *
 from sys import argv
 
+"""
+This script initializes and fits training data to Random Forest (RF) models.
+The data is pre prepared using analysis_initiate.py. The RF models are then
+pickled and saved for later use. In addition this script also generates outputs
+by classifying held-out samples using the RF model.
+"""
+
 # main program
 if __name__ == '__main__':
 

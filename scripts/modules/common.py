@@ -327,7 +327,7 @@ class Opt:
 
 
 class FTPHandler(Handler):
-    """Class to handle all remote IO for a ftp connection"""
+    """Class to handle remote IO for ftp connection"""
     def __init__(self,
                  filename=None,
                  basename=None,
@@ -337,6 +337,7 @@ class FTPHandler(Handler):
                  ftppath=None,
                  ftppasswd=None,
                  ftpfilepath=None):
+
         super(FTPHandler, self).__init__(filename,
                                          basename,
                                          dirname)

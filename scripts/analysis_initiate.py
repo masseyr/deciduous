@@ -1,6 +1,15 @@
 from modules import *
 import random
-from sys import argv
+import datetime
+# from sys import argv
+
+"""
+This script is used to generate most of the python and bash scripts
+used in the deciduous fraction analysis. The modules are not generated
+by this code. This code generates random selection of 75% and 25% of training 
+and held-out samples, respectively, from the sample set. 
+
+"""
 
 # main program
 if __name__ == '__main__':
@@ -32,22 +41,19 @@ if __name__ == '__main__':
     Handler(dirname=outoutfolder).dir_create()
 
     # bash script to run everything
-    final_bash_file = outshfolder + sep + 'y_param_tau_submit.sh'
+    final_bash_file = outshfolder + sep + 'rf_model_submit.sh'
 
-    # random forest program
-    rf_prog = '"' + prog_dir + sep + 'y_param_predict.py"'
+    # run one saved random forest model
+    rf_prog = '"' + prog_dir + sep + 'run_saved_rf_model.py"'
 
-    # bash script for job array
-    array_bash_file = outshfolder + sep + 'y_param_predict_job_array.sh'
+    # bash script for job array to run one saved random forest model
+    array_bash_file = outshfolder + sep + 'run_saved_rf_model.sh'
 
-    # compile all y files program
-    compile_prog = prog_dir + sep + 'compile_y_param_files.py'
+    # compile all rf models output files
+    compile_prog = prog_dir + sep + 'compile_rf_model_outputs.py'
 
     # compile all results submit file
-    res_coll_sh = outshfolder + sep + 'compile_y_param_files.sh'
-
-    # run saved rf model sbatch file
-    rf_sbatch = outshfolder + sep + 'run_saved_rf_model.sh'
+    res_coll_sh = outshfolder + sep + 'compile_rf_model_outputs.sh'
 
     # get data
     colnames, inData = Handler(filename=samp_file).read_csv_as_array()

@@ -2,6 +2,12 @@ import numpy as np
 from modules import *
 from sys import argv
 
+"""
+This code compiles all the outputs from saved (pickled) RF models
+applied on held out (25%) samples. The compiled outputs are used to 
+generate a scaling factor tau (t). Tau is used for scaling standard 
+deviation of tree outputs of a selected RF model to per-pixel uncertainty. 
+"""
 
 if __name__ == '__main__':
 
