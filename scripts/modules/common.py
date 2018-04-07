@@ -4,6 +4,8 @@ import pandas as pd
 import datetime
 import fnmatch
 import psutil
+import urllib
+import ftplib
 
 np.set_printoptions(suppress=True)
 
@@ -30,7 +32,7 @@ class Sublist(list):
         return [self.index(x) for x in pattern if x in self]
 
 
-class Handler:
+class Handler(object):
     """
     Class to handle file and folder operations
     """
@@ -51,6 +53,8 @@ class Handler:
         except TypeError:
             self.dirname = dirname
 
+        self.sep = os.path.sep
+
     def __repr__(self):
         if self.filename is not None:
             return '<Handler for {}>'.format(self.filename)
@@ -59,7 +63,7 @@ class Handler:
         elif self.basename is not None:
             return '<Handler for {}>'.format(self.basename)
         else:
-            return '<Handler ______>'
+            return '<Handler {s}____{s}>'.format(s=self.sep)
 
     def dir_create(self):
         """
@@ -120,6 +124,26 @@ class Handler:
                 # print('Unable to delete, using: ' + filename)
                 counter = counter + 1
         return self.filename
+
+    def file_exists(self):
+        """
+        Check file existence
+        :return: Bool
+        """
+        return os.path.isfile(self.filename)
+
+    def dir_exists(self):
+        """
+        Check folder existence
+        :return: Bool
+        """
+        return os.path.isdir(self.dirname)
+
+    def file_delete(self):
+        """
+        Delete a file
+        """
+        os.remove(self.filename)
 
     def read_csv_as_array(self):
         """
@@ -302,3 +326,66 @@ class Opt:
         print('')
 
 
+class FTPHandler(Handler):
+    """Class to handle all remote IO for a ftp connection"""
+    def __init__(self,
+                 filename=None,
+                 basename=None,
+                 dirname=None,
+                 ftpserv=None,
+                 ftpuser=None,
+                 ftppath=None,
+                 ftppasswd=None,
+                 ftpfilepath=None):
+        super(FTPHandler, self).__init__(filename,
+                                         basename,
+                                         dirname)
+        self.ftpserv = ftpserv
+        self.ftppath = ftppath
+        self.ftpuser = ftpuser
+        self.ftppasswd = ftppasswd
+        self.ftpfilepath = ftpfilepath
+        self.conn = None
+
+    def __repr__(self):
+        if self.ftpserv is not None:
+            return '<Handler for remote ftp {}>'.format(self.ftpserv)
+        else:
+            return '<Handler for remote ftp ____>'
+
+    def initialize(self):
+        """Handle for ftp connections"""
+        # define ftp
+        ftp = ftplib.FTP(self.ftpserv)
+
+        # login
+        if self.ftpuser is not None:
+            if self.ftppasswd is not None:
+                ftp.login(user=self.ftpuser, passwd=self.ftppasswd)
+            else:
+                ftp.login(user=self.ftpuser)
+        else:
+            ftp.login()
+
+        # get ftp connection object
+        self.conn = ftp
+
+    def ftp_getfiles(self):
+        """Find all files with a pattern"""
+
+        # connection
+        ftp = self.conn
+
+        # get file(s) and write to disk
+        if isinstance(self.ftpfilepath, list):
+            for i in range(0, len(self.ftpfilepath)):
+                with open(self.filename[i], 'wb') as f:
+                    ftp.retrbinary("RETR {0}".format(self.ftpfilepath[i]), f.write)
+        else:
+            with open(self.filename, 'wb') as f:
+                ftp.retrbinary("RETR {0}".format(self.ftpfilepath), f.write)
+
+    def ftp_close(self):
+        """close connection"""
+
+        self.conn.close()

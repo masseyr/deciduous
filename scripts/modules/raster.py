@@ -1,4 +1,3 @@
-import os
 import numpy as np
 from common import *
 from osgeo import gdal, gdal_array, ogr, osr
@@ -36,9 +35,10 @@ class Raster:
 
     def __repr__(self):
         if self.shape is not None:
-            return "<raster {ras} of size {bands}x{rows}x{cols}>".format(ras=os.path.basename(self.name),
+            return "<raster {ras} of size {bands}x{rows}x{cols}>".format(ras=Handler(self.name).basename,
                                                                          bands=self.shape[0],
-                                                                         rows=self.shape[1], cols=self.shape[2])
+                                                                         rows=self.shape[1],
+                                                                         cols=self.shape[2])
         else:
             return "<raster with path {ras}>".format(ras=self.name,)
 
@@ -99,7 +99,7 @@ class Raster:
         :return raster object
         """
 
-        if os.path.isfile(raster_name):
+        if Handler(raster_name).file_exists():
 
             # open file
             fileptr = gdal.Open(raster_name)
@@ -197,7 +197,7 @@ class Raster:
         check the tile for empty bands, return true if one exists
         :return: bool
         """
-        if os.path.isfile(self.name):
+        if Handler(self.name).file_exists():
             fileptr = gdal.Open(self.name)
 
             filearr = fileptr.ReadAsArray()
@@ -241,7 +241,7 @@ class Raster:
                 crs_string = metadict['projection']
 
                 # file name without extension (e.g. .tif)
-                out_file_basename = os.path.basename(in_file).split('.')[0]
+                out_file_basename = Handler(in_file).basename.split('.')[0]
 
                 # open file
                 in_file_ptr = gdal.Open(in_file)
@@ -260,7 +260,7 @@ class Raster:
                                 tile_size_y = rows - j + 1
 
                             # name of the output tile
-                            out_file_name = str(out_path) + os.path.sep + str(out_file_basename) + \
+                            out_file_name = str(out_path) + Handler().sep + str(out_file_basename) + \
                                             "_" + str(i + 1) + "_" + str(j + 1) + ".tif"
 
                             # check if file already exists
@@ -299,8 +299,8 @@ class Raster:
                             # check for empty tiles
                             out_raster = Raster(out_file_name)
                             if out_raster.chk_for_empty_tiles:
-                                print('Removing empty raster file: ' + os.path.basename(out_file_name))
-                                os.remove(out_file_name)
+                                print('Removing empty raster file: ' + Handler(out_file_name).basename)
+                                Handler(out_file_name).file_delete()
                                 print('')
 
                             # unassign
@@ -319,7 +319,7 @@ class Raster:
         Function to get all the spatial metadata associated with a geotiff raster
         """
 
-        if os.path.isfile(file_name):
+        if Handler(file_name).file_exists():
             # open raster
             img_pointer = gdal.Open(file_name)
 
@@ -338,7 +338,7 @@ class Raster:
                          'rows': img_pointer.RasterYSize,  # rows from raster pointer
                          'bands': img_pointer.RasterCount,  # bands from raster pointer
                          'projection': img_pointer.GetProjection(),  # projection information from pointer
-                         'name': os.path.basename(file_name)}  # file basename
+                         'name': Handler(file_name).basename}  # file basename
 
             # remove pointer
             img_pointer = None

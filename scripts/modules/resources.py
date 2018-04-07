@@ -2,6 +2,11 @@ import os
 import fnmatch
 import pandas as pd
 
+"""
+This module houses functions specific to the data used
+"""
+
+
 
 # dictionary for a use case
 bname_dict = {
@@ -30,6 +35,24 @@ bname_dict = {
     'ND57_2': 'ND57_Period3',
     'NMDI_2': 'NMDI_Period3',
 }
+
+
+# Tree cover files ftp server name
+TCserver = 'ftp.glcf.umd.edu'
+
+
+# Tree cover files ftp file path
+def get_TCdata_filepath(path, row, year):
+    return {
+               'filestr': "/glcf/LandsatTreecover/WRS2/p{p}/r{r}/p{p}r{r}_TC_2010/p{p}r{r}_TC_{y}.tif.gz".format(
+                p=str(path).zfill(3),
+                r=str(row).zfill(3),
+                y=str(year).zfill(3)),
+               'errfilestr': "/glcf/LandsatTreecover/WRS2/p{p}/r{r}/p{p}r{r}_TC_2010/p{p}r{r}_TC_{y}_err.tif.gz".format(
+                p=str(path).zfill(3),
+                r=str(row).zfill(3),
+                y=str(year).zfill(3))
+            }
 
 
 def get_rfpickle_info(infile):

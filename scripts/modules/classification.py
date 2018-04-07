@@ -1,17 +1,17 @@
-from common import *
-from raster import Raster
-
-import os
 import pickle
 import numpy as np
 from math import sqrt
 from osgeo import gdal
+from common import *
+from raster import Raster
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 
 
 class Classifier:
     """Classifier object to be used with scikit-learn Random Forest regressor"""
+
+    __sep = Handler().sep
 
     def __init__(self,
                  trees=10,
@@ -134,18 +134,23 @@ class Classifier:
         :param outdir: output folder
         :returns: classification as raster object
         """
+
+        # file handler object
+        handler = Handler(raster_obj.name)
+        sep = handler.sep
+
         # resolving output name
         if outdir is None:
             if outfile is None:
-                outfile = os.path.dirname(raster_obj.name) + os.path.sep + \
-                          '.'.join(os.path.basename(raster_obj.name).split('.')[0:-1]) + '_classif.' + \
-                          os.path.basename(raster_obj.name).split('.')[-1]
+                outfile = handler.dirname + sep + \
+                          '.'.join(handler.basename.split('.')[0:-1]) + '_classif.' + \
+                          handler.basename.split('.')[-1]
         elif outfile is None:
-            outfile = outdir + os.path.sep + \
-                      '.'.join(os.path.basename(raster_obj.name).split('.')[0:-1]) + '_classif.' + \
-                      os.path.basename(raster_obj.name).split('.')[-1]
+            outfile = outdir + sep + \
+                      '.'.join(handler.basename.split('.')[0:-1]) + '_classif.' + \
+                      handler.basename.split('.')[-1]
         else:
-            outfile = outdir + os.path.sep + os.path.basename(outfile)
+            outfile = outdir + sep + Handler(basename=outfile).basename
 
         # initialize raster object
         out_ras = Raster(outfile)
@@ -241,18 +246,23 @@ class Classifier:
         :param sd: (bool) flag for standard deviation
         :returns: classification as raster object
         """
+
+        # file handler object
+        handler = Handler(raster_obj.name)
+        sep = handler.sep
+
         # resolving output name
         if outdir is None:
             if outfile is None:
-                outfile = os.path.dirname(raster_obj.name) + os.path.sep + \
-                          '.'.join(os.path.basename(raster_obj.name).split('.')[0:-1]) + '_var.' + \
-                          os.path.basename(raster_obj.name).split('.')[-1]
+                outfile = handler.dirname + sep + \
+                          '.'.join(handler.basename.split('.')[0:-1]) + '_var.' + \
+                          handler.basename.split('.')[-1]
         elif outfile is None:
-            outfile = outdir + os.path.sep + \
-                      '.'.join(os.path.basename(raster_obj.name).split('.')[0:-1]) + '_var.' + \
-                      os.path.basename(raster_obj.name).split('.')[-1]
+            outfile = outdir + sep + \
+                      '.'.join(handler.basename.split('.')[0:-1]) + '_var.' + \
+                      handler.basename.split('.')[-1]
         else:
-            outfile = outdir + os.path.sep + os.path.basename(outfile)
+            outfile = outdir + sep + Handler(outfile).basename
 
         out_ras = Raster(outfile)
 
@@ -454,7 +464,7 @@ class Samples:
         :return: Samples class representation
         """
         if self.csv_file is not None:
-            return "<Samples object from {cf} with {n} samples>".format(cf=os.path.basename(self.csv_file),
+            return "<Samples object from {cf} with {n} samples>".format(cf=Handler(self.csv_file).basename,
                                                                         n=len(self.x))
         elif self.csv_file is None and self.x is not None:
             return "<Samples object with {n} samples>".format(n=len(self.x))

@@ -11,6 +11,8 @@ if __name__ == '__main__':
     # import folder name containing all the rasters, and the shapefile to output
     script, rasterfiledir, boundaryfile, tiledir, outshpfile = argv
 
+    sep = Handler().sep
+
     print('------------------------------------------')
     print('Running ' + script)
     print('------------------------------------------')
@@ -61,7 +63,7 @@ if __name__ == '__main__':
 
         # get meta data from the first raster and make feature geojson
         raster_obj2 = Raster(filename)
-        raster_metaDict = raster_obj2.get_raster_metadict()
+        raster_metaDict = Raster.get_raster_metadict(filename)
         raster_feat_geojson = raster_obj2.make_polygon_geojson_feature()
 
         print('Adding feature ' + str(i + 1) + ' : ' + raster_metaDict["name"])

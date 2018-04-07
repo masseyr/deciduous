@@ -1,3 +1,4 @@
+import numpy as np
 from modules import *
 from sys import argv
 
