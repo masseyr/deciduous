@@ -353,7 +353,7 @@ class FTPHandler(Handler):
         else:
             return '<Handler for remote ftp ____>'
 
-    def initialize(self):
+    def connect(self):
         """Handle for ftp connections"""
         # define ftp
         ftp = ftplib.FTP(self.ftpserv)
@@ -370,8 +370,12 @@ class FTPHandler(Handler):
         # get ftp connection object
         self.conn = ftp
 
-    def ftp_getfiles(self):
-        """Find all files with a pattern"""
+    def disconnect(self):
+        """close connection"""
+        self.conn.close()
+
+    def getfiles(self):
+        """Copy all files from FTP that are in a list"""
 
         # connection
         ftp = self.conn
@@ -385,7 +389,3 @@ class FTPHandler(Handler):
             with open(self.filename, 'wb') as f:
                 ftp.retrbinary("RETR {0}".format(self.ftpfilepath), f.write)
 
-    def ftp_close(self):
-        """close connection"""
-
-        self.conn.close()
