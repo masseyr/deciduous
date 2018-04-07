@@ -305,12 +305,14 @@ class Classifier:
 
     def calc_arr(self,
                  arr,
-                 ntile_max=8,
+                 ntile_max=9,
                  tile_size=128,
                  output='pred'):
         """
-        Calculate random forest tree variance. Tiling is necessary in this step because
-        large numpy arrays can cause memory issues during creation.
+        Calculate random forest model prediction, variance, or standard deviation.
+        Variance or standard deviation is calculated across all trees.
+        Tiling is necessary in this step because large numpy arrays can cause
+        memory issues during creation.
 
         :param arr: input image reshaped to 2d array (axis 0: all pixels, axis 1: all bands)
         :param ntile_max: Maximum number of tiles up to which the
