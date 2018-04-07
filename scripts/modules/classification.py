@@ -208,9 +208,13 @@ class Classifier:
         # r-squared of predicted versus actual
         rsq = r2_score(dataarray['labels'], y)
 
-        # write to file
+        # if either one of outfile or pickle file are available
+        # then raise error
         if (outfile is not None) != (picklefile is not None):
             raise ValueError("Missing outfile or picklefile")
+
+        # if outfile and pickle file are both available
+        # then write to file and proceed to return
         elif outfile is not None:
             # write y, y_hat_bar, var_y to file (<- rows in this order)
             out_list = ['obs_y,' + ', '.join([str(elem) for elem in dataarray['labels']]),
@@ -223,6 +227,8 @@ class Classifier:
             # write the list to file
             Handler(filename=outfile).write_list_to_file(out_list)
 
+        # if outfile and pickle file are not provided,
+        # then only return values
         return {
             'var_y': var_y,
             'mean_y': y,

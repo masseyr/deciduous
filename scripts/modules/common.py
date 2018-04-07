@@ -258,9 +258,14 @@ class Handler(object):
         Write numpy array to file
         :param np_array: Numpy 2d array to be written to file
         """
-        colnames = list(np_array.dtype.names)
-        np.savetxt(self.filename, np_array, delimiter=",", fmt='%3.9f',
-                   header=','.join(colnames), comments='')
+
+        if np_array.dtype.names is not None:
+            colnames = list(np_array.dtype.names)
+            np.savetxt(self.filename, np_array, delimiter=",", fmt='%3.9f',
+                       header=','.join(colnames), comments='')
+        else:
+            np.savetxt(self.filename, np_array, delimiter=",", fmt='%3.9f',
+                       comments='')
 
     def read_from_csv(self):
         """

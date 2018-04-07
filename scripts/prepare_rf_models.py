@@ -11,6 +11,8 @@ by classifying held-out samples using the RF model.
 # main program
 if __name__ == '__main__':
 
+    sep = Handler().sep
+
     # read file names from commandline arguments: (in order)
     # training samples,
     # held out samples,
@@ -35,19 +37,19 @@ if __name__ == '__main__':
     print(rf_model)
 
     # save RF classifier using pickle
-    picklefile = pickledir + os.path.sep + os.path.basename(infile).split('.')[0] + '.pickle'
+    picklefile = pickledir + sep + Handler(infile).basename.split('.')[0] + '.pickle'
     rf_model.pickle_it(picklefile)
 
     # predict using held out samples and print to file
-    outfile1 = os.path.dirname(outfile) + os.path.sep + \
-        'val' + os.path.sep + 'val_samp_' + os.path.basename(outfile)
+    outfile1 = Handler(outfile).dirname + sep + \
+        'val' + sep + 'val_samp_' + Handler(outfile).basename
     outfile1 = Handler(filename=outfile1).file_remove_check()
     pred = rf_model.tree_predictions(trn_Csamp.format_data(), outfile=outfile1, picklefile=picklefile)
     print(pred)
 
     # check training samples for fit
-    outfile2 = os.path.dirname(outfile) + os.path.sep + \
-        'trn' + os.path.sep + 'trn_samp_' + os.path.basename(outfile)
+    outfile2 = Handler(outfile).dirname + sep + \
+        'trn' + sep + 'trn_samp_' + Handler(outfile).basename
     outfile2 = Handler(filename=outfile2).file_remove_check()
     pred3 = rf_model.tree_predictions(trn_samp.format_data(), outfile=outfile2, picklefile=picklefile)
     print(pred3)
@@ -57,8 +59,8 @@ if __name__ == '__main__':
     print(trn_Csamp)
 
     # check all samples for fit
-    outfile3 = os.path.dirname(outfile) + os.path.sep + \
-        'all' + os.path.sep + 'all_samp_' + os.path.basename(outfile)
+    outfile3 = Handler(outfile).dirname + sep + \
+        'all' + sep + 'all_samp_' + Handler(outfile).basename
     outfile3 = Handler(filename=outfile3).file_remove_check()
     pred3 = rf_model.tree_predictions(trn_Csamp.format_data(), outfile=outfile3, picklefile=picklefile)
     print(pred3)
