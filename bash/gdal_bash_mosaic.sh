@@ -14,8 +14,9 @@ date
 echo 'Begin!~~~~~~~~~~'
 datadir='/scratch/rm885/gdrive/sync/decid/alaska_data/uncert_uncomp/'
 
+# list of input files
 files=(${datadir}*.tif)
-echo files
+echo ${files[*]}
 
 mosaic=$datadir'uncert_mosaic.tif'
 compmosaic=$datadir'uncert_mosaic_vis.tif'
@@ -29,12 +30,19 @@ echo 'Compressed mosaic: '$compmosaic
 echo '********************************************************************************************'
 
 # make mosaic
+# spatial resolution: 30m
+# data type: Byte
+# background value: 0
+# file format: Geotiff
 gdal_merge.py -init 0 -o $mosaic -of GTiff -ps 30 30 -ot Byte ${files[*]}
 
 # compress large tif file using LZW compression
+# use BIGTIFF=YES for large files
 gdal_translate -of GTiff -co COMPRESS=LZW -co BIGTIFF=YES $mosaic $compmosaic
 
 # make overview (pyramid) file: gdaladdo -> gdal add overview
+# this is useful if at any point ArcGIS is going to be used with this data
+# this makes pyramids and will save that step with ArcGIS
 gdaladdo -ro $compmosaic 2 4 8 16 32 64 128 256 --config COMPRESS_OVERVIEW LZW
 
 echo '********************************************************************************************'
