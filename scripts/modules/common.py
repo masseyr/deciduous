@@ -253,7 +253,8 @@ class Handler(object):
         self.write_list_to_file(script_list)
 
     def write_numpy_array_to_file(self,
-                                  np_array):
+                                  np_array,
+                                  headers=None):
         """
         Write numpy array to file
         :param np_array: Numpy 2d array to be written to file

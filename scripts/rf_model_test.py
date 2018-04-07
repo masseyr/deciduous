@@ -38,14 +38,15 @@ if __name__ == '__main__':
     split_max = 100
 
     # define trees and split ranges
-    trees = range(trees_min, trees_max)
-    split = range(split_min, split_max)
+    trees = range(trees_min, trees_max + 1)
+    split = range(split_min, split_max + 1)
 
     # 3d output array where array
     # 0 is rsq; 1 is rmse
     result = np.zeros((2, trees_max, split_max), dtype=float)
     result[1, :, :] = 1.0
 
+    # iterate through all parameters
     for i in trees:
         for j in split:
 
@@ -56,14 +57,14 @@ if __name__ == '__main__':
 
             # fit RF classifier using training data
             rf_model.fit_data(trn_samp.format_data())
-            print(rf_model)
+            # print(rf_model)
 
             # get prediction from the RF model
             pred = rf_model.tree_predictions(trn_Csamp.format_data())
 
             # predict and store result in array
-            result[0, i, j] = pred['rsq']
-            result[1, i, j] = pred['rmse']
+            result[0, i - 1, j - 1] = pred['rsq']
+            result[1, i - 1, j - 1] = pred['rmse']
 
     # unassign
     rf_model = None
