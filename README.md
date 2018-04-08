@@ -21,6 +21,6 @@ SLURM: 17.11.3-2
 
 # Resources
 
-Northern Arizona University's Computing cluster Monsoon
+Northern Arizona University's computing cluster Monsoon
 
 Google Earth Engine
