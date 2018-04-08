@@ -19,3 +19,8 @@ Bash: CentOS release 6.9 (Final) - Kernel: 2.6.32-696.18.7.el6.x86_64
 SLURM: 17.11.3-2
 
 
+# Resources
+
+Northern Arizona University's Computing cluster Monsoon
+
+Google Earth Engine
