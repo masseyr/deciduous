@@ -51,12 +51,12 @@ class Handler(object):
 
         try:
             self.basename = os.path.basename(filename)
-        except TypeError:
+        except:
             self.basename = basename
 
         try:
             self.dirname = os.path.dirname(filename)
-        except TypeError:
+        except:
             self.dirname = dirname
 
         self.sep = os.path.sep

@@ -12,10 +12,11 @@ __all__ = ['Classifier',
            'Samples']
 
 
+sep = Handler().sep
+
+
 class Classifier:
     """Classifier object to be used with scikit-learn Random Forest regressor"""
-
-    __sep = Handler().sep
 
     def __init__(self,
                  trees=10,
@@ -141,7 +142,6 @@ class Classifier:
 
         # file handler object
         handler = Handler(raster_obj.name)
-        sep = handler.sep
 
         # resolving output name
         if outdir is None:
@@ -259,7 +259,6 @@ class Classifier:
 
         # file handler object
         handler = Handler(raster_obj.name)
-        sep = handler.sep
 
         # resolving output name
         if outdir is None:
