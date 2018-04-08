@@ -33,9 +33,9 @@ if __name__ == '__main__':
 
     # define min max values
     trees_min = 10
-    trees_max = 1000
+    trees_max = 13
     split_min = 2
-    split_max = 100
+    split_max = 14
 
     # define trees and split ranges
     trees = range(trees_min, trees_max + 1)

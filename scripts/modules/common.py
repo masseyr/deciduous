@@ -4,7 +4,6 @@ import pandas as pd
 import datetime
 import fnmatch
 import psutil
-import urllib
 import ftplib
 
 np.set_printoptions(suppress=True)
@@ -301,14 +300,14 @@ class Handler(object):
 
 class Opt:
     """
-    Class to handle memory operations
+    Class to handle notices
     """
 
     @staticmethod
     def print_memory_usage():
         """
         Function to print memory usage of the python process
-        :return print to console
+        :return print to console/output
         """
         process = psutil.Process(os.getpid())
         mem = process.memory_info().rss
@@ -334,6 +333,18 @@ class Opt:
         print('')
         print('*******************************************')
         print(print_str)
+        print('*******************************************')
+        print('')
+
+    @staticmethod
+    def time_now():
+        """
+        Prints current time
+        :return: print to console/output
+        """
+        print('')
+        print('*******************************************')
+        print('CURRENT TIME: ' + str(datetime.datetime.now()))
         print('*******************************************')
         print('')
 
