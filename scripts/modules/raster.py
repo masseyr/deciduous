@@ -53,7 +53,7 @@ class Raster:
         """
         if outfile is None:
             outfile = self.name
-            outfile = Handler(filename=outfile).file_rename_check()
+            outfile = Handler(filename=outfile).file_remove_check()
 
         print('')
         print('Writing ' + outfile)
@@ -290,8 +290,6 @@ class Raster:
 
                             # set spatial reference and projection parameters
                             out_file_ptr.SetGeoTransform(new_transform)
-                            srs = osr.SpatialReference()
-                            srs.ImportFromWkt(crs_string)
                             out_file_ptr.SetProjection(crs_string)
 
                             # delete pointers
