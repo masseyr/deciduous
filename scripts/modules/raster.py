@@ -13,7 +13,7 @@ __all__ = ['Raster']
 
 class Raster:
     """
-    Raster class to read and write raster from/to files and numpy arrays
+    Class to read and write rasters from/to files and numpy arrays
     """
 
     def __init__(self,

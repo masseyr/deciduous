@@ -1,6 +1,10 @@
 import os
 import fnmatch
+import json
+import numpy as np
+from shapely.geometry import Polygon, mapping
 import pandas as pd
+from osgeo import ogr
 
 """
 This module houses functions specific to the data used
@@ -10,7 +14,8 @@ __all__ = ['bname_dict',
            'get_rfpickle_info',
            'get_TCdata_filepath',
            'TCserver',
-           'read_y_param_from_summary']
+           'read_y_param_from_summary',
+           'find_intersecting_tiles']
 
 
 # dictionary for a use case
@@ -48,6 +53,13 @@ TCserver = 'ftp.glcf.umd.edu'
 
 # Tree cover files ftp file path
 def get_TCdata_filepath(path, row, year):
+    """
+    Tree cover files ftp file path dictionary
+    :param path: WRS2 path
+    :param row: WRS2 row
+    :param year: Year
+    :return: Dictionary
+    """
     return {
                'filestr': "/glcf/LandsatTreecover/WRS2/p{p}/r{r}/p{p}r{r}_TC_2010/p{p}r{r}_TC_{y}.tif.gz".format(
                 p=str(path).zfill(3),
@@ -106,3 +118,91 @@ def read_y_param_from_summary(csv_file):
             'r_sq': r_sq,
             'rf_file': rf_file
             }
+
+
+def _eucl_dist(x1, x2, y1, y2):
+    """Euclidean distance between (x1,y1) and (x2,y2)"""
+    return np.sqrt(np.square(x1-x2)+np.square(y1-y2))
+
+
+def find_intersecting_tiles(infile, wrs2file):
+    """
+    Find intersecting Landsat tiles using wrs2 system
+    :param infile: input polygon(s) file
+    :param wrs2file: wrs2 file
+    :return: list of path and row
+    """
+    # open input shapefile
+    inshpfile = ogr.Open(infile)
+    inshape = inshpfile.GetLayer(0)
+    ptlist = [[]]
+
+    # get list of all points in the input shapefile
+    for i in range(0, inshape.GetFeatureCount()):
+        feature = inshape.GetFeature(i)
+        ptlist.extend(json.loads(feature.ExportToJson())['geometry']['coordinates'][0][0:-1])
+
+    # find limits of the points in the input shapefile
+    leftlim = min([pt[0] for pt in ptlist[1:]])
+    rightlim = max([pt[0] for pt in ptlist[1:]])
+    lowlim = min([pt[1] for pt in ptlist[1:]])
+    uplim = max([pt[1] for pt in ptlist[1:]])
+
+    # find the bounding box of the shapefile
+    boundbox = Polygon([[leftlim, lowlim], [leftlim, uplim], [rightlim, uplim], [rightlim, lowlim]])
+
+    # get all the corners of the bounding box
+    boundboxptlist = [list(elem) for elem in list(mapping(boundbox)['coordinates'])][0]
+
+    # controid of bounding box
+    centroid = [boundbox.centroid.x, boundbox.centroid.y]
+
+    # centroid to vertex distance
+    vertxdistlist = [_eucl_dist(boundboxpt[0], centroid[0], boundboxpt[1], centroid[1]) for boundboxpt in boundboxptlist]
+
+    # add buffer
+    buf = 0.05 * max(vertxdistlist)
+
+    # buffered bounding box; this reduces the number of tiles
+    #  the input polygon(s) will be compared to
+    boundbox = Polygon([[leftlim - buf, lowlim - buf],
+                        [leftlim - buf, uplim + buf],
+                        [rightlim + buf, uplim + buf],
+                        [rightlim + buf, lowlim - buf]])
+
+    # open wrs2 shapefile
+    wrsshpfile = ogr.Open(wrs2file)
+    wrsshape = wrsshpfile.GetLayer(0)
+    featlist = [[]]
+
+    # get all features
+    for i in range(wrsshape.GetFeatureCount()):
+        feature = wrsshape.GetFeature(i)
+        featlist.append(feature)
+
+    # list of Landsat footprints from wrs2file
+    LSpolylist = [Polygon(json.loads(feature.ExportToJson())['geometry']['coordinates'][0][0:-1]) for feature in
+                  featlist[1:]]
+
+    # list of landsat path and row
+    LSpathrow = [[json.loads(feature.ExportToJson())['properties']['PATH'],
+                  json.loads(feature.ExportToJson())['properties']['ROW']] for feature in featlist[1:]]
+
+    # find the footprints that intersect with budffered bounding box
+    LSftprnt_indx = [indx for indx, LSftprnt in enumerate(LSpolylist) if LSftprnt.intersects(boundbox)]
+
+    # inside the bounding box, find the foot prints that intersect with polygon
+    indx = list()  # initialize indx
+    for i in range(0, inshape.GetFeatureCount()):  # iterate over features
+        feature = inshape.GetFeature(i)
+        for j, LSscene in enumerate([LSpolylist[i] for i in LSftprnt_indx]):  # iterate over wrs2 tiles
+            if Polygon(json.loads(feature.ExportToJson())['geometry']['coordinates'][0][0:-1]).intersects(LSscene):
+                indx.extend(j)  # add to index if intersects
+
+    # find unique indices
+    indx = [LSftprnt_indx[i] for i in np.unique(indx)]
+
+    # find LS path row
+    path_row = [LSpathrow[i] for i in indx]
+
+    return path_row
