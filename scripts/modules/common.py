@@ -21,12 +21,47 @@ class Sublist(list):
     """
     @staticmethod
     def list_size(query_list):
-        """Find size of a list object"""
+        """Find size of a list object even if it is a one element non-list"""
 
         if isinstance(query_list, list):
             return len(query_list)
         else:
             return 1
+
+    @staticmethod
+    def custom_list(start, end, step=None):
+        """
+        List with custom first number but rest all follow same increment; integers only
+        :param start: starting integer
+        :param end: ending integer
+        :param step: step integer
+        :return: list of integers
+        """
+
+        # end of list
+        end = end + step - (end % step)
+
+        # initialize the list
+        out = list()
+
+        # make iterator
+        if step is not None:
+            if start % step > 0:
+                out.append(start)
+                if start < step:
+                    start = step
+                elif start > step:
+                    start = start + step - (start % step)
+            iterator = range(start, end, step)
+        else:
+            step = 1
+            iterator = range(start, step, end)
+
+        # add the rest of the list to out
+        for i in iterator:
+            out.append(i)
+
+        return out
 
     def sublistfinder(self, pattern):
         """
@@ -167,11 +202,39 @@ class Handler(object):
         return [x.strip() for x in content]
 
     def write_list_to_file(self,
-                           input_list):
+                           input_list,
+                           rownames=None,
+                           colnames=None,
+                           delim=", "):
         """
         Function to write list to file
         with each list item as one line
+        :param input_list: input text list
+        :param rownames: list of row names strings
+        :param colnames: list of column name strings
+        :param delim: delimiter (default: ", ")
+        :return: write to file
         """
+        print('inp list:')
+        print(input_list)
+        print(colnames)
+        print(rownames)
+
+        # add rownames and colnames
+        if rownames is not None and colnames is not None:
+            input_list = [str(rownames[i]) + delim + input_list[i] for i in range(0, len(input_list))]
+            header = delim + ", ".join([str(elem) for elem in colnames])
+            input_list = [header] + input_list
+        if rownames is None and colnames is not None:
+            header = ", ".join([str(elem) for elem in colnames])
+            input_list = [header] + input_list
+        if rownames is not None and colnames is None:
+            input_list = [rownames[i] + delim + input_list[i] for i in range(0, len(input_list))]
+
+        print('inp list:')
+        print(input_list)
+        print(colnames)
+        print(rownames)
 
         # create dir path if it does not exist
         self.dir_create()
@@ -253,19 +316,31 @@ class Handler(object):
 
     def write_numpy_array_to_file(self,
                                   np_array,
-                                  headers=None):
+                                  colnames=None,
+                                  rownames=None,
+                                  delim=", "):
         """
         Write numpy array to file
         :param np_array: Numpy 2d array to be written to file
+        :param colnames: list of column name strings
+        :param rownames: list of row name strings
+        :param delim: Delimiter (default: ", ")
         """
 
+        # format numpy 2d array as list of strings, each string is a line to be written
+        inp_list = [delim.join(["{:{w}.{p}f}".format(np_array[i, j], w=4, p=9)
+                                for j in range(0, np_array.shape[1])])
+                    for i in range(0, np_array.shape[0])]
+
+        # if column names are available from numpy array, this overrides input colnames
         if np_array.dtype.names is not None:
             colnames = list(np_array.dtype.names)
-            np.savetxt(self.filename, np_array, delimiter=",", fmt='%3.9f',
-                       header=','.join(colnames), comments='')
-        else:
-            np.savetxt(self.filename, np_array, delimiter=",", fmt='%3.9f',
-                       comments='')
+
+        # write to file
+        self.write_list_to_file(inp_list,
+                                rownames=rownames,
+                                colnames=colnames,
+                                delim=delim)
 
     def read_from_csv(self):
         """
