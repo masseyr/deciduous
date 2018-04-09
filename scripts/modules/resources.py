@@ -52,11 +52,11 @@ def get_TCdata_filepath(path, row, year):
                'filestr': "/glcf/LandsatTreecover/WRS2/p{p}/r{r}/p{p}r{r}_TC_2010/p{p}r{r}_TC_{y}.tif.gz".format(
                 p=str(path).zfill(3),
                 r=str(row).zfill(3),
-                y=str(year).zfill(3)),
+                y=str(year).zfill(4)),
                'errfilestr': "/glcf/LandsatTreecover/WRS2/p{p}/r{r}/p{p}r{r}_TC_2010/p{p}r{r}_TC_{y}_err.tif.gz".format(
                 p=str(path).zfill(3),
                 r=str(row).zfill(3),
-                y=str(year).zfill(3))
+                y=str(year).zfill(4))
             }
 
 

@@ -10,7 +10,7 @@ This work is part of NASA Carbon Cycle and Ecosystems Science. For more details 
 For more updates on the ABoVE project please visit: https://above.nasa.gov
 
 
-# Tool versions
+# Tools
 
 Python: 2.7.14 Anaconda
 
@@ -23,4 +23,4 @@ SLURM: 17.11.3-2
 
 Northern Arizona University's computing cluster Monsoon
 
-Google Earth Engine
+
