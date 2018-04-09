@@ -1,6 +1,7 @@
 from modules import *
 import numpy as np
 from sys import argv
+import os
 
 """
 This script tests multiple RF models for different parameters:
@@ -23,90 +24,93 @@ if __name__ == '__main__':
     outfile_rsq = outdir + sep + outfile_str + "_rsq.csv"
     outfile_rmse = outdir + sep + outfile_str + "_rmse.csv"
 
-    # prepare training samples
-    trn_samp = Samples(csv_file=infile,
-                       label_colname='Decid_AVG')
+    if (not os.path.isfile(outfile_rmse)) or (not os.path.isfile(outfile_rsq)):
 
-    print(trn_samp)
+        # prepare training samples
+        trn_samp = Samples(csv_file=infile,
+                           label_colname='Decid_AVG')
 
-    # prepare held out samples
-    trn_Csamp = Samples(csv_file=inCfile,
-                        label_colname='Decid_AVG')
+        print(trn_samp)
 
-    print(trn_Csamp)
+        # prepare held out samples
+        trn_Csamp = Samples(csv_file=inCfile,
+                            label_colname='Decid_AVG')
 
-    # define tree test list
-    trees_min = 10
-    trees_max = 1000
-    tree_step = 10
+        print(trn_Csamp)
 
-    # define split test list
-    split_min = 2
-    split_max = 100
-    split_step = 5
+        # define tree test list
+        trees_min = 10
+        trees_max = 1000
+        tree_step = 10
 
-    # define trees (rows)
-    trees = Sublist.custom_list(trees_min,
-                                trees_max,
-                                tree_step)
+        # define split test list
+        split_min = 2
+        split_max = 100
+        split_step = 5
 
-    rownames = [str(i) for i in trees]
+        # define trees (rows)
+        trees = Sublist.custom_list(trees_min,
+                                    trees_max,
+                                    tree_step)
 
-    # define splits (columns)
-    split = Sublist.custom_list(split_min,
-                                split_max,
-                                split_step)
+        rownames = [str(i) for i in trees]
 
-    colnames = [str(i) for i in split]
+        # define splits (columns)
+        split = Sublist.custom_list(split_min,
+                                    split_max,
+                                    split_step)
 
-    # 3d output array where array
-    # 0 is rsq; 1 is rmse
-    result = np.zeros((2,
-                       len(trees),
-                       len(split)),
-                      dtype=float)
+        colnames = [str(i) for i in split]
 
-    result[1, :, :] = 1.0
+        # 3d output array where array
+        # 0 is rsq; 1 is rmse
+        result = np.zeros((2,
+                           len(trees),
+                           len(split)),
+                          dtype=float)
 
-    # iterate through all parameters
-    for i in range(0, len(trees)):
-        for j in range(0, len(split)):
+        result[1, :, :] = 1.0
 
-            print('Making RF model with {} trees and {} sample splits'.format(str(i), str(j)))
+        # iterate through all parameters
+        for i in range(0, len(trees)):
+            for j in range(0, len(split)):
 
-            # initialize RF clasifier
-            rf_model = Classifier(trees=trees[i],
-                                  samp_split=split[j],
-                                  oob_score=False)
+                print('Making RF model with {} trees and {} sample splits'.format(str(trees[i]),
+                                                                                  str(split[j])))
 
-            # fit RF classifier using training data
-            rf_model.fit_data(trn_samp.format_data())
-            # print(rf_model)
+                # initialize RF clasifier
+                rf_model = Classifier(trees=trees[i],
+                                      samp_split=split[j],
+                                      oob_score=False)
 
-            # get prediction from the RF model
-            pred = rf_model.tree_predictions(trn_Csamp.format_data())
+                # fit RF classifier using training data
+                rf_model.fit_data(trn_samp.format_data())
+                # print(rf_model)
 
-            # predict and store result in array
-            result[0, i, j] = pred['rsq']
-            result[1, i, j] = pred['rmse']
+                # get prediction from the RF model
+                pred = rf_model.tree_predictions(trn_Csamp.format_data())
 
-    # unassign
-    rf_model = None
-    pred = None
+                # predict and store result in array
+                result[0, i, j] = pred['rsq']
+                result[1, i, j] = pred['rmse']
 
-    # file handlers
-    rsq_handler = Handler(filename=outfile_rsq)
-    rmse_handler = Handler(filename=outfile_rmse)
+        # unassign
+        rf_model = None
+        pred = None
 
-    print('Writing arrays to files...')
+        # file handlers
+        rsq_handler = Handler(filename=outfile_rsq)
+        rmse_handler = Handler(filename=outfile_rmse)
 
-    # write to file
-    rsq_handler.write_numpy_array_to_file(result[0, :, :],
-                                          rownames=rownames,
-                                          colnames=colnames)
+        print('Writing arrays to files...')
 
-    rmse_handler.write_numpy_array_to_file(result[1, :, :],
-                                           rownames=rownames,
-                                           colnames=colnames)
+        # write to file
+        rsq_handler.write_numpy_array_to_file(result[0, :, :],
+                                              rownames=rownames,
+                                              colnames=colnames)
+
+        rmse_handler.write_numpy_array_to_file(result[1, :, :],
+                                               rownames=rownames,
+                                               colnames=colnames)
 
     print('~Done!~')
