@@ -149,7 +149,10 @@ def find_intersecting_tiles(infile, wrs2file):
     uplim = max([pt[1] for pt in ptlist[1:]])
 
     # find the bounding box of the shapefile
-    boundbox = Polygon([[leftlim, lowlim], [leftlim, uplim], [rightlim, uplim], [rightlim, lowlim]])
+    boundbox = Polygon([[leftlim, lowlim],
+                        [leftlim, uplim],
+                        [rightlim, uplim],
+                        [rightlim, lowlim]])
 
     # get all the corners of the bounding box
     boundboxptlist = [list(elem) for elem in list(mapping(boundbox)['coordinates'])][0]
@@ -158,7 +161,8 @@ def find_intersecting_tiles(infile, wrs2file):
     centroid = [boundbox.centroid.x, boundbox.centroid.y]
 
     # centroid to vertex distance
-    vertxdistlist = [_eucl_dist(boundboxpt[0], centroid[0], boundboxpt[1], centroid[1]) for boundboxpt in boundboxptlist]
+    vertxdistlist = [_eucl_dist(boundboxpt[0], centroid[0],
+                                boundboxpt[1], centroid[1]) for boundboxpt in boundboxptlist]
 
     # add buffer
     buf = 0.05 * max(vertxdistlist)
