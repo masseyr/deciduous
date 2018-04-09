@@ -321,7 +321,7 @@ class Classifier:
 
         :param arr: input image reshaped to 2d array (axis 0: all pixels, axis 1: all bands)
         :param ntile_max: Maximum number of tiles up to which the
-                          input image is processed without tiling (default = 8).
+                          input image is processed without tiling (default = 9).
                           You can choose any (small) number that suits the available memory.
         :param tile_size: Size of each square tile (default = 128)
         :param output: which output to produce,
