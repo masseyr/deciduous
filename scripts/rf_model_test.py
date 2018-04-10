@@ -75,8 +75,8 @@ if __name__ == '__main__':
         for i in range(0, len(trees)):
             for j in range(0, len(split)):
 
-                print('Making RF model with {} trees and {} sample splits'.format(str(trees[i]),
-                                                                                  str(split[j])))
+                Opt.cprint('Making RF model with {} trees and {} sample splits'.format(str(trees[i]),
+                                                                                       str(split[j])))
 
                 # initialize RF clasifier
                 rf_model = Classifier(trees=trees[i],

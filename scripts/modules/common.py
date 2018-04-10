@@ -5,6 +5,7 @@ import datetime
 import fnmatch
 import psutil
 import ftplib
+import sys
 
 np.set_printoptions(suppress=True)
 
@@ -70,6 +71,42 @@ class Sublist(list):
         :return: list of locations of elements in mylist ordered as in pattern
         """
         return [self.index(x) for x in pattern if x in self]
+
+    def count_in_range(self, llim, ulim):
+        """
+        Find elements in a range
+        :param ulim: upper limit
+        :param llim: lower limit
+        :return: count, list
+        """
+        return len([i for i in self if llim <= i < ulim])
+
+    @staticmethod
+    def frange(start, end, step):
+        """
+        To make list from float arguments
+        :param start: start number
+        :param end: end number
+        :param step: step
+        :return: list
+        """
+        if end > start:
+            if (end-start) % step > 0.0:
+                n = long((end-start) / step) + 2
+            else:
+                n = long((end - start) / step) + 1
+
+            temp = np.zeros(n, dtype=float)
+
+            for i in range(0, n - 1):
+                temp[i] = start + i * step
+
+            temp[n - 1] = end
+
+            return list(temp)
+
+        else:
+            raise ValueError("Start value is less than end value")
 
 
 class Handler(object):
@@ -405,11 +442,11 @@ class Opt:
 
         print_str = 'MEMORY USAGE: {:{w}.{p}f}'.format(process.memory_info().rss / div, w=5, p=2) + suff
 
-        print('')
-        print('*******************************************')
-        print(print_str)
-        print('*******************************************')
-        print('')
+        Opt.cprint('')
+        Opt.cprint('*******************************************')
+        Opt.cprint(print_str)
+        Opt.cprint('*******************************************')
+        Opt.cprint('')
 
     @staticmethod
     def time_now():
@@ -417,11 +454,16 @@ class Opt:
         Prints current time
         :return: print to console/output
         """
-        print('')
-        print('*******************************************')
-        print('CURRENT TIME: ' + str(datetime.datetime.now()))
-        print('*******************************************')
-        print('')
+        Opt.cprint('')
+        Opt.cprint('*******************************************')
+        Opt.cprint('CURRENT TIME: ' + str(datetime.datetime.now()))
+        Opt.cprint('*******************************************')
+        Opt.cprint('')
+
+    @staticmethod
+    def cprint(text):
+        sys.stdout.write(str(text) + '\n')
+        sys.stdout.flush()
 
 
 class FTPHandler(Handler):
