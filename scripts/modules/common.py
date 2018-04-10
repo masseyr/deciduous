@@ -153,6 +153,14 @@ class Handler(object):
         else:
             print('Path already exists: ' + self.dirname)
 
+    def add_to_filename(self, string):
+        components = self.basename.split('.')
+        if len(components) >= 2:
+            return self.dirname + self.sep + '.'.join(components[0:-1]) + \
+                      string + '.' + components[-1]
+        else:
+            return self.basename + self.sep + components[0] + string
+
     def file_rename_check(self):
         """
         Change the file name if already exists by incrementing trailing number

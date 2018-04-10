@@ -314,10 +314,44 @@ class Raster:
                                                                                             self.shape[1],
                                                                                             self.shape[2]))
 
+    def reproject(self, crs_string):
+        """
+        Reproject a raster based on given crs_string
+        :param crs_string: WKT format spatial reference string
+        :return: output filename
+        """
+
+        # get outfile name
+        outfile = Handler(self.name).add_to_filename('_reproj')
+
+        # open file
+        fileptr = gdal.Open(self.name)
+
+        # resampling parameters
+        error_threshold = 0.125
+        resampling = gdal.GRA_NearestNeighbour
+
+        # Call AutoCreateWarpedVRT() to fetch default values for target raster dimensions and geotransform
+        tempfileptr = gdal.AutoCreateWarpedVRT(fileptr,
+                                               None,  # src_wkt
+                                               crs_string,
+                                               resampling,
+                                               error_threshold)
+
+        # Create the final warped raster
+        gtiffdriver = gdal.GetDriverByName('GTiff')
+        gtiffdriver.CreateCopy(outfile, tempfileptr)
+        tempfileptr.FlushCache()
+        tempfileptr = None
+        fileptr = None
+        return outfile
+
     @staticmethod
     def get_raster_metadict(file_name):
         """
         Function to get all the spatial metadata associated with a geotiff raster
+        :param file_name: Name of the raster file (includes full path)
+        :return: Dictionary of raster metadata
         """
 
         if Handler(file_name).file_exists():
