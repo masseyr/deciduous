@@ -1,6 +1,6 @@
 import numpy as np
 from common import *
-from osgeo import gdal, gdal_array, ogr, osr
+from osgeo import gdal, gdal_array
 np.set_printoptions(suppress=True)
 
 # Tell GDAL to throw Python exceptions, and register all drivers
@@ -315,40 +315,48 @@ class Raster:
                                                                                             self.shape[2]))
 
     @staticmethod
-    def get_raster_metadict(file_name):
+    def get_raster_metadict(file_name=None,
+                            file_ptr=None):
         """
         Function to get all the spatial metadata associated with a geotiff raster
         :param file_name: Name of the raster file (includes full path)
+        :param file_ptr: Gdal file pointer
         :return: Dictionary of raster metadata
         """
+        if file_name is not None:
+            if Handler(file_name).file_exists():
+                # open raster
+                img_pointer = gdal.Open(file_name)
+            else:
+                raise ValueError("File does not exist.")
 
-        if Handler(file_name).file_exists():
-            # open raster
-            img_pointer = gdal.Open(file_name)
+        elif file_ptr is not None:
+            img_pointer = file_ptr
 
-            # get tiepoint, pixel size, pixel rotation
-            geometadata = img_pointer.GetGeoTransform()
-
-            # make dictionary of all the metadata
-            meta_dict = {'ulx': geometadata[0],
-                         'uly': geometadata[3],
-                         'xpixel': abs(geometadata[1]),
-                         'ypixel': abs(geometadata[5]),
-                         'rotationx': geometadata[2],
-                         'rotationy': geometadata[4],
-                         'datatype': img_pointer.GetRasterBand(1).DataType,
-                         'columns': img_pointer.RasterXSize,  # columns from raster pointer
-                         'rows': img_pointer.RasterYSize,  # rows from raster pointer
-                         'bands': img_pointer.RasterCount,  # bands from raster pointer
-                         'projection': img_pointer.GetProjection(),  # projection information from pointer
-                         'name': Handler(file_name).basename}  # file basename
-
-            # remove pointer
-            img_pointer = None
-
-            return meta_dict
         else:
-            raise ValueError("File does not exist.")
+            raise ValueError("File or pointer not found")
+
+        # get tiepoint, pixel size, pixel rotation
+        geometadata = img_pointer.GetGeoTransform()
+
+        # make dictionary of all the metadata
+        meta_dict = {'ulx': geometadata[0],
+                     'uly': geometadata[3],
+                     'xpixel': abs(geometadata[1]),
+                     'ypixel': abs(geometadata[5]),
+                     'rotationx': geometadata[2],
+                     'rotationy': geometadata[4],
+                     'datatype': img_pointer.GetRasterBand(1).DataType,
+                     'columns': img_pointer.RasterXSize,  # columns from raster pointer
+                     'rows': img_pointer.RasterYSize,  # rows from raster pointer
+                     'bands': img_pointer.RasterCount,  # bands from raster pointer
+                     'projection': img_pointer.GetProjection(),  # projection information from pointer
+                     'name': Handler(file_name).basename}  # file basename
+
+        # remove pointer
+        img_pointer = None
+
+        return meta_dict
 
     def make_polygon_geojson_feature(self):
         """

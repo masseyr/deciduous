@@ -1,25 +1,22 @@
 from common import Handler, Sublist
 import numpy as np
 import pandas as pd
-from numpy.random import randn
-from scipy import stats
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn as sns
 
 plt.rcParams["patch.force_edgecolor"] = True
 plt.interactive(False)
 
-# this is under construction
-
-
+"""
 plot_dictionary = {
-    'type': None,  # plot types: histogram, surface, relative, regression
-    'data': None,  # list or 1d array
-    'bins': None,  # list or 1d array
-    'range': None,  # tuple of two elements
-    'xlim': None,  # list of two elements
-    'ylim': None,  # list of two elements
+    'type': None,  # plot types: histogram, boxwhisker, regression
+    'names': None,  # list of names of 2d array columns
+    'xvar': None,  # variable on the x axis
+    'yvar': None,  # variable on the y axis
+    'data': None,  # 2d array containing all data
+    'bins': None,  # list or 1d array for box whisker plot binning
+    'xlim': None,  # list of two elements (min, max) of plot, tuple of two elements
+    'ylim': None,  # list of two elements(min, max) of plot, tuple of two elements
     'xlabel': None,  # x axis labels
     'ylabel': None,  # y axis labels
     'xtitle': None,  # title of x axis
@@ -27,17 +24,20 @@ plot_dictionary = {
     'title': None,  # plot title
     'text': None,  # text to display in plot
     'text_loc': None,  # location of text on plot
-    'filename': None,  # output file name
+    'datafile': None,  # data file name
+    'plotfile': None,  # output plot file name
     'color': None,  # plot color
+    'group_names': None  # group names for boxwhisker plots
 }
+"""
 
 
 class Plot:
     """Class to plot data"""
     def __init__(self, dict):
         self.dict = dict
-        if 'filename' in self.dict:
-            self.filename = Handler(self.dict['filename']).file_remove_check()
+        if 'plotfile' in self.dict:
+            self.filename = Handler(self.dict['plotfile']).file_remove_check()
         else:
             self.filename = None
 
@@ -51,14 +51,22 @@ class Plot:
         if 'type' in self.dict:
             if self.dict['type'] == 'histogram':
                 self.histogram()
+        elif 'type' in self.dict:
+            if self.dict['type'] == 'boxwhisker':
+                self.boxwhisker()
 
     def histogram(self):
 
         # data
-        if 'data' not in self.dict:
-            raise ValueError("Data not found")
-        else:
-            dataset = self.dict['data']
+        data = self.dict['data']
+        names = self.dict['names']
+        try:
+            indx = next(i for i in range(0, len(names)) if names[i] == self.dict['xvar'])
+        except StopIteration:
+            print('Histogram variable not found')
+            return
+
+        dataset = [elem[indx] for elem in data]
 
         # color
         if 'color' not in self.dict:
@@ -122,27 +130,56 @@ class Plot:
         else:
             plt.show()
 
+    def boxwhisker(self):
 
-if __name__ == '__main__':
+        # get file name from dictionary
+        filename = self.dict['filename']
 
-    dataset1 = randn(1000)*0.0015 + 0.0025
-    file1 = 'c:/temp/plot3.png'
+        # get data and the column names
+        data = self.dict['data']
+        names = self.dict['names']
 
-    plot_d = {
-        'type': 'histogram',
-        'data': dataset1,
-        'title': 'Random plot',
-        'filename': file1,
-        'xtitle': 'Independent variable (units)',
-        'ytitle': 'Dependent variable (units)',
+        # bins to plot box whisker plot
+        bins = self.dict['bins']
 
-    }
+        # name of the bin groups
+        group_names = self.dict['group_names']
 
-    kk = Plot(plot_d)
-    kk.draw()
+        # variables on x and y axes
+        xvar = self.dict['xvar']
+        yvar = self.dict['yvar']
 
+        # column indices
+        x_index = next(i for i in range(0, len(names)) if names[i] == xvar)
+        y_index = next(i for i in range(0, len(names)) if names[i] == yvar)
 
+        # get data to be plotted
+        out_data = np.array([[elem[x_index], elem[y_index]] for elem in data])
 
+        # initialize lists
+        pdata = list()
+        gname = list()
 
+        # data bining
+        for i in range(0, len(group_names)):
+            temp = out_data[(bins[i] <= out_data[:, 0]) & (out_data[:, 0] < bins[i + 1]), 1]
+            for j in range(0, len(temp)):
+                pdata.append(temp[j])
+                gname.append(group_names[i])
 
+        # dataframe with bins
+        df = pd.DataFrame({xvar: gname, yvar: pdata})
 
+        f, (ax1) = plt.subplots(1, 1, figsize=(8, 4))
+        f.suptitle(self.dict['title'], fontsize=14)
+
+        sns.boxplot(x=xvar, y=yvar,
+                    data=df, ax=ax1, color=self.dict['color'], showfliers=False)
+        ax1.set_xlabel(self.dict['xlabel'], size=12, alpha=0.8)
+        ax1.set_ylabel(self.dict['ylabel'], size=12, alpha=0.8)
+
+        plt.savefig(self.filename)
+
+    def regression(self, dict):
+        # Under construction
+        pass
