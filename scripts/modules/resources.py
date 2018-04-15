@@ -155,14 +155,14 @@ def find_intersecting_tiles(infile, wrs2file):
                         [rightlim, lowlim]])
 
     # get all the corners of the bounding box
-    boundboxptlist = [list(elem) for elem in list(mapping(boundbox)['coordinates'])][0]
+    boundboxptlist = list(list(elem) for elem in list(mapping(boundbox)['coordinates']))
 
     # controid of bounding box
     centroid = [boundbox.centroid.x, boundbox.centroid.y]
 
     # centroid to vertex distance
-    vertxdistlist = [_eucl_dist(boundboxpt[0], centroid[0],
-                                boundboxpt[1], centroid[1]) for boundboxpt in boundboxptlist]
+    vertxdistlist = list(_eucl_dist(boundboxpt[0], centroid[0],
+                         boundboxpt[1], centroid[1]) for boundboxpt in boundboxptlist)
 
     # add buffer
     buf = 0.05 * max(vertxdistlist)
@@ -185,15 +185,15 @@ def find_intersecting_tiles(infile, wrs2file):
         featlist.append(feature)
 
     # list of Landsat footprints from wrs2file
-    LSpolylist = [Polygon(json.loads(feature.ExportToJson())['geometry']['coordinates'][0][0:-1]) for feature in
-                  featlist[1:]]
+    LSpolylist = list(Polygon(json.loads(feature.ExportToJson())['geometry']['coordinates'][0][0:-1]) for feature in
+                      featlist[1:])
 
     # list of landsat path and row
-    LSpathrow = [[json.loads(feature.ExportToJson())['properties']['PATH'],
-                  json.loads(feature.ExportToJson())['properties']['ROW']] for feature in featlist[1:]]
+    LSpathrow = list([json.loads(feature.ExportToJson())['properties']['PATH'],
+                  json.loads(feature.ExportToJson())['properties']['ROW']] for feature in featlist[1:])
 
     # find the footprints that intersect with budffered bounding box
-    LSftprnt_indx = [indx for indx, LSftprnt in enumerate(LSpolylist) if LSftprnt.intersects(boundbox)]
+    LSftprnt_indx = list(indx for indx, LSftprnt in enumerate(LSpolylist) if LSftprnt.intersects(boundbox))
 
     # inside the bounding box, find the foot prints that intersect with polygon
     indx = list()  # initialize indx

@@ -135,9 +135,6 @@ class Plot:
 
     def boxwhisker(self):
 
-        # get file name from dictionary
-        filename = self.dict['filename']
-
         # get data and the column names
         data = self.dict['data']
         names = self.dict['names']
