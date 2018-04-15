@@ -51,9 +51,12 @@ class Plot:
         if 'type' in self.dict:
             if self.dict['type'] == 'histogram':
                 self.histogram()
-        elif 'type' in self.dict:
-            if self.dict['type'] == 'boxwhisker':
+            elif self.dict['type'] == 'boxwhisker':
                 self.boxwhisker()
+            elif self.dict['type'] == 'regression':
+                self.regression()
+        else:
+            raise ValueError("Plot type not found")
 
     def histogram(self):
 
@@ -180,6 +183,6 @@ class Plot:
 
         plt.savefig(self.filename)
 
-    def regression(self, dict):
+    def regression(self):
         # Under construction
         pass
