@@ -41,7 +41,7 @@ if __name__ == '__main__':
     # **************************************************
     # plotting box whisker plot
 
-    datafile = "D:\\projects\\NAU\\landsat_deciduous\\data\\10k_saved_samp_ak.csv"
+    datafile = "D:\\projects\\NAU\\landsat_deciduous\\data\\saved_samp_ak.csv"
     plotfile = "D:\\projects\\NAU\\landsat_deciduous\\data\\fig1.png"
     names, data = Handler(datafile).read_csv_as_array()
     bins = Sublist.custom_list(0, 100, step=10)
