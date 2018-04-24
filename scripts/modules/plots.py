@@ -7,7 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 import seaborn as sns
-from scipy.stats.stats import pearsonr
+
 
 plt.rcParams["patch.force_edgecolor"] = True
 plt.interactive(False)
@@ -222,29 +222,14 @@ class Plot:
         """
 
         if 'data' in self.dict:
-            data_mat = self.dict['data']
-            nsamp, nvar = data_mat.shape
-
-        elif 'datafile' in self.dict:
-            trn_samp = Samples(csv_file=self.dict['datafile'], label_colname='Decid_AVG')
-            data_mat = np.matrix(trn_samp.x)
-            nsamp, nvar = data_mat.shape
+            corr = self.dict['data']
+            nvar = corr.shape[0]
 
         else:
             raise ObjectNotFound("No data found")
 
-        corr = np.zeros([nvar, nvar], dtype=float)
-
-        for i in range(0, nvar):
-            for j in range(0, nvar):
-                corr[i, j] = np.abs(pearsonr(Sublist.column(data_mat, i),
-                                             Sublist.column(data_mat, j))[0])
-
         if 'xlabel' in self.dict:
             var_names = self.dict['xlabel']
-        elif 'datafile' in self.dict:
-            trn_samp = Samples(csv_file=self.dict['datafile'], label_colname='Decid_AVG')
-            var_names = list(bname_dict[elem] for elem in trn_samp.x_name)
         else:
             var_names = list(str(i+1) for i in range(0, nvar))
 

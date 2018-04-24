@@ -4,9 +4,10 @@ from math import sqrt
 from osgeo import gdal
 from common import *
 from raster import Raster
+from resources import bname_dict
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score
-
+from scipy.stats.stats import pearsonr
 
 __all__ = ['Classifier',
            'Samples']
@@ -495,12 +496,27 @@ class Samples:
         }
 
     def correlation_matrix(self):
+        """
+        Method to return a dictionary with data (rows are samples; columns are variables)
+        :return: Dictionary
+        """
+        # get data from samples
+        data_mat = np.matrix(self.x)
+        nsamp, nvar = data_mat.shape
 
+        # initialize correlation matrix
+        corr = np.zeros([nvar, nvar], dtype=float)
 
+        # calculate correlation matrix
+        for i in range(0, nvar):
+            for j in range(0, nvar):
+                corr[i, j] = np.abs(pearsonr(Sublist.column(data_mat, i),
+                                             Sublist.column(data_mat, j))[0])
 
+        # get names of variables variables
+        var_names = list(bname_dict[elem] for elem in self.x_name)
 
-
-        pass
+        return {'data': corr, 'names': var_names}
 
     def merge_data(self,
                    samp):
