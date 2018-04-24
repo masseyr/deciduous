@@ -439,6 +439,7 @@ class Samples:
         self.y = y
         self.y_name = y_name
         self.use_band_dict = use_band_dict
+        self.index = None
 
         # either of label name or csv file is provided without the other
         if (label_colname is not None) != (csv_file is not None):
@@ -456,8 +457,9 @@ class Samples:
                 raise ValueError("Label name mismatch.\nAvailable names: " + ', '.join(temp['name']))
 
             # read from data dictionary
-            self.x  = [feat[:loc] + feat[(loc + 1):] for feat in temp['feature']]
+
             self.x_name = [elem.strip() for elem in temp['name'][:loc] + temp['name'][(loc + 1):]]
+            self.x = [feat[:loc] + feat[(loc + 1):] for feat in temp['feature']]
             self.y = [feat[loc] for feat in temp['feature']]
             self.y_name = temp['name'][loc].strip()
 
@@ -495,18 +497,32 @@ class Samples:
             'feature_names': self.x_name
         }
 
-    def correlation_matrix(self, sensor='ls57'):
+    def correlation_matrix(self,
+                           sensor='ls57',
+                           display_progress=True):
         """
         Method to return a dictionary with correlation data
         rows = columns = variables (or dimensions)
+        :param sensor: Sensor parameters to be used (current options: 'ls57' for Landsat 5 and 7,
+                        and 'ls8' for Landsat 8)
+        :param display_progress: Should the elements of correlatino matrix
+        be displayed while being calculated? (default: True)
+
         :return: Dictionary
         """
         # get data from samples
         data_mat = np.matrix(self.x)
         nsamp, nvar = data_mat.shape
+        print(nsamp, nvar)
 
         # get names of variables variables
-        var_names = list(bname_dict[sensor][elem] for elem in self.x_name)
+        var_names = list()
+        i = 0
+        for i, name in enumerate(self.x_name):
+            print(str(i)+' '+name)
+            if name in bname_dict[sensor]:
+                var_names.append(bname_dict[sensor][name])
+                i = i + 1
 
         # initialize correlation matrix
         corr = np.zeros([nvar, nvar], dtype=float)
@@ -516,11 +532,10 @@ class Samples:
             for j in range(0, nvar):
                 corr[i, j] = np.abs(pearsonr(Sublist.column(data_mat, i),
                                              Sublist.column(data_mat, j))[0])
-                """
-                str1 = '{row} <---> {col} = '.format(row=var_names[i], col=var_names[j])
-                str2 = '{:{w}.{p}f}'.format(corr[i, j], w=3, p=2)
-                print(str1 + str2)
-                """
+                if display_progress:
+                    str1 = '{row} <---> {col} = '.format(row=var_names[i], col=var_names[j])
+                    str2 = '{:{w}.{p}f}'.format(corr[i, j], w=3, p=2)
+                    print(str1 + str2)
 
         return {'data': corr, 'names': var_names}
 

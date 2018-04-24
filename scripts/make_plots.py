@@ -69,8 +69,8 @@ if __name__ == '__main__':
     # **************************************************
     # plotting heatmap
 
-    infile = "C:\\Users\\rm885\\Dropbox\\projects\\NAU\\landsat_deciduous\\data\\Alaska_all_2010_sampV2.csv"
-    plotfile = "C:\\Users\\rm885\\Dropbox\\projects\\NAU\\landsat_deciduous\\data\\heatmap.png"
+    infile = "D:\\Shared\\Dropbox\\projects\\NAU\\landsat_deciduous\\data\\ABoVE_all_2010_sampV1_clean.csv"
+    plotfile = "D:\\Shared\\Dropbox\\projects\\NAU\\landsat_deciduous\\data\\heatmap2.png"
 
     trn_samp = Samples(csv_file=infile, label_colname='Decid_AVG')
     corr_dict = trn_samp.correlation_matrix()

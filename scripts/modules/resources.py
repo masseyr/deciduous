@@ -34,6 +34,7 @@ bname_dict = {
         'RATIO57': 'RATIO57_Period1',
         'ND57': 'ND57_Period1',
         'NMDI': 'NMDI_Period1',
+        'EVI': 'EVI_Period1',
         'BLUE_1': 'BLUE_Period2',
         'GREEN_1': 'GREEN_Period2',
         'RED_1': 'RED_Period2',
@@ -46,6 +47,7 @@ bname_dict = {
         'RATIO57_1': 'RATIO57_Period2',
         'ND57_1': 'ND57_Period2',
         'NMDI_1': 'NMDI_Period2',
+        'EVI_1': 'EVI_Period2',
         'BLUE_2': 'BLUE_Period3',
         'GREEN_2': 'GREEN_Period3',
         'RED_2': 'RED_Period3',
@@ -57,7 +59,8 @@ bname_dict = {
         'NBR_2': 'NBR_Period3',
         'RATIO57_2': 'RATIO57_Period3',
         'ND57_2': 'ND57_Period3',
-        'NMDI_2': 'NMDI_Period3'},
+        'NMDI_2': 'NMDI_Period3',
+        'EVI_2': 'EVI_Period3'},
 
     'ls8': {
         'BLUE': 'BLUE_Period1',
@@ -72,6 +75,7 @@ bname_dict = {
         'RATIO57': 'RATIO57_Period1',
         'ND57': 'ND57_Period1',
         'NMDI': 'NMDI_Period1',
+        'EVI': 'EVI_Period1',
         'BLUE_1': 'BLUE_Period2',
         'GREEN_1': 'GREEN_Period2',
         'RED_1': 'RED_Period2',
@@ -84,6 +88,7 @@ bname_dict = {
         'RATIO57_1': 'RATIO57_Period2',
         'ND57_1': 'ND57_Period2',
         'NMDI_1': 'NMDI_Period2',
+        'EVI_1': 'EVI_Period2',
         'BLUE_2': 'BLUE_Period3',
         'GREEN_2': 'GREEN_Period3',
         'RED_2': 'RED_Period3',
@@ -95,7 +100,8 @@ bname_dict = {
         'NBR_2': 'NBR_Period3',
         'RATIO57_2': 'RATIO57_Period3',
         'ND57_2': 'ND57_Period3',
-        'NMDI_2': 'NMDI_Period3'},
+        'NMDI_2': 'NMDI_Period3',
+        'EVI_2': 'EVI_Period3'},
 
 }
 
