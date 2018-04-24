@@ -87,17 +87,19 @@ class Raster:
                    band_order=None,
                    finite_only=True,
                    nan_replacement=0.0,
-                   use_dict=None):
+                   use_dict=None,
+                   sensor='ls57'):
 
         """
         Initialize a raster object from a file
-        :param cls - Raster object class <empty>
-        :param raster_name - raster filename
-        :param get_array - flag to include raster as 3 dimensional array (bool)
-        :param band_order - band location array (int starting at 0; ignored if get_array is False)
-        :param finite_only - flag to remove non-finite values from array (ignored if get_array is False)
-        :param nan_replacement - replacement for all non-finite replacements
-        :param use_dict
+        :param cls: Raster object class <empty>
+        :param raster_name: raster filename
+        :param get_array: flag to include raster as 3 dimensional array (bool)
+        :param band_order: band location array (int starting at 0; ignored if get_array is False)
+        :param finite_only: flag to remove non-finite values from array (ignored if get_array is False)
+        :param nan_replacement: replacement for all non-finite replacements
+        :param use_dict: Dictionary to use for renaming bands
+        :param sensor: Sensor to be used with dictionary (resources.bname_dict)
         (ignored if finite_only, get_array is false)
         :return raster object
         """
@@ -188,7 +190,7 @@ class Raster:
 
             # remap band names
             if use_dict is not None:
-                raster_obj.bnames = [use_dict[b] for b in raster_obj.bnames]
+                raster_obj.bnames = [use_dict[sensor][b] for b in raster_obj.bnames]
 
             return raster_obj
         else:

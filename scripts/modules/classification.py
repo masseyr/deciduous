@@ -495,14 +495,18 @@ class Samples:
             'feature_names': self.x_name
         }
 
-    def correlation_matrix(self):
+    def correlation_matrix(self, sensor='ls57'):
         """
-        Method to return a dictionary with data (rows are samples; columns are variables)
+        Method to return a dictionary with correlation data
+        rows = columns = variables (or dimensions)
         :return: Dictionary
         """
         # get data from samples
         data_mat = np.matrix(self.x)
         nsamp, nvar = data_mat.shape
+
+        # get names of variables variables
+        var_names = list(bname_dict[sensor][elem] for elem in self.x_name)
 
         # initialize correlation matrix
         corr = np.zeros([nvar, nvar], dtype=float)
@@ -512,9 +516,11 @@ class Samples:
             for j in range(0, nvar):
                 corr[i, j] = np.abs(pearsonr(Sublist.column(data_mat, i),
                                              Sublist.column(data_mat, j))[0])
-
-        # get names of variables variables
-        var_names = list(bname_dict[elem] for elem in self.x_name)
+                """
+                str1 = '{row} <---> {col} = '.format(row=var_names[i], col=var_names[j])
+                str2 = '{:{w}.{p}f}'.format(corr[i, j], w=3, p=2)
+                print(str1 + str2)
+                """
 
         return {'data': corr, 'names': var_names}
 

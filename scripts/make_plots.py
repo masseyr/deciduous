@@ -84,7 +84,7 @@ if __name__ == '__main__':
         'xlabel': xlabel,
         'title': 'Correlation among variables',
         'plotfile': plotfile,
-        'show_values': True,
+        'show_values': False,
         'heat_range': [0.0, 1.0],
         'color_str': "YlGnBu"
     }

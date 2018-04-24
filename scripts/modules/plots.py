@@ -1,7 +1,5 @@
 from common import Handler, Sublist
 from exceptions import ObjectNotFound
-from classification import Samples
-from resources import bname_dict
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt

@@ -46,6 +46,7 @@ if __name__ == '__main__':
     print(Sublist.column(data_mat, 7))
 
     print('******')
+    sensor='ls57'
 
     print(pearsonr(nir, ndvi)[0])
     print(np.corrcoef(nir, ndvi)[0,1])
@@ -53,7 +54,7 @@ if __name__ == '__main__':
 
     cov_mat = np.cov(data_mat, rowvar=False,)
 
-    var_names = list(bname_dict[elem] for elem in trn_samp.x_name)
+    var_names = list(bname_dict[sensor][elem] for elem in trn_samp.x_name)
 
     print(data_mat)
     print(trn_samp.x_name)
