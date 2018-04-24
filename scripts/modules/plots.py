@@ -1,8 +1,13 @@
 from common import Handler, Sublist
+from exceptions import ObjectNotFound
+from classification import Samples
+from resources import bname_dict
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.font_manager import FontProperties
 import seaborn as sns
+from scipy.stats.stats import pearsonr
 
 plt.rcParams["patch.force_edgecolor"] = True
 plt.interactive(False)
@@ -28,13 +33,23 @@ plot_dictionary = {
     'plotfile': None,  # output plot file name
     'color': None,  # plot color
     'group_names': None  # group names for boxwhisker plots
+    'show_values': None  # to show values in heatmap
+    'heat_range': None  # to show range of heat values in heatmap
+    'color_str': None  # color string for heatmap colors
+    'label_colname': None  # column name in datafile to ignore
 }
 """
 
 
 class Plot:
-    """Class to plot data"""
+    """
+    Class to plot data
+    """
     def __init__(self, dict):
+        """
+        Initialize the plot class
+        :param dict: Input dictionary of parameters
+        """
         self.dict = dict
         if 'plotfile' in self.dict:
             self.filename = Handler(self.dict['plotfile']).file_remove_check()
@@ -48,17 +63,37 @@ class Plot:
             return "<Plot object -empty- >"
 
     def draw(self):
+        """
+        Draw a plot object based on its type in plot dictionary
+        :return: Plot object
+        """
         if 'type' in self.dict:
             if self.dict['type'] == 'histogram':
-                self.histogram()
+                plot = self.histogram()
             elif self.dict['type'] == 'boxwhisker':
-                self.boxwhisker()
-            elif self.dict['type'] == 'regression':
-                self.regression()
+                plot = self.boxwhisker()
+            elif self.dict['type'] == 'heatmap':
+                plot = self.heatmap()
+            else:
+                plot = None
+
+            if plot is not None:
+                # save to file or show in window
+                if self.filename is not None:
+                    plot.savefig(self.filename)
+                else:
+                    plot.show()
+            else:
+                raise ObjectNotFound
+
         else:
-            raise ValueError("Plot type not found")
+            raise ValueError("Plot type not found in dictionary")
 
     def histogram(self):
+        """
+        Makes plot object of type histogram
+        :return: Plot object
+        """
 
         # data
         data = self.dict['data']
@@ -127,13 +162,13 @@ class Plot:
             # plot with default
             plt.axis(xlim + ylim)
 
-        # save to file or show in window
-        if self.filename is not None:
-            plt.savefig(self.filename)
-        else:
-            plt.show()
+        return plt
 
     def boxwhisker(self):
+        """
+        Make plot object of type bowhisker
+        :return: Plot object
+        """
 
         # get data and the column names
         data = self.dict['data']
@@ -170,16 +205,90 @@ class Plot:
         # dataframe with bins
         df = pd.DataFrame({xvar: gname, yvar: pdata})
 
-        f, (ax1) = plt.subplots(1, 1, figsize=(8, 4))
+        f, (ax) = plt.subplots(1, 1, figsize=(8, 4))
         f.suptitle(self.dict['title'], fontsize=14)
 
         sns.boxplot(x=xvar, y=yvar,
-                    data=df, ax=ax1, color=self.dict['color'], showfliers=False)
-        ax1.set_xlabel(self.dict['xlabel'], size=12, alpha=0.8)
-        ax1.set_ylabel(self.dict['ylabel'], size=12, alpha=0.8)
+                    data=df, ax=ax, color=self.dict['color'], showfliers=False)
+        ax.set_xlabel(self.dict['xlabel'], size=12, alpha=0.8)
+        ax.set_ylabel(self.dict['ylabel'], size=12, alpha=0.8)
 
-        plt.savefig(self.filename)
+        return plt
 
-    def regression(self):
-        # Under construction
-        pass
+    def heatmap(self):
+        """
+        Make plot object of type heatmap
+        :return: Plot object
+        """
+
+        if 'data' in self.dict:
+            data_mat = self.dict['data']
+            nsamp, nvar = data_mat.shape
+
+        elif 'datafile' in self.dict:
+            trn_samp = Samples(csv_file=self.dict['datafile'], label_colname='Decid_AVG')
+            data_mat = np.matrix(trn_samp.x)
+            nsamp, nvar = data_mat.shape
+
+        else:
+            raise ObjectNotFound("No data found")
+
+        corr = np.zeros([nvar, nvar], dtype=float)
+
+        for i in range(0, nvar):
+            for j in range(0, nvar):
+                corr[i, j] = np.abs(pearsonr(Sublist.column(data_mat, i),
+                                             Sublist.column(data_mat, j))[0])
+
+        if 'xlabel' in self.dict:
+            var_names = self.dict['xlabel']
+        elif 'datafile' in self.dict:
+            trn_samp = Samples(csv_file=self.dict['datafile'], label_colname='Decid_AVG')
+            var_names = list(bname_dict[elem] for elem in trn_samp.x_name)
+        else:
+            var_names = list(str(i+1) for i in range(0, nvar))
+
+        mask = np.zeros_like(corr)
+        mask[np.triu_indices_from(mask, k=0)] = True
+
+        xticklabels = var_names[:-1] + ['']
+        yticklabels = [''] + var_names[1:]
+
+        font = FontProperties()
+        font.set_family('serif')
+        font.set_style('normal')
+        font.set_variant('normal')
+        font.set_weight('bold')
+        font.set_size('small')
+
+        sns.set(font=font.get_fontconfig_pattern())
+        sns.set(font_scale=2)
+
+        plot_dict = dict()
+        plot_dict['mask'] = mask
+        plot_dict['xticklabels'] = xticklabels
+        plot_dict['yticklabels'] = yticklabels
+
+        if 'show_values' in self.dict:
+            plot_dict['annot'] = self.dict['show_values']
+            plot_dict['annot_kws'] = {"size": 15}
+
+        if 'heat_range' in self.dict:
+            plot_dict['vmin'] = self.dict['heat_range'][0]
+            plot_dict['vmax'] = self.dict['heat_range'][1]
+
+        if 'color_str' in self.dict:
+            plot_dict['cmap'] = self.dict['color_str']
+
+        plt.figure(figsize=(20, 18))
+
+        with sns.axes_style("white"):
+            ax = sns.heatmap(corr,
+                             square=True,
+                             **plot_dict)
+
+            if 'title' in self.dict:
+                plt.title(self.dict['title'])
+
+        return plt
+

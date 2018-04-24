@@ -67,3 +67,24 @@ if __name__ == '__main__':
     boxwhisker.draw()
 
     # **************************************************
+    # plotting heatmap
+
+    infile = "C:\\Users\\rm885\\Dropbox\\projects\\NAU\\landsat_deciduous\\data\\Alaska_all_2010_sampV2.csv"
+    plotfile = "C:\\Users\\rm885\\Dropbox\\projects\\NAU\\landsat_deciduous\\data\\heatmap_var_1.png"
+
+    plot_heatmap = {
+        'type': 'heatmap',
+        'datafile': infile,
+        'title': 'Correlation among variables',
+        'plotfile': plotfile,
+        'show_values': True,
+        'heat_range': [0.0, 1.0],
+        'color_str': "YlGnBu"
+    }
+
+    print(plot_heatmap)
+
+    heatmap = Plot(plot_heatmap)
+    heatmap.draw()
+
+    # **************************************************

@@ -455,7 +455,7 @@ class Samples:
                 raise ValueError("Label name mismatch.\nAvailable names: " + ', '.join(temp['name']))
 
             # read from data dictionary
-            self.x = [feat[:loc] + feat[(loc + 1):] for feat in temp['feature']]
+            self.x  = [feat[:loc] + feat[(loc + 1):] for feat in temp['feature']]
             self.x_name = [elem.strip() for elem in temp['name'][:loc] + temp['name'][(loc + 1):]]
             self.y = [feat[loc] for feat in temp['feature']]
             self.y_name = temp['name'][loc].strip()
@@ -493,6 +493,14 @@ class Samples:
             'label_name': self.y_name,
             'feature_names': self.x_name
         }
+
+    def correlation_matrix(self):
+
+
+
+
+
+        pass
 
     def merge_data(self,
                    samp):

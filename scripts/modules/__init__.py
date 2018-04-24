@@ -3,3 +3,4 @@ from plots import Plot
 from classification import Classifier, Samples
 from raster import Raster
 from resources import *
+from exceptions import ObjectNotFound, UninitializedError

@@ -108,6 +108,55 @@ class Sublist(list):
         else:
             raise ValueError("Start value is less than end value")
 
+    def where(self, operator='=', obj=None):
+        """
+        Locate the list of indices given a condition
+        :param operator: boolean operator (options: =, <, >, =<, ,=>, !=)
+        :param obj: Object to compare with input list
+        :return: List of indices
+        """
+        if operator == '=':
+            loc = list(i for i in range(0, len(self)) if self[i] == obj)
+        elif operator == '>':
+            loc = list(i for i in range(0, len(self)) if self[i] > obj)
+        elif operator == '<':
+            loc = list(i for i in range(0, len(self)) if self[i] < obj)
+        elif operator == '<=':
+            loc = list(i for i in range(0, len(self)) if self[i] <= obj)
+        elif operator == '>=':
+            loc = list(i for i in range(0, len(self)) if self[i] >= obj)
+        elif operator == '!=':
+            loc = list(i for i in range(0, len(self)) if self[i] != obj)
+        else:
+            loc = None
+
+        if len(loc) == 1:
+            return loc[0]
+        else:
+            return loc
+
+    @staticmethod
+    def column(matrix, i):
+        """
+        Get column of a numpy matrix
+        :param matrix: Numpy matrix
+        :param i: index
+        :return: List
+        """
+        mat = matrix[:, i].tolist()
+        return list(elem[0] for elem in mat)
+
+    @staticmethod
+    def row(matrix, i):
+        """
+        Get row of a numpy matrix
+        :param matrix: Numpy matrix
+        :param i: index
+        :return: List
+        """
+        mat = matrix[i].tolist()
+        return mat[0]
+
 
 class Handler(object):
     """
@@ -122,12 +171,12 @@ class Handler(object):
 
         try:
             self.basename = os.path.basename(filename)
-        except:
+        except Exception:
             self.basename = basename
 
         try:
             self.dirname = os.path.dirname(filename)
-        except:
+        except Exception:
             self.dirname = dirname
 
         self.sep = os.path.sep
