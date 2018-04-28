@@ -7,7 +7,7 @@ if __name__ == '__main__':
     script, year, folder, regionfile, wrsfile = argv
 
     # find the wrs2 path and row that intersect with region boundary
-    path_row, _ = find_intersecting_tiles(regionfile, wrsfile)
+    path_row = find_path_row(regionfile, wrsfile)
 
     # prepare list of tuples based on the path, row, and year
     tile_list = list()

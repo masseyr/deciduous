@@ -4,7 +4,8 @@ import json
 import numpy as np
 from shapely.geometry import Polygon, mapping
 import pandas as pd
-from osgeo import ogr
+from osgeo import ogr, gdal
+import sys
 
 """
 This module houses functions specific to the data used
@@ -15,8 +16,7 @@ __all__ = ['bname_dict',
            'get_TCdata_filepath',
            'TCserver',
            'read_y_param_from_summary',
-           'find_intersecting_tiles']
-
+           'find_path_row']
 
 # dictionary for a use case
 bname_dict = {
@@ -105,7 +105,6 @@ bname_dict = {
 
 }
 
-
 # Tree cover files ftp server name
 TCserver = 'ftp.glcf.umd.edu'
 
@@ -120,15 +119,15 @@ def get_TCdata_filepath(path, row, year):
     :return: Dictionary
     """
     return {
-               'filestr': "/glcf/LandsatTreecover/WRS2/p{p}/r{r}/p{p}r{r}_TC_2010/p{p}r{r}_TC_{y}.tif.gz".format(
-                p=str(path).zfill(3),
-                r=str(row).zfill(3),
-                y=str(year).zfill(4)),
-               'errfilestr': "/glcf/LandsatTreecover/WRS2/p{p}/r{r}/p{p}r{r}_TC_2010/p{p}r{r}_TC_{y}_err.tif.gz".format(
-                p=str(path).zfill(3),
-                r=str(row).zfill(3),
-                y=str(year).zfill(4))
-            }
+        'filestr': "/glcf/LandsatTreecover/WRS2/p{p}/r{r}/p{p}r{r}_TC_2010/p{p}r{r}_TC_{y}.tif.gz".format(
+            p=str(path).zfill(3),
+            r=str(row).zfill(3),
+            y=str(year).zfill(4)),
+        'errfilestr': "/glcf/LandsatTreecover/WRS2/p{p}/r{r}/p{p}r{r}_TC_2010/p{p}r{r}_TC_{y}_err.tif.gz".format(
+            p=str(path).zfill(3),
+            r=str(row).zfill(3),
+            y=str(year).zfill(4))
+    }
 
 
 def get_rfpickle_info(infile):
@@ -138,7 +137,7 @@ def get_rfpickle_info(infile):
     :return:
     """
     jumble = pd.read_csv(infile)
-    return {'name': jumble.iloc[4, 0], 'rsq': jumble.iloc[3,0], 'rmse': jumble.iloc[2,0]}
+    return {'name': jumble.iloc[4, 0], 'rsq': jumble.iloc[3, 0], 'rmse': jumble.iloc[2, 0]}
 
 
 def read_y_param_from_summary(csv_file):
@@ -149,7 +148,7 @@ def read_y_param_from_summary(csv_file):
     """
     # read lines
     with open(csv_file, 'r') as fileptr:
-            lines = fileptr.readlines()
+        lines = fileptr.readlines()
 
     # y observed
     y = [float(elem.strip()) for elem in lines[0].split(',')[1:]]
@@ -170,84 +169,48 @@ def read_y_param_from_summary(csv_file):
     rf_file = lines[5].split(',')[1].strip()
 
     return {
-            'obs_y': y,
-            'mean_y': mean_y,
-            'var_y': var_y,
-            'rmse': rmse,
-            'r_sq': r_sq,
-            'rf_file': rf_file
-            }
+        'obs_y': y,
+        'mean_y': mean_y,
+        'var_y': var_y,
+        'rmse': rmse,
+        'r_sq': r_sq,
+        'rf_file': rf_file
+    }
 
 
-def _eucl_dist(x1, x2, y1, y2):
-    """Euclidean distance between (x1,y1) and (x2,y2)"""
-    return np.sqrt(np.square(x1-x2)+np.square(y1-y2))
+def find_path_row(polygonfile, wrsfile):
+    """
+    module to identify path row of intersecting landsat footprints
+    :param polygonfile: Shapefile with only one polygon
+    :param wrsfile: WRS2 - descending shapefile
+    :return: list of path and row tuples
+    """
 
-
-# module to identify, path row, bounding box, and intersecting landsat footprints
-def find_intersecting_tiles(fieldfile, wrsfile):
-    fieldshpfile = ogr.Open(fieldfile)
+    fieldshpfile = ogr.Open(polygonfile)
     fieldshape = fieldshpfile.GetLayer(0)
-    fieldgeom = list()
-    for i in range(0, fieldshape.GetFeatureCount()):
-        feat = fieldshape.GetFeature(i)
-        coordinates = json.loads(feat.ExportToJson())['geometry']['coordinates'][0][0:-1]
-        fieldgeom.append(Polygon(coordinates))
-    if fieldshape.GetFeatureCount() == 1:
-        fieldgeom = fieldgeom[0]
-
-    ptlist = [[]]
-
-    for i in range(0, fieldshape.GetFeatureCount()):
-        feature = fieldshape.GetFeature(i)
-        ptlist.extend(json.loads(feature.ExportToJson())['geometry']['coordinates'][0][0:-1])
-
-    # bounding box and coordinates
-    leftlim = min([pt[0] for pt in ptlist[1:]])
-    rightlim = max([pt[0] for pt in ptlist[1:]])
-    lowlim = min([pt[1] for pt in ptlist[1:]])
-    uplim = max([pt[1] for pt in ptlist[1:]])
-
-    boundbox = Polygon([[leftlim, lowlim],
-                        [leftlim, uplim],
-                        [rightlim, uplim],
-                        [rightlim, lowlim]])
-
-    boundboxptlist = [list(elem) for elem in list(mapping(boundbox)['coordinates'])][0]
-    centroid = [boundbox.centroid.x, boundbox.centroid.y]
-
-    vertxdistlist = list(_eucl_dist(boundboxpt[0], centroid[0], boundboxpt[1], centroid[1])
-                         for boundboxpt in boundboxptlist)
-
-    buf = 0.05 * max(vertxdistlist)
-
-    # buffered bounding box
-    boundbox = Polygon([[leftlim - buf, lowlim - buf],
-                        [leftlim - buf, uplim + buf],
-                        [rightlim + buf, uplim + buf],
-                        [rightlim + buf, lowlim - buf]])
+    fieldfeat = fieldshape.GetFeature(0)
+    fieldgeom = fieldfeat.GetGeometryRef()
 
     wrsshpfile = ogr.Open(wrsfile)
     wrsshape = wrsshpfile.GetLayer(0)
-    featlist = [[]]
 
-    for i in range(wrsshape.GetFeatureCount()):
-        feature = wrsshape.GetFeature(i)
-        featlist.append(feature)
+    pathrow = list()
 
-    # list of Landsat footprints and centers
-    polylist = list(Polygon(json.loads(feature.ExportToJson())['geometry']['coordinates'][0][0:-1])
-                    for feature in featlist[1:])
+    feature = wrsshape.GetNextFeature()
 
-    pathrow = list([json.loads(feature.ExportToJson())['properties']['PATH'],
-                    json.loads(feature.ExportToJson())['properties']['ROW']] for feature in featlist[1:])
+    while feature:
 
-    ftprnt_indx = list(indx for indx, ftprnt in enumerate(polylist) if ftprnt.intersects(boundbox))
+        wrsgeom = feature.GetGeometryRef()
 
-    final_indx = list(indx for indx, ftprnt in enumerate([polylist[i] for i in ftprnt_indx])
-                      if ftprnt.intersects(fieldgeom))
+        if wrsgeom.Intersects(fieldgeom):
+            path = json.loads(feature.ExportToJson())['properties']['PATH']
+            row = json.loads(feature.ExportToJson())['properties']['ROW']
+            pathrow.append((path, row))
 
-    scene_centers = list(list(mapping(poly.centroid)['coordinates'])
-                         for poly in [polylist[i] for i in [ftprnt_indx[k] for k in final_indx]])
+        feature = wrsshape.GetNextFeature()
 
-    return [pathrow[i] for i in [ftprnt_indx[k] for k in final_indx]], scene_centers
+    fieldshpfile = None
+    wrsshpfile = None
+
+    return pathrow
+
