@@ -6,6 +6,8 @@ import fnmatch
 import psutil
 import ftplib
 import sys
+import gzip
+import glob
 
 np.set_printoptions(suppress=True)
 
@@ -200,7 +202,7 @@ class Handler(object):
             os.makedirs(self.dirname)
             # print('Created path: ' + input_dir)
         else:
-            print('Path already exists: ' + self.dirname)
+            pass  # print('Path already exists: ' + self.dirname)
 
     def add_to_filename(self, string):
         components = self.basename.split('.')
@@ -294,6 +296,26 @@ class Handler(object):
         with open(self.filename) as f:
             content = f.readlines()
         return [x.strip() for x in content]
+
+    def extract_gz(self):
+        """
+        Extract landsat file to a temp folder
+        """
+
+        # define a temp folder with scene ID
+        tempfile = self.dirname + self.sep + self.basename.split('.gz')[0]
+
+        Handler(tempfile).file_remove_check()
+
+        # extract infile to temp folder
+        if self.filename.endswith(".gz"):
+            with gzip.open(self.filename, 'rb') as gf:
+                file_content = gf.read()
+                with open(tempfile, 'wb') as fw:
+                    fw.write(file_content)
+
+        else:  # not a tar.gz archive
+            raise TypeError("Not a .gz archive")
 
     def write_list_to_file(self,
                            input_list,
@@ -576,14 +598,29 @@ class FTPHandler(Handler):
         """Copy all files from FTP that are in a list"""
 
         # connection
-        ftp = self.conn
+        ftp_conn = self.conn
 
         # get file(s) and write to disk
         if isinstance(self.ftpfilepath, list):
+            self.filename = [self.dirname + Handler().sep + Handler(ftpfile).basename
+                             for ftpfile in self.ftpfilepath]
+
             for i in range(0, len(self.ftpfilepath)):
                 with open(self.filename[i], 'wb') as f:
-                    ftp.retrbinary("RETR {0}".format(self.ftpfilepath[i]), f.write)
+                    try:
+                        if ftp_conn.retrbinary("RETR {}".format(self.ftpfilepath[i]), f.write):
+                            print('Copying file {} to {}'.format(Handler(self.ftpfilepath[i]).basename,
+                                                                 self.dirname))
+
+                    except:
+                        print('File {} not found or already written'.format(Handler(self.ftpfilepath[i]).basename))
         else:
+            self.filename = self.dirname + Handler().sep + Handler(self.ftpfilepath).basename
             with open(self.filename, 'wb') as f:
-                ftp.retrbinary("RETR {0}".format(self.ftpfilepath), f.write)
+                try:
+                    if ftp_conn.retrbinary("RETR {}".format(self.ftpfilepath), f.write):
+                        print('Copying file {} to {}'.format(Handler(self.ftpfilepath).basename,
+                                                             self.dirname))
+                except:
+                    print('File {} not found or already written'.format(Handler(self.ftpfilepath).basename))
 

@@ -184,88 +184,70 @@ def _eucl_dist(x1, x2, y1, y2):
     return np.sqrt(np.square(x1-x2)+np.square(y1-y2))
 
 
-def find_intersecting_tiles(infile, wrs2file):
-    """
-    Find intersecting Landsat tiles using wrs2 system
-    :param infile: input polygon(s) file
-    :param wrs2file: wrs2 file
-    :return: list of path and row
-    """
-    # open input shapefile
-    inshpfile = ogr.Open(infile)
-    inshape = inshpfile.GetLayer(0)
+# module to identify, path row, bounding box, and intersecting landsat footprints
+def find_intersecting_tiles(fieldfile, wrsfile):
+    fieldshpfile = ogr.Open(fieldfile)
+    fieldshape = fieldshpfile.GetLayer(0)
+    fieldgeom = list()
+    for i in range(0, fieldshape.GetFeatureCount()):
+        feat = fieldshape.GetFeature(i)
+        coordinates = json.loads(feat.ExportToJson())['geometry']['coordinates'][0][0:-1]
+        fieldgeom.append(Polygon(coordinates))
+    if fieldshape.GetFeatureCount() == 1:
+        fieldgeom = fieldgeom[0]
+
     ptlist = [[]]
 
-    # get list of all points in the input shapefile
-    for i in range(0, inshape.GetFeatureCount()):
-        feature = inshape.GetFeature(i)
+    for i in range(0, fieldshape.GetFeatureCount()):
+        feature = fieldshape.GetFeature(i)
         ptlist.extend(json.loads(feature.ExportToJson())['geometry']['coordinates'][0][0:-1])
 
-    # find limits of the points in the input shapefile
+    # bounding box and coordinates
     leftlim = min([pt[0] for pt in ptlist[1:]])
     rightlim = max([pt[0] for pt in ptlist[1:]])
     lowlim = min([pt[1] for pt in ptlist[1:]])
     uplim = max([pt[1] for pt in ptlist[1:]])
 
-    # find the bounding box of the shapefile
     boundbox = Polygon([[leftlim, lowlim],
                         [leftlim, uplim],
                         [rightlim, uplim],
                         [rightlim, lowlim]])
 
-    # get all the corners of the bounding box
-    boundboxptlist = list(list(elem) for elem in list(mapping(boundbox)['coordinates']))
-
-    # controid of bounding box
+    boundboxptlist = [list(elem) for elem in list(mapping(boundbox)['coordinates'])][0]
     centroid = [boundbox.centroid.x, boundbox.centroid.y]
 
-    # centroid to vertex distance
-    vertxdistlist = list(_eucl_dist(boundboxpt[0], centroid[0],
-                         boundboxpt[1], centroid[1]) for boundboxpt in boundboxptlist)
+    vertxdistlist = list(_eucl_dist(boundboxpt[0], centroid[0], boundboxpt[1], centroid[1])
+                         for boundboxpt in boundboxptlist)
 
-    # add buffer
     buf = 0.05 * max(vertxdistlist)
 
-    # buffered bounding box; this reduces the number of tiles
-    #  the input polygon(s) will be compared to
+    # buffered bounding box
     boundbox = Polygon([[leftlim - buf, lowlim - buf],
                         [leftlim - buf, uplim + buf],
                         [rightlim + buf, uplim + buf],
                         [rightlim + buf, lowlim - buf]])
 
-    # open wrs2 shapefile
-    wrsshpfile = ogr.Open(wrs2file)
+    wrsshpfile = ogr.Open(wrsfile)
     wrsshape = wrsshpfile.GetLayer(0)
     featlist = [[]]
 
-    # get all features
     for i in range(wrsshape.GetFeatureCount()):
         feature = wrsshape.GetFeature(i)
         featlist.append(feature)
 
-    # list of Landsat footprints from wrs2file
-    LSpolylist = list(Polygon(json.loads(feature.ExportToJson())['geometry']['coordinates'][0][0:-1]) for feature in
-                      featlist[1:])
+    # list of Landsat footprints and centers
+    polylist = list(Polygon(json.loads(feature.ExportToJson())['geometry']['coordinates'][0][0:-1])
+                    for feature in featlist[1:])
 
-    # list of landsat path and row
-    LSpathrow = list([json.loads(feature.ExportToJson())['properties']['PATH'],
-                  json.loads(feature.ExportToJson())['properties']['ROW']] for feature in featlist[1:])
+    pathrow = list([json.loads(feature.ExportToJson())['properties']['PATH'],
+                    json.loads(feature.ExportToJson())['properties']['ROW']] for feature in featlist[1:])
 
-    # find the footprints that intersect with budffered bounding box
-    LSftprnt_indx = list(indx for indx, LSftprnt in enumerate(LSpolylist) if LSftprnt.intersects(boundbox))
+    ftprnt_indx = list(indx for indx, ftprnt in enumerate(polylist) if ftprnt.intersects(boundbox))
 
-    # inside the bounding box, find the foot prints that intersect with polygon
-    indx = list()  # initialize indx
-    for i in range(0, inshape.GetFeatureCount()):  # iterate over features
-        feature = inshape.GetFeature(i)
-        for j, LSscene in enumerate([LSpolylist[i] for i in LSftprnt_indx]):  # iterate over wrs2 tiles
-            if Polygon(json.loads(feature.ExportToJson())['geometry']['coordinates'][0][0:-1]).intersects(LSscene):
-                indx.extend(j)  # add to index if intersects
+    final_indx = list(indx for indx, ftprnt in enumerate([polylist[i] for i in ftprnt_indx])
+                      if ftprnt.intersects(fieldgeom))
 
-    # find unique indices
-    indx = [LSftprnt_indx[i] for i in np.unique(indx)]
+    scene_centers = list(list(mapping(poly.centroid)['coordinates'])
+                         for poly in [polylist[i] for i in [ftprnt_indx[k] for k in final_indx]])
 
-    # find LS path row
-    path_row = [LSpathrow[i] for i in indx]
-
-    return path_row
+    return [pathrow[i] for i in [ftprnt_indx[k] for k in final_indx]], scene_centers
