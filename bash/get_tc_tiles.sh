@@ -6,30 +6,48 @@
 
 date
 
+year=2010
 echo 'Begin Download!~~~~~~~~~~'
 
-downloaddir='/scratch/rm885/gdrive/sync/decid/tc_files/gz'
-extractdir='/scratch/rm885/gdrive/sync/decid/tc_files/tif'
+downloaddir='/scratch/rm885/gdrive/sync/decid/tc_files/gz'$year
+extractdir='/scratch/rm885/gdrive/sync/decid/tc_files/tif'$year
+
+if [ ! -d $downloaddir ] ; then
+	mkdir $downloaddir;
+fi
+
+if [ ! -d $extractdir ] ; then
+	mkdir $extractdir;
+fi
 regionfile='/scratch/rm885/gdrive/sync/decid/bounds/above_domain/domain_simple.shp'
 wrsfile='/scratch/rm885/gdrive/sync/decid/bounds/wrs2/wrs2_descending.shp'
-year=2010
+
 
 python '/home/rm885/projects/decid/src/get_tc_tiles.py' $year downloaddir $extractdir $regionfile $wrsfile
 
 echo 'End Download!~~~~~~~~~~'
 
-echo ''
-
-echo 'Begin Reprojection!~~~~~~~~~~'
 echo '********************************************************************************************'
+echo 'Begin Reprojection!~~~~~~~~~~'
 
-datadir='/scratch/rm885/gdrive/sync/decid/tc_files/tif/'
-outdir='/scratch/rm885/gdrive/sync/decid/tc_files/tif_geo/'
-export GDAL_DATA=/home/rm885/path/gdal
+datadir='/scratch/rm885/gdrive/sync/decid/tc_files/tif'$year'/'
+outdir='/scratch/rm885/gdrive/sync/decid/tc_files/tif_geo'$year'/'
+
+if [ ! -d $datadir ] ; then
+	mkdir $datadir;
+fi
+
+if [ ! -d $outdir ] ; then
+	mkdir $outdir;
+fi
+
+export GDAL_DATA='/home/rm885/path/gdal'
 
 # list of input files
 files=(${datadir}*.tif)
 echo ${files[*]}
+
+echo '********************************************************************************************'
 
 for f in ${files[*]}; do
    bname=$(basename $f);
@@ -40,15 +58,29 @@ for f in ${files[*]}; do
       rm -f $outf;
    fi;
    echo 'Reprojecting '$f' to '$outf;
-   gdalwarp -overwrite -multi $f $outf -ot Byte -tr 0.00027 0.00027 -et 0.05 -t_srs 'EPSG:4326' -wo WRITE_FLUSH=YES -wo NUM_THREADS=4 ;
+   gdalwarp -overwrite -multi $f $outf -et 0.05 -ot Byte -tr 0.00027 0.00027 -t_srs 'EPSG:4326' -wo WRITE_FLUSH=YES -wo NUM_THREADS=4 ;
 done
 
-echo 'Begin Mosaic!~~~~~~~~~~'
 echo '********************************************************************************************'
-datadir='/scratch/rm885/gdrive/sync/decid/tc_files/tif_geo/'
-outdir='/scratch/rm885/gdrive/sync/decid/tc_files/mosaic/'
-mosaic=$outdir'uncert_mosaic.tif'
-compmosaic=$outdir'uncert_mosaic_vis.tif'
+echo 'Begin Mosaic!~~~~~~~~~~'
+
+
+datadir='/scratch/rm885/gdrive/sync/decid/tc_files/tif_geo'$year'/'
+outdir='/scratch/rm885/gdrive/sync/decid/tc_files/mosaic'$year'/'
+
+if [ ! -d $datadir ] ; then
+	mkdir $datadir;
+fi
+
+if [ ! -d $outdir ] ; then
+	mkdir $outdir;
+fi
+
+mosaic=$outdir'tc_mosaic.tif'
+compmosaic=$outdir'tc_mosaic_vis.tif'
+
+files=(${datadir}*.tif)
+echo ${files[*]}
 
 echo 'Data folder: '$datadir
 echo 'Mosaic: '$mosaic
