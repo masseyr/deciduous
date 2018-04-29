@@ -602,18 +602,19 @@ class FTPHandler(Handler):
 
         # get file(s) and write to disk
         if isinstance(self.ftpfilepath, list):
-            self.filename = [self.dirname + Handler().sep + Handler(ftpfile).basename
-                             for ftpfile in self.ftpfilepath]
+            filenamelist = [self.dirname + self.sep + Handler(ftpfile).basename
+                            for ftpfile in self.ftpfilepath]
 
-            for i in range(0, len(self.ftpfilepath)):
-                with open(self.filename[i], 'wb') as f:
+            for i in range(0, len(filenamelist)):
+                self.filename = filenamelist[i]
+                with open(self.filename, 'wb') as f:
                     try:
                         if ftp_conn.retrbinary("RETR {}".format(self.ftpfilepath[i]), f.write):
-                            print('Copying file {} to {}'.format(Handler(self.ftpfilepath[i]).basename,
+                            print('Copying file {} to {}'.format(self.basename,
                                                                  self.dirname))
 
                     except:
-                        print('File {} not found or already written'.format(Handler(self.ftpfilepath[i]).basename))
+                        print('File {} not found on FTP server or already written'.format(self.basename))
         else:
             self.filename = self.dirname + Handler().sep + Handler(self.ftpfilepath).basename
             with open(self.filename, 'wb') as f:
@@ -622,5 +623,5 @@ class FTPHandler(Handler):
                         print('Copying file {} to {}'.format(Handler(self.ftpfilepath).basename,
                                                              self.dirname))
                 except:
-                    print('File {} not found or already written'.format(Handler(self.ftpfilepath).basename))
+                    print('File {} not found or already written'.format(self.basename))
 
