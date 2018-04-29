@@ -4,7 +4,7 @@ from sys import argv
 
 if __name__ == '__main__':
 
-    script, year, folder, regionfile, wrsfile = argv
+    script, year, folder, extractfolder, regionfile, wrsfile = argv
 
     # find the wrs2 path and row that intersect with region boundary
     path_row = find_path_row(regionfile, wrsfile)
@@ -34,5 +34,12 @@ if __name__ == '__main__':
 
     # disconnect the ftp
     ftp.disconnect()
+
+    # extrat gz files
+    gzfiles = Handler(dirname=folder).find_all('.gz')
+    for gzfile in gzfiles:
+        h = Handler(gzfile)
+        if h.get_size() != 0:
+            h.extract_gz(dirname=extractfolder)
 
     print('Done!')

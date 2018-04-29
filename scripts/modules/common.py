@@ -1,15 +1,13 @@
-import os
-import numpy as np
+from decimal import *
 import pandas as pd
+import numpy as np
 import datetime
 import fnmatch
 import psutil
 import ftplib
-import sys
 import gzip
-import glob
-
-np.set_printoptions(suppress=True)
+import sys
+import os
 
 
 __all__ = ['Sublist',
@@ -297,18 +295,34 @@ class Handler(object):
             content = f.readlines()
         return [x.strip() for x in content]
 
-    def extract_gz(self):
+    def extract_gz(self,
+                   dirname=None,
+                   add_ext=None):
         """
         Extract landsat file to a temp folder
+        :param dirname: Folder to extract all files to
+        :param add_ext: Extension to be added to extracted file
         """
 
-        # define a temp folder with scene ID
-        tempfile = self.dirname + self.sep + self.basename.split('.gz')[0]
+        if add_ext is None:
+            add_ext = ''
+        else:
+            add_ext = '.' + str(add_ext)
 
-        Handler(tempfile).file_remove_check()
+        # define a temp file with scene ID
+        if dirname is not None:
+            tempfile = dirname + self.sep + self.basename.split('.gz')[0] + add_ext
+        else:
+            tempfile = self.dirname + self.sep + self.basename.split('.gz')[0] + add_ext
+
+        # remove if file already exists
+        temp = Handler(tempfile)
+        temp.file_remove_check()
 
         # extract infile to temp folder
         if self.filename.endswith(".gz"):
+            Opt.cprint('Extracting {} to {}'.format(self.basename,
+                                                    temp.basename))
             with gzip.open(self.filename, 'rb') as gf:
                 file_content = gf.read()
                 with open(tempfile, 'wb') as fw:
@@ -316,6 +330,40 @@ class Handler(object):
 
         else:  # not a tar.gz archive
             raise TypeError("Not a .gz archive")
+
+    def get_size(self,
+                 unit='kb',
+                 precision=3,
+                 as_long=True):
+        """
+        Function to get file size
+        :param unit: Unit to get file size in (options: 'b', 'kb', 'mb', 'gb', 'tb', 'pb', 'bit')
+        :param precision: Precision to report
+        :param as_long: Should the output be returned as a long integer? This truncates any decimal value
+        :return: long integer
+        """
+        size = os.path.getsize(self.filename)
+
+        getcontext().prec = precision
+
+        if unit == 'bit':
+            output = float(Decimal(size)*Decimal(8))
+        elif unit == 'kb':
+            output = float(Decimal(size)/Decimal(1024))
+        elif unit == 'mb':
+            output = float(Decimal(size)/(Decimal(1024)*Decimal(1024)))
+        elif unit == 'gb':
+            output = float(Decimal(size)/(Decimal(1024)*Decimal(1024)*Decimal(1024)))
+        elif unit == 'tb':
+            output = float(Decimal(size)/(Decimal(1024)*Decimal(1024)*Decimal(1024)*Decimal(1024)))
+        elif unit == 'pb':
+            output = float(Decimal(size)/(Decimal(1024)*Decimal(1024)*Decimal(1024)*Decimal(1024)*Decimal(1024)))
+        else:
+            output = size
+        if as_long:
+            return long(round(output, precision))
+        else:
+            return round(output, precision)
 
     def write_list_to_file(self,
                            input_list,
@@ -614,14 +662,14 @@ class FTPHandler(Handler):
                                                                  self.dirname))
 
                     except:
-                        print('File {} not found on FTP server or already written'.format(self.basename))
+                        Opt.cprint('File {} not found on FTP server or already written'.format(self.basename))
         else:
             self.filename = self.dirname + Handler().sep + Handler(self.ftpfilepath).basename
             with open(self.filename, 'wb') as f:
                 try:
                     if ftp_conn.retrbinary("RETR {}".format(self.ftpfilepath), f.write):
-                        print('Copying file {} to {}'.format(Handler(self.ftpfilepath).basename,
+                        Opt.cprint('Copying file {} to {}'.format(Handler(self.ftpfilepath).basename,
                                                              self.dirname))
                 except:
-                    print('File {} not found or already written'.format(self.basename))
+                    Opt.cprint('File {} not found or already written'.format(self.basename))
 
