@@ -661,8 +661,9 @@ class FTPHandler(Handler):
                             print('Copying file {} to {}'.format(self.basename,
                                                                  self.dirname))
 
-                    except:
-                        Opt.cprint('File {} not found on FTP server or already written'.format(self.basename))
+                    except Exception as err:
+                        Opt.cprint('File {} not found or already written\n Error: {}'.format(self.basename,
+                                                                                             err))
         else:
             self.filename = self.dirname + Handler().sep + Handler(self.ftpfilepath).basename
             with open(self.filename, 'wb') as f:
