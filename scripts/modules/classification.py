@@ -477,8 +477,9 @@ class Samples:
         :return: Samples class representation
         """
         if self.csv_file is not None:
-            return "<Samples object from {cf} with {n} samples>".format(cf=Handler(self.csv_file).basename,
-                                                                        n=len(self.x))
+            return "<Samples object from {cf} with {v} variables, {n} samples>".format(cf=Handler(self.csv_file).basename,
+                                                                                       n=len(self.x),
+                                                                                       v=len(self.x_name))
         elif self.csv_file is None and self.x is not None:
             return "<Samples object with {n} samples>".format(n=len(self.x))
         else:
@@ -505,7 +506,7 @@ class Samples:
         rows = columns = variables (or dimensions)
         :param sensor: Sensor parameters to be used (current options: 'ls57' for Landsat 5 and 7,
                         and 'ls8' for Landsat 8)
-        :param display_progress: Should the elements of correlatino matrix
+        :param display_progress: Should the elements of correlation matrix
         be displayed while being calculated? (default: True)
 
         :return: Dictionary
@@ -549,3 +550,102 @@ class Samples:
             self.x.append(item)
         for item in samp.y:
             self.y.append(item)
+
+    def delete_column(self,
+                      column_id=None,
+                      column_name=None):
+        """
+        Function to remove a data column from the samples object
+        :param column_id: ID (index) of the column
+        :param column_name: Column label or name
+        :return: Samples object with a column removed
+        """
+        if column_id is None:
+            column_id = Sublist(self.x_name).where('=', column_name)
+        elif column_name is None:
+            raise AttributeError('No argument for delete operation')
+
+        temp = self.x
+        nsamp = len(temp)
+
+        self.x = list([val for j, val in enumerate(temp[i]) if j != column_id]
+                      for i in range(0, nsamp))
+        temp_name = self.x_name
+        self.x_name = [val for j, val in enumerate(temp_name) if j != column_id]
+
+    def extract_column(self,
+                       column_id=None,
+                       column_name=None):
+        """
+        Function to extract a data column from the samples object
+        :param column_id: ID (index) of the column
+        :param column_name: Column label or name
+        :return: Samples object with only one column
+        """
+        if column_id is None:
+            column_id = Sublist(self.x_name).where('=', column_name)
+        elif column_name is None:
+            raise AttributeError('No argument for extract operation')
+
+        temp = [samp[column_id] for samp in self.x]
+        temp_name = self.x_name[column_id]
+
+        return {'name': temp_name, 'value': temp}
+
+    def add_column(self,
+                   column_name=None,
+                   column_data=None,
+                   column_order=None):
+        """
+        Function to add a column to the samples matrix
+        :param column_name: Name of column to be added
+        :param column_data: List of column values to be added
+        :param column_order: List of numbers specifying column order for the column to be added
+                            (e.g. if for three samples, the first value in column_data
+                            is for second column, second value for first, third value for third,
+                            the column_order is [1, 0, 2]
+        :return: Samples object with added column
+        """
+
+        if column_data is None:
+            raise AttributeError('No argument for add operation')
+
+        if column_name is None:
+            column_name = 'Column_{}'.format(str(len(self.x_name) + 1))
+
+        if column_order is None or len(column_order) != len(self.x):
+            print('Inconsistent or missing order - ignored')
+            column_order = list(range(0, len(self.x)))
+
+        temp = list()
+        for i, j in enumerate(column_order):
+            prev_samp = list(val for val in self.x[j])
+            prev_samp.append(column_data[i])
+            temp.append(prev_samp)
+
+        self.x = temp
+        self.x_name.append(column_name)
+
+    def save_to_file(self,
+                     out_file):
+        """
+        Function to save sample object to csv file
+        :param out_file: CSV file full path (string)
+        :return: Write to file
+        """
+
+        samp_matrix = list()
+        for i, j in enumerate(range(0, len(self.x))):
+            samples = list(val for val in self.x[j])
+            samples.append(self.y)
+            samp_matrix.append(samples)
+
+        out_arr = np.array(samp_matrix)
+        out_names = self.x_name
+        out_names.append(self.y_name)
+
+        Handler(out_file).write_numpy_array_to_file(np_array=out_arr,
+                                                    colnames=out_names)
+
+
+

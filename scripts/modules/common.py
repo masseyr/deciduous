@@ -379,11 +379,6 @@ class Handler(object):
         :param delim: delimiter (default: ", ")
         :return: write to file
         """
-        print('inp list:')
-        print(input_list)
-        print(colnames)
-        print(rownames)
-
         # add rownames and colnames
         if rownames is not None and colnames is not None:
             input_list = [str(rownames[i]) + delim + input_list[i] for i in range(0, len(input_list))]
@@ -394,11 +389,6 @@ class Handler(object):
             input_list = [header] + input_list
         if rownames is not None and colnames is None:
             input_list = [rownames[i] + delim + input_list[i] for i in range(0, len(input_list))]
-
-        print('inp list:')
-        print(input_list)
-        print(colnames)
-        print(rownames)
 
         # create dir path if it does not exist
         self.dir_create()
