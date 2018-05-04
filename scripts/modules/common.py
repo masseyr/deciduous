@@ -295,6 +295,36 @@ class Handler(object):
             content = f.readlines()
         return [x.strip() for x in content]
 
+    def read_array_from_csv(self,
+                            delim=",",
+                            array_1d=False,
+                            nodataval=None):
+        """
+        Read array from file and output a numpy array. There should be no header.
+        :param delim: Delimiter (default ',')
+        :param array_1d: Should the array be reshaped to 1-dimensional array? (default: False)
+        :param nodataval: Data values to be removed from 1-dimensional array
+                          (ignored if array_1d flag is false)
+        :returns: Numpy array (2d or 1d)
+        """
+        with open(self.filename) as f:
+            content = f.readlines()
+            lines = [x.strip() for x in content]
+            ncols = len(lines[0].split(delim))
+            nrows = len(lines)
+            arr = np.zeros((nrows, ncols))
+            for i, line in enumerate(lines):
+                arr[i:] = [float(elem.strip()) for elem in line.split(delim)]
+
+        if array_1d:
+            lenr, lenc = arr.shape
+            arr_out = arr.reshape(lenr * lenc)
+            if nodataval is not None:
+                arr_out = arr_out[arr_out != nodataval]
+            return arr_out
+        else:
+            return arr
+
     def extract_gz(self,
                    dirname=None,
                    add_ext=None):
@@ -480,18 +510,18 @@ class Handler(object):
         :param rownames: list of row name strings
         :param delim: Delimiter (default: ", ")
         """
-
         # format numpy 2d array as list of strings, each string is a line to be written
-        inp_list = [delim.join(["{:{w}.{p}f}".format(np_array[i, j], w=4, p=9)
-                                for j in range(0, np_array.shape[1])])
-                    for i in range(0, np_array.shape[0])]
+        lines = list()
+        for i in range(0, np_array.shape[0]):
+            lines.append(delim.join(["{:{w}.{p}f}".format(np_array[i, j], w=4, p=9)
+                                     for j in range(0, np_array.shape[1])]))
 
         # if column names are available from numpy array, this overrides input colnames
         if np_array.dtype.names is not None:
             colnames = list(np_array.dtype.names)
 
         # write to file
-        self.write_list_to_file(inp_list,
+        self.write_list_to_file(lines,
                                 rownames=rownames,
                                 colnames=colnames,
                                 delim=delim)

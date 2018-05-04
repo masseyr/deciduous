@@ -99,3 +99,5 @@ ENV/
 .mypy_cache/
 *.xml
 *.iml
+scripts/test_1.py
+scripts/test_2.py

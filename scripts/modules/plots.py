@@ -70,8 +70,10 @@ class Plot:
                 plot = self.histogram()
             elif self.dict['type'] == 'boxwhisker':
                 plot = self.boxwhisker()
-            elif self.dict['type'] == 'heatmap':
-                plot = self.heatmap()
+            elif self.dict['type'] == 'mheatmap':
+                plot = self.matrix_heatmap()
+            elif self.dict['type'] == 'rheatmap':
+                plot = self.regression_heatmap()
             else:
                 plot = None
 
@@ -79,8 +81,10 @@ class Plot:
                 # save to file or show in window
                 if self.filename is not None:
                     plot.savefig(self.filename)
+                    plot.close()
                 else:
                     plot.show()
+
             else:
                 raise ObjectNotFound
 
@@ -213,7 +217,7 @@ class Plot:
 
         return plt
 
-    def heatmap(self):
+    def matrix_heatmap(self):
         """
         Make plot object of type heatmap
         :return: Plot object
@@ -275,3 +279,92 @@ class Plot:
 
         return plt
 
+    def regression_heatmap(self):
+
+        if 'points' in self.dict:
+            x = [pt[0] for pt in self.dict['points']]
+            y = [pt[1] for pt in self.dict['points']]
+        else:
+            raise ValueError('No data found')
+
+        if 'xlim' in self.dict:
+            xlim = self.dict['xlim']
+            xloc = list(k for k in range(0, len(x)) if xlim[0] <= x[k] <= xlim[1])
+
+        else:
+            xloc = list(range(0, len(x)))
+            xlim = (min(x), max(x))
+
+        if 'ylim' in self.dict:
+            ylim = self.dict['ylim']
+            yloc = list(k for k in range(0, len(y)) if ylim[0] <= y[k] <= ylim[1])
+
+        else:
+            yloc = list(range(0, len(y)))
+            ylim = (min(y), max(y))
+
+        loc = list(set(xloc) & set(yloc))
+
+        points_ = list(self.dict['points'][k] for k in loc)
+
+        x_ = list(pt[0] for pt in points_)
+        y_ = list(pt[1] for pt in points_)
+
+        if 'xbins' in self.dict and 'ybins' in self.dict:
+            xbins = self.dict['xbins']
+            ybins = self.dict['ybins']
+        elif 'ybins' in self.dict and 'xbins' not in self.dict:
+            ybins = self.dict['ybins']
+            xbins = self.dict['ybins']
+        elif 'xbins' in self.dict and 'ybins' not in self.dict:
+            ybins = self.dict['xbins']
+            xbins = self.dict['xbins']
+        else:
+            xbins = 50
+            ybins = 50
+
+        if 'xbinvals' in self.dict and 'ybinvals' in self.dict:
+            zi, xedges, yedges = np.histogram2d(x_, y_, bins=[self.dict['xbinvals'],
+                                                              self.dict['ybinvals']])
+        else:
+            zi, xedges, yedges = np.histogram2d(x_, y_, bins=[xbins, ybins])
+
+        xi, yi = np.meshgrid(xedges, yedges)
+
+        if 'color' in self.dict:
+            color = self.dict['color']
+        else:
+            color = plt.cm.gnuplot2_r
+
+        plt.pcolormesh(xi, yi, zi, cmap=color)
+
+        if 'xlabel' in self.dict:
+            xlabel = self.dict['xlabel']
+        else:
+            xlabel = 'x'
+
+        if 'ylabel' in self.dict:
+            ylabel = self.dict['ylabel']
+        else:
+            ylabel = 'y'
+
+        if 'title' in self.dict:
+            title = self.dict['title']
+        else:
+            title = 'Regression heatmap'
+
+        plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
+
+        if 'color_bar_label' in self.dict:
+            plt.colorbar().set_label(self.dict['color_bar_label'])
+
+        if 'line' in self.dict:
+            if self.dict['line']:
+                fit = np.polyfit(x, y, 1)
+                print('Fitting coefficients: ' + ' '.join([str(i) for i in fit]))
+                plt.plot(x_, [fit[0] * x_[i] + fit[1] for i in range(0, len(x_))], 'r-', lw=0.5)
+                plt.xlim(xlim)
+                plt.ylim(ylim)
+
+        return plt

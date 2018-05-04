@@ -1,3 +1,4 @@
+import numpy as np
 from modules import *
 
 if __name__ == '__main__':
@@ -67,7 +68,7 @@ if __name__ == '__main__':
     boxwhisker.draw()
 
     # **************************************************
-    # plotting heatmap
+    # plotting matrix heatmap
 
     infile = "D:\\Shared\\Dropbox\\projects\\NAU\\landsat_deciduous\\data\\ABoVE_all_2010_sampV1_clean.csv"
     plotfile = "D:\\Shared\\Dropbox\\projects\\NAU\\landsat_deciduous\\data\\heatmap2.png"
@@ -79,7 +80,7 @@ if __name__ == '__main__':
     xlabel = corr_dict['names']
 
     plot_heatmap = {
-        'type': 'heatmap',
+        'type': 'mheatmap',
         'data': corr_mat,
         'xlabel': xlabel,
         'title': 'Correlation among variables',
@@ -87,6 +88,40 @@ if __name__ == '__main__':
         'show_values': False,
         'heat_range': [0.0, 1.0],
         'color_str': "YlGnBu"
+    }
+
+    heatmap = Plot(plot_heatmap)
+    heatmap.draw()
+
+    # **************************************************
+    # plotting regression heatmap
+
+    yhb_arr = Handler("C:/Users/rm885/Dropbox/projects/NAU/landsat_deciduous/data/RF_bootstrap_2000_y_hat_bar_v1.csv")\
+        .read_array_from_csv(array_1d=True, nodataval=-99.0)
+    vary_arr = Handler("C:/Users/rm885/Dropbox/projects/NAU/landsat_deciduous/data/RF_bootstrap_2000_var_y_v1.csv") \
+        .read_array_from_csv(array_1d=True, nodataval=-99.0)
+    yf_arr = Handler("C:/Users/rm885/Dropbox/projects/NAU/landsat_deciduous/data/RF_bootstrap_2000_y_v1.csv") \
+        .read_array_from_csv(array_1d=True, nodataval=-99.0)
+
+    y = np.abs(yf_arr-yhb_arr)
+    x = vary_arr
+
+    pts = [(x[i], y[i]) for i in range(0, len(x))]
+
+    plotfile = 'c:/temp/test_plot9_.png'
+
+    plot_heatmap = {
+        'type': 'rheatmap',
+        'points': pts,
+        'xlabel': 'Variance in tree predictors',
+        'ylabel': 'Abs. difference in observed and predicted',
+        'color_bar_label': 'Data-points per bin',
+        'plotfile': plotfile,
+        'xlim': (0, 0.1),
+        'ylim': (0, 0.25),
+        'line': True,
+        'xbins': 50,
+        'ybins': 50,
     }
 
     heatmap = Plot(plot_heatmap)

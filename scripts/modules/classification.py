@@ -442,12 +442,12 @@ class Samples:
         self.index = None
 
         # either of label name or csv file is provided without the other
-        if (label_colname is not None) != (csv_file is not None):
-            raise ValueError("Missing label or file")
+        if (csv_file is None) and (label_colname is None):
+            print("Samples initiated without data file or label")
 
         # label name or csv file are provided
-        elif (label_colname is not None and
-              csv_file is not None):
+        elif (label_colname is not None) and (csv_file is not None):
+
             temp = Handler(filename=csv_file).read_from_csv()
 
             # label name doesn't match
@@ -457,7 +457,6 @@ class Samples:
                 raise ValueError("Label name mismatch.\nAvailable names: " + ', '.join(temp['name']))
 
             # read from data dictionary
-
             self.x_name = [elem.strip() for elem in temp['name'][:loc] + temp['name'][(loc + 1):]]
             self.x = [feat[:loc] + feat[(loc + 1):] for feat in temp['feature']]
             self.y = [feat[loc] for feat in temp['feature']]
@@ -467,9 +466,16 @@ class Samples:
             if use_band_dict is not None:
                 self.y_name = [use_band_dict[b] for b in self.y_name]
 
-        # no label name or csv file, but either feature or label list is provided without the other
-        elif (x is not None) != (y is not None):
-            raise ValueError("Missing label or feature")
+        elif (label_colname is None) and (csv_file is not None):
+
+            temp = Handler(filename=csv_file).read_from_csv()
+
+            # read from data dictionary
+            self.x_name = [elem.strip() for elem in temp['name']]
+            self.x = [feat for feat in temp['feature']]
+
+        else:
+            ValueError("No data found for label.")
 
     def __repr__(self):
         """
@@ -560,10 +566,11 @@ class Samples:
         :param column_name: Column label or name
         :return: Samples object with a column removed
         """
-        if column_id is None:
-            column_id = Sublist(self.x_name).where('=', column_name)
-        elif column_name is None:
+        if column_name is None and column_id is None:
             raise AttributeError('No argument for delete operation')
+
+        elif column_id is None and column_name is not None:
+            column_id = Sublist(self.x_name).where('=', column_name)
 
         temp = self.x
         nsamp = len(temp)
@@ -582,10 +589,12 @@ class Samples:
         :param column_name: Column label or name
         :return: Samples object with only one column
         """
-        if column_id is None:
-            column_id = Sublist(self.x_name).where('=', column_name)
-        elif column_name is None:
+
+        if column_name is None and column_id is None:
             raise AttributeError('No argument for extract operation')
+
+        elif column_id is None and column_name is not None:
+            column_id = Sublist(self.x_name).where('=', column_name)
 
         temp = [samp[column_id] for samp in self.x]
         temp_name = self.x_name[column_id]
