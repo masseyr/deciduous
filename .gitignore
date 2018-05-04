@@ -101,3 +101,4 @@ ENV/
 *.iml
 scripts/test_1.py
 scripts/test_2.py
+scripts/test_3.py
