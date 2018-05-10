@@ -11,6 +11,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 from scipy.stats.stats import pearsonr
 
 __all__ = ['RFRegressor',
+           'MRegressor',
            'Samples']
 
 
