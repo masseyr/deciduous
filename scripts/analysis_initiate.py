@@ -1,7 +1,8 @@
 from modules import *
 import random
 import datetime
-# from sys import argv
+import os
+from sys import argv
 
 """
 This script is used to generate most of the python and bash scripts

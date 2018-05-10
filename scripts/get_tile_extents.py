@@ -1,5 +1,6 @@
 import glob
 import json
+import os
 from sys import argv
 from osgeo import ogr, osr
 from shutil import copyfile

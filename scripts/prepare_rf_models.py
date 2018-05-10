@@ -29,7 +29,7 @@ if __name__ == '__main__':
     print(trn_Csamp)
 
     # initialize RF clasifier
-    rf_model = Classifier(trees=500, samp_split=15, oob_score=False)
+    rf_model = RFRegressor(trees=500, samp_split=15, oob_score=False)
     print(rf_model)
 
     # fit RF classifier using training data
@@ -44,14 +44,14 @@ if __name__ == '__main__':
     outfile1 = Handler(outfile).dirname + sep + \
         'val' + sep + 'val_samp_' + Handler(outfile).basename
     outfile1 = Handler(filename=outfile1).file_remove_check()
-    pred = rf_model.tree_predictions(trn_Csamp.format_data(), outfile=outfile1, picklefile=picklefile)
+    pred = rf_model.sample_predictions(trn_Csamp.format_data(), outfile=outfile1, picklefile=picklefile)
     print(pred)
 
     # check training samples for fit
     outfile2 = Handler(outfile).dirname + sep + \
         'trn' + sep + 'trn_samp_' + Handler(outfile).basename
     outfile2 = Handler(filename=outfile2).file_remove_check()
-    pred3 = rf_model.tree_predictions(trn_samp.format_data(), outfile=outfile2, picklefile=picklefile)
+    pred3 = rf_model.sample_predictions(trn_samp.format_data(), outfile=outfile2, picklefile=picklefile)
     print(pred3)
 
     # predict using all samples and print to file
@@ -62,5 +62,5 @@ if __name__ == '__main__':
     outfile3 = Handler(outfile).dirname + sep + \
         'all' + sep + 'all_samp_' + Handler(outfile).basename
     outfile3 = Handler(filename=outfile3).file_remove_check()
-    pred3 = rf_model.tree_predictions(trn_Csamp.format_data(), outfile=outfile3, picklefile=picklefile)
+    pred3 = rf_model.sample_predictions(trn_Csamp.format_data(), outfile=outfile3, picklefile=picklefile)
     print(pred3)

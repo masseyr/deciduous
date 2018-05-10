@@ -25,7 +25,7 @@ if __name__ == '__main__':
     print('-----------------------------------------------------------------')
 
     # load classifier from file
-    rf_classifier = Classifier.load_from_pickle(rf_picklefile)
+    rf_classifier = RFRegressor.load_from_pickle(rf_picklefile)
     print(rf_classifier)
     classif_bandnames = rf_classifier.data['feature_names']
     print('Bands : ' + ' '.join(classif_bandnames))

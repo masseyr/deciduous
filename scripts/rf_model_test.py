@@ -79,16 +79,16 @@ if __name__ == '__main__':
                                                                                        str(split[j])))
 
                 # initialize RF clasifier
-                rf_model = Classifier(trees=trees[i],
-                                      samp_split=split[j],
-                                      oob_score=False)
+                rf_model = RFRegressor(trees=trees[i],
+                                       samp_split=split[j],
+                                       oob_score=False)
 
                 # fit RF classifier using training data
                 rf_model.fit_data(trn_samp.format_data())
                 # print(rf_model)
 
                 # get prediction from the RF model
-                pred = rf_model.tree_predictions(trn_Csamp.format_data())
+                pred = rf_model.sample_predictions(trn_Csamp.format_data())
 
                 # predict and store result in array
                 result[0, i, j] = pred['rsq']

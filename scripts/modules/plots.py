@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 import seaborn as sns
 
-
+plt.rcParams['agg.path.chunksize'] = 100000
 plt.rcParams["patch.force_edgecolor"] = True
 plt.interactive(False)
 
@@ -49,8 +49,9 @@ class Plot:
         :param dict: Input dictionary of parameters
         """
         self.dict = dict
+
         if 'plotfile' in self.dict:
-            self.filename = Handler(self.dict['plotfile']).file_remove_check()
+            self.filename = self.dict['plotfile']
         else:
             self.filename = None
 
@@ -80,6 +81,7 @@ class Plot:
             if plot is not None:
                 # save to file or show in window
                 if self.filename is not None:
+                    self.filename = Handler(self.dict['plotfile']).file_remove_check()
                     plot.savefig(self.filename)
                     plot.close()
                 else:
@@ -289,18 +291,18 @@ class Plot:
 
         if 'xlim' in self.dict:
             xlim = self.dict['xlim']
-            xloc = list(k for k in range(0, len(x)) if xlim[0] <= x[k] <= xlim[1])
+            xloc = list(k for k in range(0, len(self.dict['points'])) if xlim[0] <= x[k] <= xlim[1])
 
         else:
-            xloc = list(range(0, len(x)))
+            xloc = list(range(0, len(self.dict['points'])))
             xlim = (min(x), max(x))
 
         if 'ylim' in self.dict:
             ylim = self.dict['ylim']
-            yloc = list(k for k in range(0, len(y)) if ylim[0] <= y[k] <= ylim[1])
+            yloc = list(k for k in range(0, len(self.dict['points'])) if ylim[0] <= y[k] <= ylim[1])
 
         else:
-            yloc = list(range(0, len(y)))
+            yloc = list(range(0, len(self.dict['points'])))
             ylim = (min(y), max(y))
 
         loc = list(set(xloc) & set(yloc))

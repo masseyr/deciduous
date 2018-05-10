@@ -4,7 +4,7 @@ from modules import *
 if __name__ == '__main__':
     # **************************************************
     # plotting histogram plot - rmse, rsq
-
+    """
     datafile = "D:\\projects\\NAU\\landsat_deciduous\\data\\rf_info_val.csv"
     names, data = Handler(datafile).read_csv_as_array()
 
@@ -92,36 +92,39 @@ if __name__ == '__main__':
 
     heatmap = Plot(plot_heatmap)
     heatmap.draw()
-
+    """
     # **************************************************
     # plotting regression heatmap
 
-    yhb_arr = Handler("C:/Users/rm885/Dropbox/projects/NAU/landsat_deciduous/data/RF_bootstrap_2000_y_hat_bar_v1.csv")\
+    yhb_arr = Handler("C:/users/rm885/Dropbox/projects/NAU/landsat_deciduous/data/RF_bootstrap_2000_y_hat_bar_v1.csv")\
         .read_array_from_csv(array_1d=True, nodataval=-99.0)
-    vary_arr = Handler("C:/Users/rm885/Dropbox/projects/NAU/landsat_deciduous/data/RF_bootstrap_2000_var_y_v1.csv") \
+    vary_arr = Handler("C:/users/rm885/Dropbox/projects/NAU/landsat_deciduous/data/RF_bootstrap_2000_var_y_v1.csv") \
         .read_array_from_csv(array_1d=True, nodataval=-99.0)
-    yf_arr = Handler("C:/Users/rm885/Dropbox/projects/NAU/landsat_deciduous/data/RF_bootstrap_2000_y_v1.csv") \
+    yf_arr = Handler("C:/users/rm885/Dropbox/projects/NAU/landsat_deciduous/data/RF_bootstrap_2000_y_v1.csv") \
         .read_array_from_csv(array_1d=True, nodataval=-99.0)
 
-    y = np.abs(yf_arr-yhb_arr)
+    y = (np.abs(yf_arr-yhb_arr))**2
     x = vary_arr
+    print(np.mean(y))
+    print(np.mean(x))
 
-    pts = [(x[i], y[i]) for i in range(0, len(x))]
+    pts = [(np.sqrt(x[i]), np.sqrt(y[i])) for i in range(0, len(x))]
+    # pts = [(x[i], y[i]) for i in range(0, len(x))]
 
-    plotfile = 'c:/temp/test_plot9_.png'
+    plotfile = 'C:/users/rm885/Dropbox/projects/NAU/landsat_deciduous/data/test_plot12_.png'
 
     plot_heatmap = {
         'type': 'rheatmap',
         'points': pts,
-        'xlabel': 'Variance in tree predictors',
+        'xlabel': 'SD in tree predictors',
         'ylabel': 'Abs. difference in observed and predicted',
         'color_bar_label': 'Data-points per bin',
-        'plotfile': plotfile,
-        'xlim': (0, 0.1),
-        'ylim': (0, 0.25),
-        'line': True,
-        'xbins': 50,
-        'ybins': 50,
+        'plotfile': None,
+        'xlim': (0, 0.5),
+        'ylim': (0, 1),
+        'line': False,
+        'xbins': 100,
+        'ybins': 100,
     }
 
     heatmap = Plot(plot_heatmap)
