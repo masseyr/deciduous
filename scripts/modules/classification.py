@@ -18,7 +18,7 @@ __all__ = ['RFRegressor',
 sep = Handler().sep
 
 
-class Classifier(object):
+class _Classifier(object):
 
     def __init__(self,
                  data=None,
@@ -38,6 +38,10 @@ class Classifier(object):
         """
         self.data = data
         self.classifier.fit(data['features'], data['labels'])
+
+    def predict(self, *args, **kwargs):
+        """Placeholder function"""
+        return
 
     def pickle_it(self,
                   outfile):
@@ -64,7 +68,6 @@ class Classifier(object):
                         raster_obj,
                         outfile=None,
                         outdir=None,
-                        predict_method=None,
                         band_name='prediction',
                         output_type='pred',
                         array_multiplier=1.0,
@@ -74,8 +77,6 @@ class Classifier(object):
         """Tree variance from the RF classifier
         :param raster_obj: Initialized Raster object with a 3d array
         :param outfile: name of output classification file
-        :param predict_method: Classifier method to predict output values
-                              (e.g. RFRegressor.predict or MRegressor.predict)
         :param array_multiplier: rescale data using this value
         :param array_additive: Rescale data using this value
         :param data_type: output raster data type
@@ -86,60 +87,54 @@ class Classifier(object):
         :returns: classification as raster object
         """
 
-        if predict_method is None:
+        # file handler object
+        handler = Handler(raster_obj.name)
 
-            raise ValueError("No method to calculate raster array")
-
-        else:
-
-            # file handler object
-            handler = Handler(raster_obj.name)
-
-            # resolving output name
-            if outdir is None:
-                if outfile is None:
-                    outfile = handler.add_to_filename('_{}'.format(band_name))
-            elif outfile is None:
-                handler.dirname = outdir
+        # resolving output name
+        if outdir is None:
+            if outfile is None:
                 outfile = handler.add_to_filename('_{}'.format(band_name))
-            else:
-                outfile = Handler(outfile).file_remove_check()
+        elif outfile is None:
+            handler.dirname = outdir
+            outfile = handler.add_to_filename('_{}'.format(band_name))
+        else:
+            outfile = Handler(outfile).file_remove_check()
 
-            out_ras = Raster(outfile)
+        out_ras = Raster(outfile)
 
-            # classify by line
-            nbands = raster_obj.shape[0]
-            nrows = raster_obj.shape[1]
-            ncols = raster_obj.shape[2]
+        # classify by line
+        nbands = raster_obj.shape[0]
+        nrows = raster_obj.shape[1]
+        ncols = raster_obj.shape[2]
 
-            print('Shape: ' + ', '.join([str(elem) for elem in raster_obj.shape]))
+        print('Shape: ' + ', '.join([str(elem) for elem in raster_obj.shape]))
 
-            # reshape into a long 2d array (nband, nrow * ncol) for classification,
-            new_shape = [nbands, nrows * ncols]
+        # reshape into a long 2d array (nband, nrow * ncol) for classification,
+        new_shape = [nbands, nrows * ncols]
 
-            print('New Shape: ' + ', '.join([str(elem) for elem in new_shape]))
-            temp_arr = raster_obj.array
-            temp_arr = temp_arr.reshape(new_shape) * array_multiplier + array_additive
-            temp_arr = temp_arr.swapaxes(0, 1)
+        print('New Shape: ' + ', '.join([str(elem) for elem in new_shape]))
+        temp_arr = raster_obj.array
+        temp_arr = temp_arr.reshape(new_shape) * array_multiplier + array_additive
+        temp_arr = temp_arr.swapaxes(0, 1)
 
-            # apply the variance calculating function on the array
-            out_arr = predict_method(temp_arr,
-                                     output=output_type)
+        # apply the variance calculating function on the array
+        out_arr = self.predict(temp_arr,
+                               output=output_type)
 
-            # output raster and metadata
-            out_ras.dtype = data_type
-            out_ras.transform = raster_obj.transform
-            out_ras.crs_string = raster_obj.crs_string
+        # output raster and metadata
+        out_ras.dtype = data_type
+        out_ras.transform = raster_obj.transform
+        out_ras.crs_string = raster_obj.crs_string
 
-            out_ras.array = out_arr.reshape([nrows, ncols])
-            out_ras.shape = [1, nrows, ncols]
-            out_ras.bnames = [band_name]
+        out_ras.array = out_arr.reshape([nrows, ncols])
+        out_ras.shape = [1, nrows, ncols]
+        out_ras.bnames = [band_name]
 
-            # return raster object
-            return out_ras
+        # return raster object
+        return out_ras
 
 
-class MRegressor(Classifier):
+class MRegressor(_Classifier):
     """Multiple linear regressor object for scikit-learn linear model"""
 
     def __init__(self,
@@ -285,7 +280,7 @@ class MRegressor(Classifier):
         }
 
 
-class RFRegressor(Classifier):
+class RFRegressor(_Classifier):
     """Random Forest Regressor class for scikit-learn Random Forest regressor"""
 
     def __init__(self,
