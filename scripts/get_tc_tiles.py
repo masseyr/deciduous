@@ -39,7 +39,7 @@ if __name__ == '__main__':
     gzfiles = Handler(dirname=folder).find_all('.gz')
     for gzfile in gzfiles:
         h = Handler(gzfile)
-        if h.get_size() != 0:
+        if h.get_size() > 0:
             h.extract_gz(dirname=extractfolder)
         else:
             h.file_delete()
