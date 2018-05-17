@@ -4,7 +4,7 @@ from modules import *
 if __name__ == '__main__':
     # **************************************************
     # plotting histogram plot - rmse, rsq
-    """
+
     datafile = "D:\\projects\\NAU\\landsat_deciduous\\data\\rf_info_val.csv"
     names, data = Handler(datafile).read_csv_as_array()
 
@@ -92,7 +92,7 @@ if __name__ == '__main__':
 
     heatmap = Plot(plot_heatmap)
     heatmap.draw()
-    """
+
     # **************************************************
     # plotting regression heatmap
 
