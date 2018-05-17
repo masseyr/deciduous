@@ -57,7 +57,6 @@ if __name__ == '__main__':
 
     # get projection information
     spref = osr.SpatialReference(raster_metaDict['projection'])
-    raster_metaDict = None
 
     # initialize layer for the features
     layer = outfileptr.CreateLayer("Tiles", spref, geom_type=ogr.wkbPolygon)
@@ -68,11 +67,9 @@ if __name__ == '__main__':
     for i, filename in enumerate(filelist):
 
         # get meta data from the first raster and make feature geojson
-        raster_obj2 = Raster(filename)
-        raster_metaDict = Raster.get_raster_metadict(filename)
+        raster_obj2 = Raster(filename).initialize()
+        raster_metaDict = raster_obj2.metadict
         raster_feat_geojson = raster_obj2.make_polygon_geojson_feature()
-
-        print('Adding feature ' + str(i + 1) + ' : ' + raster_metaDict["name"])
 
         # output geometry
         json_string = json.dumps(raster_feat_geojson['geometry'])
@@ -95,7 +92,7 @@ if __name__ == '__main__':
             # create the feature in the layer
             layer.CreateFeature(outFeat)
             
-            print('2')
+            print('Adding feature ' + str(i + 1) + ' : ' + raster_metaDict["name"])
             
             # destroy the objects
             outFeat = None

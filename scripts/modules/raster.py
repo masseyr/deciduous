@@ -80,9 +80,7 @@ class Raster:
         print('File written to disk!')
         fileptr = None
 
-    @classmethod
-    def initialize(cls,
-                   raster_name,
+    def initialize(self,
                    get_array=False,
                    band_order=None,
                    finite_only=True,
@@ -92,8 +90,6 @@ class Raster:
 
         """
         Initialize a raster object from a file
-        :param cls: Raster object class <empty>
-        :param raster_name: raster filename
         :param get_array: flag to include raster as 3 dimensional array (bool)
         :param band_order: band location array (int starting at 0; ignored if get_array is False)
         :param finite_only: flag to remove non-finite values from array (ignored if get_array is False)
@@ -103,6 +99,7 @@ class Raster:
         (ignored if finite_only, get_array is false)
         :return raster object
         """
+        raster_name = self.name
 
         if Handler(raster_name).file_exists():
 
@@ -162,14 +159,13 @@ class Raster:
                             print("Non-finite values absent in file")
 
                 # assign to empty class object
-                raster_obj = cls(name=raster_name,
-                                 array=array3d,
-                                 bnames=names,
-                                 shape=[bands, rows, cols],
-                                 transform=fileptr.GetGeoTransform(),
-                                 crs_string=fileptr.GetProjection(),
-                                 dtype=fileptr.GetRasterBand(1).DataType,
-                                 metadict=Raster.get_raster_metadict(raster_name))
+                self.array = array3d,
+                self.bnames = names,
+                self.shape = [bands, rows, cols],
+                self.transform = fileptr.GetGeoTransform(),
+                self.crs_string = fileptr.GetProjection(),
+                self.dtype = fileptr.GetRasterBand(1).DataType,
+                self.metadict = Raster.get_raster_metadict(raster_name)
 
             # if get_array is false
             else:
@@ -179,20 +175,18 @@ class Raster:
                     names.append(fileptr.GetRasterBand(i + 1).GetDescription())
 
                 # assign to empty class object without the array
-                raster_obj = cls(name=raster_name,
-                                 bnames=names,
-                                 shape=[bands, rows, cols],
-                                 transform=fileptr.GetGeoTransform(),
-                                 crs_string=fileptr.GetProjection(),
-                                 dtype=fileptr.GetRasterBand(1).DataType,
-                                 metadict=Raster.get_raster_metadict(raster_name))
+                self.bnames = names,
+                self.shape = [bands, rows, cols],
+                self.transform = fileptr.GetGeoTransform(),
+                self.crs_string = fileptr.GetProjection(),
+                self.dtype = fileptr.GetRasterBand(1).DataType,
+                self.metadict = Raster.get_raster_metadict(raster_name)
             fileptr = None
 
             # remap band names
             if use_dict is not None:
-                raster_obj.bnames = [use_dict[sensor][b] for b in raster_obj.bnames]
+                self.bnames = [use_dict[sensor][b] for b in self.bnames]
 
-            return raster_obj
         else:
             raise ValueError('No matching file found on disk')
 
