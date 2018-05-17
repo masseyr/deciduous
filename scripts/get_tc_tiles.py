@@ -41,5 +41,7 @@ if __name__ == '__main__':
         h = Handler(gzfile)
         if h.get_size() != 0:
             h.extract_gz(dirname=extractfolder)
+        else:
+            h.file_delete()
 
     print('Done!')
