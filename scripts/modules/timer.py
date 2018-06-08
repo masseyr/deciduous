@@ -8,7 +8,7 @@ class Timer:
 
     example usage:
 
-    @Timer.timing()
+    @Timer.timing(True)
     def my_function(a, b, c):
         return a + b + c
 
@@ -83,6 +83,7 @@ class Timer:
                doit=False):
         """
         Function to compute timing for input function
+        :param doit: Keyword to determine if the wrapper returns the function with ot without timing it
         :return: Function and prints time taken
         """
 
