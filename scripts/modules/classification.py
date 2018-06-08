@@ -630,8 +630,10 @@ class Samples:
         for i, name in enumerate(self.x_name):
             print(str(i)+' '+name)
             if name in bname_dict[sensor]:
-                var_names.append(bname_dict[sensor][name])
-                i = i + 1
+                var_names.append(bname_dict[sensor][name.upper()])
+            else:
+                var_names.append(name.upper())
+            i = i + 1
 
         # initialize correlation matrix
         corr = np.zeros([nvar, nvar], dtype=float)
