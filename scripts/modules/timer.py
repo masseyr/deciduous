@@ -40,7 +40,7 @@ class Timer:
         :return: String
         """
 
-        # define intervals for time periods
+        # define denominations
         intervals = [('weeks', 604800),
                      ('days', 86400),
                      ('hours', 3600),
