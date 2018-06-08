@@ -60,7 +60,9 @@ bname_dict = {
         'RATIO57_2': 'RATIO57_Period3',
         'ND57_2': 'ND57_Period3',
         'NMDI_2': 'NMDI_Period3',
-        'EVI_2': 'EVI_Period3'},
+        'EVI_2': 'EVI_Period3',
+        'SLOPE': 'SLOPE',
+        'ELEVATION': 'ELEVATION'},
 
     'ls8': {
         'BLUE': 'BLUE_Period1',
@@ -101,7 +103,9 @@ bname_dict = {
         'RATIO57_2': 'RATIO57_Period3',
         'ND57_2': 'ND57_Period3',
         'NMDI_2': 'NMDI_Period3',
-        'EVI_2': 'EVI_Period3'},
+        'EVI_2': 'EVI_Period3',
+        'SLOPE': 'SLOPE',
+        'ELEVATION': 'ELEVATION'},
 
 }
 
