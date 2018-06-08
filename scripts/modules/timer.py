@@ -79,7 +79,8 @@ class Timer:
         return ' '.join(result)
 
     @classmethod
-    def timing(cls):
+    def timing(cls,
+               doit=False):
         """
         Function to compute timing for input function
         :return: Function and prints time taken
@@ -98,15 +99,18 @@ class Timer:
                 :param kwargs: Key word arguments
                 :return: Function func return
                 """
-                t1 = time.time()
-                val = func(*args, **kwargs)
-                t2 = time.time()
+                if doit:
+                    t1 = time.time()
+                    val = func(*args, **kwargs)
+                    t2 = time.time()
 
-                # time to run
-                t = Timer.display_time(t2 - t1)
+                    # time to run
+                    t = Timer.display_time(t2 - t1)
 
-                print("Time it took to run {}: {}\n".format(func.__name__,
-                                                            t))
-                return val
+                    print("Time it took to run {}: {}\n".format(func.__name__,
+                                                                t))
+                    return val
+                else:
+                    return func(*args, **kwargs)
             return wrapper
         return time_it
