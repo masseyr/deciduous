@@ -83,7 +83,8 @@ class Timer:
                doit=False):
         """
         Function to compute timing for input function
-        :param doit: Keyword to determine if the wrapper returns the function with ot without timing it
+        :param doit: (abbr: Do it.) Keyword to determine if the wrapper returns
+                     the function with or without timing it
         :return: Function and prints time taken
         """
 
