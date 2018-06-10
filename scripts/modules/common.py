@@ -20,6 +20,79 @@ class Sublist(list):
     """
     Class to handle list operations
     """
+    def __eq__(self, other):
+        """
+        Check for a = <some value>
+        return: List of indices
+        """
+        return list(i for i in range(0, len(self)) if self[i] == other)
+
+    def __gt__(self, other):
+        """
+        Check for a > <some value>
+        return: List of indices
+        """
+        return list(i for i in range(0, len(self)) if self[i] > other)
+
+    def __ge__(self, other):
+        """
+        Check for a >= <some value>
+        return: List of indices
+        """
+        return list(i for i in range(0, len(self)) if self[i] >= other)
+
+    def __lt__(self, other):
+        """
+        Check for a < <some value>
+        return: List of indices
+        """
+        return list(i for i in range(0, len(self)) if self[i] < other)
+
+    def __le__(self, other):
+        """
+        Check for a <= <some value>
+        return: List of indices
+        """
+        return list(i for i in range(0, len(self)) if self[i] <= other)
+
+    def __ne__(self, other):
+        """
+        Check for a != <some value>
+        return: List of indices
+        """
+        return list(i for i in range(0, len(self)) if self[i] != other)
+
+    def __getitem__(self, item):
+        """
+        Method to get item(s) from the list using list or number as index
+        :param item: Number or list of numbers
+        :return: List
+        """
+        if isinstance(item, list):
+            try:
+                return list(list(self)[i] for i in item)
+            except TypeError:
+                print("List index not number or list of numbers")
+        else:
+            try:
+                return list(self)[item]
+            except TypeError:
+                print("List index not number or list of numbers")
+
+    def add(self, other):
+        """
+        Add two lists
+        :param other: Another list or element
+        :return: list
+        """
+        if isinstance(other, list):
+            for elem in other:
+                self.append(elem)
+            return self
+        else:
+            self.append(other)
+            return self
+
     @staticmethod
     def list_size(query_list):
         """Find size of a list object even if it is a one element non-list"""
@@ -81,8 +154,11 @@ class Sublist(list):
         """
         return len([i for i in self if llim <= i < ulim])
 
-    @staticmethod
-    def frange(start, end, step):
+    @classmethod
+    def frange(cls,
+               start,
+               end,
+               step):
         """
         To make list from float arguments
         :param start: start number
@@ -103,37 +179,10 @@ class Sublist(list):
 
             temp[n - 1] = end
 
-            return list(temp)
+            return Sublist(temp)
 
         else:
             raise ValueError("Start value is less than end value")
-
-    def where(self, operator='=', obj=None):
-        """
-        Locate the list of indices given a condition
-        :param operator: boolean operator (options: =, <, >, =<, ,=>, !=)
-        :param obj: Object to compare with input list
-        :return: List of indices
-        """
-        if operator == '=':
-            loc = list(i for i in range(0, len(self)) if self[i] == obj)
-        elif operator == '>':
-            loc = list(i for i in range(0, len(self)) if self[i] > obj)
-        elif operator == '<':
-            loc = list(i for i in range(0, len(self)) if self[i] < obj)
-        elif operator == '<=':
-            loc = list(i for i in range(0, len(self)) if self[i] <= obj)
-        elif operator == '>=':
-            loc = list(i for i in range(0, len(self)) if self[i] >= obj)
-        elif operator == '!=':
-            loc = list(i for i in range(0, len(self)) if self[i] != obj)
-        else:
-            loc = None
-
-        if len(loc) == 1:
-            return loc[0]
-        else:
-            return loc
 
     @staticmethod
     def column(matrix, i):
@@ -171,12 +220,12 @@ class Handler(object):
 
         try:
             self.basename = os.path.basename(filename)
-        except Exception:
+        except:
             self.basename = basename
 
         try:
             self.dirname = os.path.dirname(filename)
-        except Exception:
+        except:
             self.dirname = dirname
 
         self.sep = os.path.sep
@@ -694,3 +743,11 @@ class FTPHandler(Handler):
                 except:
                     Opt.cprint('File {} not found or already written'.format(self.basename))
 
+
+if __name__ == '__main__':
+    s = Sublist([1,2,3,4,5])
+    p = Sublist([6,7,8])
+    print(s+p)
+    print(s.add(p))
+    print(s[s>2])
+    print(s[1.2])
