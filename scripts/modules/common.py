@@ -75,16 +75,15 @@ class Sublist(list):
         :param item: Number or list of numbers
         :return: List
         """
-        if isinstance(item, list):
-            try:
+
+        try:
+            if isinstance(item, list):
                 return list(list(self)[i] for i in item)
-            except TypeError:
-                print("List index not number or list of numbers")
-        else:
-            try:
+            else:
                 return list(self)[item]
-            except TypeError:
-                print("List index not number or list of numbers")
+
+        except (TypeError, KeyError):
+            print("List index not a number or list of numbers")
 
     def add(self,
             other):
@@ -761,11 +760,3 @@ class FTPHandler(Handler):
                 except:
                     Opt.cprint('File {} not found or already written'.format(self.basename))
 
-
-if __name__ == '__main__':
-    s = Sublist([1,2,3,4,5])
-    p = Sublist([6,7,8])
-    print(s+p)
-    print(s.add(p))
-    print(s[s>2])
-    print(s[1.2])
