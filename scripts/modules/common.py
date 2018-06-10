@@ -20,49 +20,56 @@ class Sublist(list):
     """
     Class to handle list operations
     """
-    def __eq__(self, other):
+    def __eq__(self,
+               other):
         """
         Check for a = <some value>
         return: List of indices
         """
         return list(i for i in range(0, len(self)) if self[i] == other)
 
-    def __gt__(self, other):
+    def __gt__(self,
+               other):
         """
         Check for a > <some value>
         return: List of indices
         """
         return list(i for i in range(0, len(self)) if self[i] > other)
 
-    def __ge__(self, other):
+    def __ge__(self,
+               other):
         """
         Check for a >= <some value>
         return: List of indices
         """
         return list(i for i in range(0, len(self)) if self[i] >= other)
 
-    def __lt__(self, other):
+    def __lt__(self,
+               other):
         """
         Check for a < <some value>
         return: List of indices
         """
         return list(i for i in range(0, len(self)) if self[i] < other)
 
-    def __le__(self, other):
+    def __le__(self,
+               other):
         """
         Check for a <= <some value>
         return: List of indices
         """
         return list(i for i in range(0, len(self)) if self[i] <= other)
 
-    def __ne__(self, other):
+    def __ne__(self,
+               other):
         """
         Check for a != <some value>
         return: List of indices
         """
         return list(i for i in range(0, len(self)) if self[i] != other)
 
-    def __getitem__(self, item):
+    def __getitem__(self,
+                    item):
         """
         Method to get item(s) from the list using list or number as index
         :param item: Number or list of numbers
@@ -79,7 +86,8 @@ class Sublist(list):
             except TypeError:
                 print("List index not number or list of numbers")
 
-    def add(self, other):
+    def add(self,
+            other):
         """
         Add two lists
         :param other: Another list or element
@@ -102,8 +110,11 @@ class Sublist(list):
         else:
             return 1
 
-    @staticmethod
-    def custom_list(start, end, step=None):
+    @classmethod
+    def custom_list(cls,
+                    start,
+                    end,
+                    step=None):
         """
         List with custom first number but rest all follow same increment; integers only
         :param start: starting integer
@@ -116,7 +127,7 @@ class Sublist(list):
         end = end + step - (end % step)
 
         # initialize the list
-        out = list()
+        out = Sublist()
 
         # make iterator
         if step is not None:
@@ -137,15 +148,18 @@ class Sublist(list):
 
         return out
 
-    def sublistfinder(self, pattern):
+    def sublistfinder(self,
+                      pattern):
         """
         Find the location of sub-list in a python list, no repetitions in mylist or pattern
         :param pattern: shorter list
         :return: list of locations of elements in mylist ordered as in pattern
         """
-        return [self.index(x) for x in pattern if x in self]
+        return Sublist(self.index(x) for x in pattern if x in self)
 
-    def count_in_range(self, llim, ulim):
+    def count_in_range(self,
+                       llim,
+                       ulim):
         """
         Find elements in a range
         :param ulim: upper limit
@@ -184,8 +198,10 @@ class Sublist(list):
         else:
             raise ValueError("Start value is less than end value")
 
-    @staticmethod
-    def column(matrix, i):
+    @classmethod
+    def column(cls,
+               matrix,
+               i):
         """
         Get column of a numpy matrix
         :param matrix: Numpy matrix
@@ -193,10 +209,12 @@ class Sublist(list):
         :return: List
         """
         mat = matrix[:, i].tolist()
-        return list(elem[0] for elem in mat)
+        return Sublist(elem[0] for elem in mat)
 
-    @staticmethod
-    def row(matrix, i):
+    @classmethod
+    def row(cls,
+            matrix,
+            i):
         """
         Get row of a numpy matrix
         :param matrix: Numpy matrix
@@ -204,7 +222,7 @@ class Sublist(list):
         :return: List
         """
         mat = matrix[i].tolist()
-        return mat[0]
+        return Sublist(mat[0])
 
 
 class Handler(object):
