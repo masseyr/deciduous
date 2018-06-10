@@ -4,6 +4,7 @@ from math import sqrt
 from osgeo import gdal
 from common import *
 from raster import Raster
+from timer import Timer
 from resources import bname_dict
 from sklearn import linear_model
 from sklearn.ensemble import RandomForestRegressor
@@ -20,11 +21,18 @@ sep = Handler().sep
 
 class _Classifier(object):
 
+    time_it = False
+
     def __init__(self,
                  data=None,
-                 classifier=None):
+                 classifier=None,
+                 **kwargs):
         self.data = data
         self.classifier = classifier
+
+        if kwargs is not None:
+            if 'timer' in kwargs:
+                _Classifier.time_it = kwargs['timer']
 
     def __repr__(self):
         return "<Classifier base class>"
@@ -54,6 +62,7 @@ class _Classifier(object):
             pickle.dump(self, fileptr)
 
     @classmethod
+    @Timer.timing(time_it)
     def load_from_pickle(cls,
                          infile):
         """
@@ -64,6 +73,7 @@ class _Classifier(object):
             classifier_obj = pickle.load(fileptr)
             return classifier_obj
 
+    @Timer.timing(time_it)
     def classify_raster(self,
                         raster_obj,
                         outfile=None,
@@ -137,12 +147,15 @@ class _Classifier(object):
 class MRegressor(_Classifier):
     """Multiple linear regressor object for scikit-learn linear model"""
 
+    time_it = False
+
     def __init__(self,
                  data=None,
                  classifier=None,
                  intercept=True,
                  jobs=1,
-                 normalize=False):
+                 normalize=False,
+                 **kwargs):
 
         super(MRegressor, self).__init__(data,
                                          classifier)
@@ -154,6 +167,10 @@ class MRegressor(_Classifier):
 
         self.intercept = self.classifier.intercept_ if hasattr(self.classifier, 'intercept_') else None
         self.coefficient = self.classifier.coef_ if hasattr(self.classifier, 'coef_') else None
+
+        if kwargs is not None:
+            if 'timer' in kwargs:
+                MRegressor.time_it = kwargs['timer']
 
     def __repr__(self):
         # gather which attributes exist
@@ -180,6 +197,7 @@ class MRegressor(_Classifier):
             # if empty return empty
             return "<Multiple Linear Regressor: __empty__>"
 
+    @Timer.timing(time_it)
     def predict(self,
                 arr,
                 ntile_max=9,
@@ -283,13 +301,16 @@ class MRegressor(_Classifier):
 class RFRegressor(_Classifier):
     """Random Forest Regressor class for scikit-learn Random Forest regressor"""
 
+    time_it = False
+
     def __init__(self,
                  data=None,
                  classifier=None,
                  trees=10,
                  samp_split=2,
                  oob_score=True,
-                 criterion='mse'):
+                 criterion='mse',
+                 **kwargs):
         """
         Initialize RF classifier using class parameters
         :param trees: Number of trees
@@ -312,6 +333,10 @@ class RFRegressor(_Classifier):
         self.samp_split = samp_split
         self.oob_score = oob_score
         self.criterion = criterion
+
+        if kwargs is not None:
+            if 'timer' in kwargs:
+                MRegressor.time_it = kwargs['timer']
 
     def __repr__(self):
         # gather which attributes exist
@@ -348,6 +373,7 @@ class RFRegressor(_Classifier):
             # if empty return empty
             return "<Random Forest Regressor: __empty__>"
 
+    @Timer.timing(time_it)
     def predict(self,
                 arr,
                 ntile_max=9,
@@ -761,4 +787,10 @@ class Samples:
                                                     colnames=out_names)
 
 
+
+if __name__ == '__main__':
+
+    file1 = "C:\\temp\\temp_data_iter_1892.pickle"
+    cl = _Classifier(timer=True).load_from_pickle(file1)
+    print(cl)
 
