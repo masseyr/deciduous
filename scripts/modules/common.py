@@ -26,7 +26,12 @@ class Sublist(list):
         Check for a = <some value>
         return: List of indices
         """
-        return list(i for i in range(0, len(self)) if self[i] == other)
+        temp = list(i for i in range(0, len(self)) if self[i] == other)
+
+        if len(temp) == 1:
+            return temp[0]
+        else:
+            return temp
 
     def __gt__(self,
                other):
@@ -34,7 +39,12 @@ class Sublist(list):
         Check for a > <some value>
         return: List of indices
         """
-        return list(i for i in range(0, len(self)) if self[i] > other)
+        temp = list(i for i in range(0, len(self)) if self[i] > other)
+
+        if len(temp) == 1:
+            return temp[0]
+        else:
+            return temp
 
     def __ge__(self,
                other):
@@ -42,7 +52,12 @@ class Sublist(list):
         Check for a >= <some value>
         return: List of indices
         """
-        return list(i for i in range(0, len(self)) if self[i] >= other)
+        temp = list(i for i in range(0, len(self)) if self[i] >= other)
+
+        if len(temp) == 1:
+            return temp[0]
+        else:
+            return temp
 
     def __lt__(self,
                other):
@@ -50,7 +65,12 @@ class Sublist(list):
         Check for a < <some value>
         return: List of indices
         """
-        return list(i for i in range(0, len(self)) if self[i] < other)
+        temp = list(i for i in range(0, len(self)) if self[i] < other)
+
+        if len(temp) == 1:
+            return temp[0]
+        else:
+            return temp
 
     def __le__(self,
                other):
@@ -58,7 +78,12 @@ class Sublist(list):
         Check for a <= <some value>
         return: List of indices
         """
-        return list(i for i in range(0, len(self)) if self[i] <= other)
+        temp = list(i for i in range(0, len(self)) if self[i] <= other)
+
+        if len(temp) == 1:
+            return temp[0]
+        else:
+            return temp
 
     def __ne__(self,
                other):
@@ -66,7 +91,12 @@ class Sublist(list):
         Check for a != <some value>
         return: List of indices
         """
-        return list(i for i in range(0, len(self)) if self[i] != other)
+        temp = list(i for i in range(0, len(self)) if self[i] != other)
+
+        if len(temp) == 1:
+            return temp[0]
+        else:
+            return temp
 
     def __getitem__(self,
                     item):
@@ -759,4 +789,11 @@ class FTPHandler(Handler):
                                                              self.dirname))
                 except:
                     Opt.cprint('File {} not found or already written'.format(self.basename))
+
+
+if __name__ == '__main__':
+
+    a = Sublist(['11','22','33','44','55']) == '44'
+
+    print(a)
 
