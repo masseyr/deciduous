@@ -786,11 +786,3 @@ class Samples:
         Handler(out_file).write_numpy_array_to_file(np_array=out_arr,
                                                     colnames=out_names)
 
-
-
-if __name__ == '__main__':
-
-    file1 = "C:\\temp\\temp_data_iter_1892.pickle"
-    cl = _Classifier(timer=True).load_from_pickle(file1)
-    print(cl)
-
