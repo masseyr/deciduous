@@ -700,7 +700,7 @@ class Samples:
             raise AttributeError('No argument for delete operation')
 
         elif column_id is None and column_name is not None:
-            column_id = Sublist(self.x_name).where('=', column_name)
+            column_id = Sublist(self.x_name) == column_name
 
         temp = self.x
         nsamp = len(temp)
@@ -724,7 +724,7 @@ class Samples:
             raise AttributeError('No argument for extract operation')
 
         elif column_id is None and column_name is not None:
-            column_id = Sublist(self.x_name).where('=', column_name)
+            column_id = Sublist(self.x_name) == column_name
 
         temp = [samp[column_id] for samp in self.x]
         temp_name = self.x_name[column_id]
