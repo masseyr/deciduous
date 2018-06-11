@@ -473,17 +473,17 @@ class Handler(object):
         getcontext().prec = precision
 
         if unit == 'bit':
-            output = float(Decimal(size)*Decimal(8))
+            output = float(Decimal(size)*Decimal(2**3))
         elif unit == 'kb':
-            output = float(Decimal(size)/Decimal(1024))
+            output = float(Decimal(size)/Decimal(2**10))
         elif unit == 'mb':
-            output = float(Decimal(size)/(Decimal(1024)*Decimal(1024)))
+            output = float(Decimal(size)/(Decimal(2**20)))
         elif unit == 'gb':
-            output = float(Decimal(size)/(Decimal(1024)*Decimal(1024)*Decimal(1024)))
+            output = float(Decimal(size)/(Decimal(2**30)))
         elif unit == 'tb':
-            output = float(Decimal(size)/(Decimal(1024)*Decimal(1024)*Decimal(1024)*Decimal(1024)))
+            output = float(Decimal(size)/(Decimal(2**40)))
         elif unit == 'pb':
-            output = float(Decimal(size)/(Decimal(1024)*Decimal(1024)*Decimal(1024)*Decimal(1024)*Decimal(1024)))
+            output = float(Decimal(size)/(Decimal(2**50)))
         else:
             output = size
         if as_long:
@@ -667,17 +667,17 @@ class Opt:
         process = psutil.Process(os.getpid())
         mem = process.memory_info().rss
 
-        if 1024 <= mem < 1024 * 1024:
-            div = 1024.0
+        if 2**10 <= mem < 2**20:
+            div = float(2**10)
             suff = ' KB'
-        elif 1024 * 1024 <= mem < 1024 * 1024 * 1024:
-            div = 1024.0 * 1024.0
+        elif 2**20 <= mem < 2**30:
+            div = float(2**20)
             suff = ' MB'
-        elif 1024 * 1024 * 1024 <= mem < 1024 * 1024 * 1024 * 1024:
-            div = 1024.0 * 1024.0 * 1024.0
+        elif 2**30 <= mem < 2**40:
+            div = float(2**30)
             suff = ' GB'
-        elif mem >= 1024 * 1024 * 1024 * 1024:
-            div = 1024.0 * 1024.0 * 1024.0 * 1024.0
+        elif mem >= 2**40:
+            div = float(2**40)
             suff = ' TB'
         else:
             div = 1.0
