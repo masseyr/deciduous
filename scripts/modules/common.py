@@ -23,7 +23,7 @@ class Sublist(list):
     def __eq__(self,
                other):
         """
-        Check for a = <some value>
+        Check for a = other
         return: List of indices
         """
         temp = list(i for i in range(0, len(self)) if self[i] == other)
@@ -36,7 +36,7 @@ class Sublist(list):
     def __gt__(self,
                other):
         """
-        Check for a > <some value>
+        Check for a > other
         return: List of indices
         """
         temp = list(i for i in range(0, len(self)) if self[i] > other)
@@ -49,7 +49,7 @@ class Sublist(list):
     def __ge__(self,
                other):
         """
-        Check for a >= <some value>
+        Check for a >= other
         return: List of indices
         """
         temp = list(i for i in range(0, len(self)) if self[i] >= other)
@@ -62,7 +62,7 @@ class Sublist(list):
     def __lt__(self,
                other):
         """
-        Check for a < <some value>
+        Check for a < other
         return: List of indices
         """
         temp = list(i for i in range(0, len(self)) if self[i] < other)
@@ -75,7 +75,7 @@ class Sublist(list):
     def __le__(self,
                other):
         """
-        Check for a <= <some value>
+        Check for a <= other
         return: List of indices
         """
         temp = list(i for i in range(0, len(self)) if self[i] <= other)
@@ -88,7 +88,7 @@ class Sublist(list):
     def __ne__(self,
                other):
         """
-        Check for a != <some value>
+        Check for a != other
         return: List of indices
         """
         temp = list(i for i in range(0, len(self)) if self[i] != other)
@@ -129,6 +129,18 @@ class Sublist(list):
         else:
             self.append(other)
             return self
+
+    def remove(self,
+               other):
+        """
+        Method to remove a Sublist element with index 'other'
+        :param other: Index
+        :return: Sublist
+        """
+        if isinstance(other, list):
+            return list(val for j, val in enumerate(self) for loc in other if j != loc)
+        else:
+            return list(val for j, val in enumerate(self) if j != other)
 
     @staticmethod
     def list_size(query_list):
