@@ -802,10 +802,3 @@ class FTPHandler(Handler):
                 except:
                     Opt.cprint('File {} not found or already written'.format(self.basename))
 
-
-if __name__ == '__main__':
-
-    a = Sublist(['11','22','33','44','55']) == '44'
-
-    print(a)
-
