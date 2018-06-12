@@ -134,7 +134,7 @@ class Sublist(list):
                other):
         """
         Method to remove a Sublist element with index 'other'
-        :param other: Index
+        :param other: Index or list of indices
         :return: Sublist
         """
         if isinstance(other, list):
