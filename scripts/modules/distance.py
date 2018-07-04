@@ -2,7 +2,7 @@ import numpy as np
 from common import *
 
 
-class _Distance(object):
+class Distance(object):
     """
     Parent class for all the distance type methods
     """
@@ -64,7 +64,7 @@ class _Distance(object):
             raise ValueError("Sample matrix not found")
 
 
-class Mahalanobis(_Distance):
+class Mahalanobis(Distance):
     """
     Class for calculating Mahalanobis distance from cluster center
     """
