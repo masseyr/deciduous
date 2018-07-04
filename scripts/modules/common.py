@@ -391,7 +391,12 @@ class Handler(object):
         """
         Read csv file as numpy array
         """
-        csv_data = np.genfromtxt(self.filename, delimiter=',', names=True, dtype=None)
+        csv_data = np.genfromtxt(self.filename,
+                                 delimiter=',',
+                                 names=True,
+                                 encoding="utf-8",
+                                 dtype=None)
+
         names = [csv_data.dtype.names[i] for i in range(0, len(csv_data.dtype.names))]
         return names, csv_data
 
@@ -799,6 +804,6 @@ class FTPHandler(Handler):
                     if ftp_conn.retrbinary("RETR {}".format(self.ftpfilepath), f.write):
                         Opt.cprint('Copying file {} to {}'.format(Handler(self.ftpfilepath).basename,
                                                              self.dirname))
-                except:
+                except Exception:
                     Opt.cprint('File {} not found or already written'.format(self.basename))
 
