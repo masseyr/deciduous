@@ -116,31 +116,31 @@ class Sublist(list):
             print("List index not a number or list of numbers")
 
     def add(self,
-            other):
+            elem):
         """
         Add two lists
-        :param other: Another list or element
+        :param elem: Another list or element
         :return: list
         """
-        if isinstance(other, list):
-            for elem in other:
-                self.append(elem)
+        if isinstance(elem, list):
+            for val in elem:
+                self.append(val)
             return self
         else:
-            self.append(other)
+            self.append(elem)
             return self
 
     def remove(self,
-               other):
+               elem):
         """
         Method to remove a Sublist element with index 'other'
-        :param other: Index or list of indices
+        :param elem: Index or list of indices
         :return: Sublist
         """
-        if isinstance(other, list):
-            return list(val for j, val in enumerate(self) for loc in other if j != loc)
+        if isinstance(elem, list):
+            return list(val for j, val in enumerate(self) for loc in elem if j != loc)
         else:
-            return list(val for j, val in enumerate(self) if j != other)
+            return list(val for j, val in enumerate(self) if j != elem)
 
     @staticmethod
     def list_size(query_list):
