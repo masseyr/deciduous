@@ -130,8 +130,8 @@ class Sublist(list):
             self.append(elem)
             return self
 
-    def remove(self,
-               elem):
+    def remove_by_loc(self,
+                      elem):
         """
         Method to remove a Sublist element with index 'other'
         :param elem: Index or list of indices
@@ -141,6 +141,19 @@ class Sublist(list):
             return list(val for j, val in enumerate(self) for loc in elem if j != loc)
         else:
             return list(val for j, val in enumerate(self) if j != elem)
+
+    def remove(self,
+               elem):
+        """
+        Method to remove list item or sublist
+        :param elem: item or list
+        :return: list
+        """
+        if isinstance(elem, list):
+            return list(val for val in self if val not in elem)
+        else:
+            return list(val for val in self if val != elem)
+
 
     @staticmethod
     def list_size(query_list):
