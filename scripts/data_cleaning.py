@@ -5,7 +5,7 @@ import pandas as pd
 if __name__ == '__main__':
 
     # static vars--------------------------------------------------------------------------------------------
-    md_cutoff = 25
+    md_cutoff = 75
 
     outdir = "c:\\users\\rm885\\Dropbox\\projects\\NAU\\landsat_deciduous\\data\\"
 
