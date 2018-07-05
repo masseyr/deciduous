@@ -52,12 +52,12 @@ class Distance(object):
         """
         if self.matrix is not None:
             if method == 'median':
-                return np.median(self.matrix, axis=0)
+                self.center = np.array(np.median(self.matrix, axis=0))[0]
             elif method == 'mean':
-                return np.mean(self.matrix, axis=0)
+                self.center = np.array(np.mean(self.matrix, axis=0))[0]
             elif 'percentile' in method:
                 perc = int(method.replace('percentile', '')[1:])
-                return np.percentile(self.matrix, perc, axis=0)
+                self.center = np.array(np.percentile(self.matrix, perc, axis=0))[0]
             else:
                 raise ValueError("Invalid or no reducer")
         else:
@@ -102,10 +102,11 @@ class Mahalanobis(Distance):
         """
         cov_mat = np.cov(self.matrix,
                          rowvar=False)
+
         if inverse:
-            return np.linalg.inv(cov_mat)
+            return np.matrix(np.linalg.inv(cov_mat))
         else:
-            return cov_mat
+            return np.matrix(cov_mat)
 
     def difference(self,
                    transpose=False):
@@ -115,11 +116,12 @@ class Mahalanobis(Distance):
         """
         center = self.center
 
-        diff_matrix = np.apply_along_axis(lambda row: np.array(row) - center,
-                                          axis=0,
-                                          arr=self.matrix)
+        diff_matrix = np.matrix(np.apply_along_axis(lambda row: np.array(row) - center,
+                                                    axis=1,
+                                                    arr=np.array(self.matrix)))
+
         if transpose:
-            return np.transpose(diff_matrix)
+            return diff_matrix.T
         else:
             return diff_matrix
 
@@ -132,11 +134,19 @@ class Mahalanobis(Distance):
         diff = self.difference(False)
         transpose_diff = self.difference(True)
 
-        mdist = list()
+        mdist = np.zeros(self.nsamp)
 
         for i in range(0, self.nsamp):
-            mdist.append(np.sqrt(np.dot(np.dot(transpose_diff,
-                                        inv_cov_matrix),
-                                 diff)))
+            prod = np.array(
+                            np.dot(
+                                np.dot(diff[i, :],
+                                       inv_cov_matrix),
+                                transpose_diff[:, i])
+                        )[0][0]
 
-        return mdist
+            if prod < 0:
+                mdist[i] = np.nan
+            else:
+                mdist[i] = np.sqrt(prod)
+
+        return list(mdist)
