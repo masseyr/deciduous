@@ -5,12 +5,12 @@ import pandas as pd
 if __name__ == '__main__':
 
     # static vars--------------------------------------------------------------------------------------------
+    md_cutoff = 25
+
     outdir = "c:\\users\\rm885\\Dropbox\\projects\\NAU\\landsat_deciduous\\data\\"
 
     infile = outdir + "ABoVE_all_2010_sampV1.csv"
-    outfile = outdir + "ABoVE_all_2010_sampV1_clean_md60.csv"
-
-    md_cutoff = 60
+    outfile = outdir + "ABoVE_all_2010_sampV1_clean_md{}.csv".format(str(md_cutoff))
 
     header = ['site',
               'sample']
