@@ -104,7 +104,14 @@ class Mahalanobis(Distance):
                          rowvar=False)
 
         if inverse:
-            return np.matrix(np.linalg.inv(cov_mat))
+            # Inverse using SVD
+            u, s, v = np.linalg.svd(cov_mat)
+
+            try:
+                return np.dot(np.dot(v.T, np.linalg.inv(np.diag(s))), u.T)
+
+            except ValueError:
+                return None
         else:
             return np.matrix(cov_mat)
 
@@ -131,12 +138,18 @@ class Mahalanobis(Distance):
         :return: scalar value
         """
         inv_cov_matrix = self.covariance(True)
+
         diff = self.difference(False)
         transpose_diff = self.difference(True)
 
         mdist = np.zeros(self.nsamp)
 
         for i in range(0, self.nsamp):
+
+            if inv_cov_matrix is None:
+                mdist[i] = np.nan
+                continue
+
             prod = np.array(
                             np.dot(
                                 np.dot(diff[i, :],
