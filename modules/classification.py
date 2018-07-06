@@ -12,8 +12,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 
 
 __all__ = ['RFRegressor',
-           'MRegressor',
-           'Samples']
+           'MRegressor']
 
 
 sep = Handler().sep

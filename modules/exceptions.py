@@ -1,3 +1,7 @@
+__all__ = ['UninitializedError',
+           'ObjectNotFound']
+
+
 class UninitializedError(Exception):
     """
     Error class for use in returning fields that may be in error.

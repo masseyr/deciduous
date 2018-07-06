@@ -4,6 +4,8 @@ from timer import Timer
 from resources import bname_dict
 from scipy.stats.stats import pearsonr
 
+__all__ = ['Samples']
+
 
 class Samples:
     """

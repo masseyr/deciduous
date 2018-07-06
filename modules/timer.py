@@ -2,6 +2,9 @@ import time
 from functools import wraps
 
 
+__all__ = ['Timer']
+
+
 class Timer:
     """
     Decorator class to compute time a function takes to execute

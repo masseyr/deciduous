@@ -2,6 +2,10 @@ import numpy as np
 from common import *
 
 
+__all__ = ['Distance',
+           'Mahalanobis']
+
+
 class Distance(object):
     """
     Parent class for all the distance type methods
