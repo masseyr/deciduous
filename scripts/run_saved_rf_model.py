@@ -1,8 +1,5 @@
 from modules import *
 from sys import argv
-import os
-import time
-import psutil
 import gc
 
 
@@ -15,7 +12,10 @@ This script also generates the uncertainty raster.
 if __name__ == '__main__':
 
     # read in the input files
-    script, rf_picklefile, infile, outdir = argv
+    # script, rf_picklefile, infile, outdir = argv
+    rf_picklefile="C:\\Users\\rm885\\Dropbox\\projects\\NAU\\landsat_deciduous\\data\\ABoVE_CAN_AK_all_2010_trn_samp_clean_md95.pickle"
+    infile="C:\\temp\\ABoVE_img_am_2010_z1-0000000000-0000048384.tif"
+    outdir="C:\\temp\\"
 
     print('-----------------------------------------------------------------')
     # print('Script: ' + script)
@@ -27,23 +27,24 @@ if __name__ == '__main__':
     # load classifier from file
     rf_classifier = RFRegressor.load_from_pickle(rf_picklefile)
     print(rf_classifier)
-    classif_bandnames = rf_classifier.data['feature_names']
-    print('Bands : ' + ' '.join(classif_bandnames))
+    classif_bandnames = rf_classifier.features
+    print('Bands : "' + '", "'.join(classif_bandnames) + '"')
     
     # get raster metadata
-    ras = Raster.initialize(infile,
-                            use_dict=bname_dict)
+    ras = Raster(infile)
+    ras.initialize()
+    print(ras.shape)
+
     print(ras)
     bandnames = ras.bnames
-    print('Raster bands: ' + ' '.join(bandnames))
+    print('Raster bands: "' + '", "'.join(bandnames) + '"')
     band_order = Sublist(bandnames).sublistfinder(classif_bandnames)
     print('Band order: ' + ', '.join([str(b) for b in band_order]))
 
     # re-initialize raster
-    ras = Raster.initialize(infile,
-                            get_array=True,
-                            band_order=band_order,
-                            use_dict=bname_dict)
+    ras.initialize(get_array=True,
+                   band_order=band_order)
+
     print(ras)
 
     # classify raster and write to file
