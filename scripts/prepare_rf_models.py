@@ -13,28 +13,37 @@ if __name__ == '__main__':
 
     sep = Handler().sep
 
+    md_cutoff = 95
+
     # read file names from commandline arguments: (in order)
     # training samples,
     # held out samples,
     # out file to write,
     # directory to store RF classifier
-    script, infile, inCfile, outfile, pickledir = argv
+    # script, infile, inCfile, outfile, pickledir = argv
+
+    infile = "C:/Users/rm885/Dropbox/projects/NAU/landsat_deciduous/data/ABoVE_CAN_AK_all_2010_trn_samp_clean_md{md}.csv".format(md=md_cutoff)
+    inCfile = "C:/Users/rm885/Dropbox/projects/NAU/landsat_deciduous/data/ABoVE_CAN_AK_all_2010_val_samp_clean_md{md}.csv".format(md=md_cutoff)
+    pickledir = "C:/Users/rm885/Dropbox/projects/NAU/landsat_deciduous/data/"
+    outfile = "C:/Users/rm885/Dropbox/projects/NAU/landsat_deciduous/data/ABoVE_CAN_AK_all_2010_md{md}.txt".format(md=md_cutoff)
 
     # prepare training samples
-    trn_samp = Samples(csv_file=infile, label_colname='Decid_AVG')
+    trn_samp = Samples(csv_file=infile, label_colname='decid_frac')
     print(trn_samp)
 
     # prepare held out samples
-    trn_Csamp = Samples(csv_file=inCfile, label_colname='Decid_AVG')
+    trn_Csamp = Samples(csv_file=inCfile, label_colname='decid_frac')
     print(trn_Csamp)
 
     # initialize RF clasifier
-    rf_model = RFRegressor(trees=500, samp_split=15, oob_score=False)
+    rf_model = RFRegressor(trees=200, samp_split=2, oob_score=False)
     print(rf_model)
 
     # fit RF classifier using training data
     rf_model.fit_data(trn_samp.format_data())
     print(rf_model)
+    print(rf_model.features)
+    print(rf_model.label)
 
     # save RF classifier using pickle
     picklefile = pickledir + sep + Handler(infile).basename.split('.')[0] + '.pickle'
@@ -45,15 +54,16 @@ if __name__ == '__main__':
         'val' + sep + 'val_samp_' + Handler(outfile).basename
     outfile1 = Handler(filename=outfile1).file_remove_check()
     pred = rf_model.sample_predictions(trn_Csamp.format_data(), outfile=outfile1, picklefile=picklefile)
-    print(pred)
+    # print(pred)
 
     # check training samples for fit
     outfile2 = Handler(outfile).dirname + sep + \
         'trn' + sep + 'trn_samp_' + Handler(outfile).basename
     outfile2 = Handler(filename=outfile2).file_remove_check()
     pred3 = rf_model.sample_predictions(trn_samp.format_data(), outfile=outfile2, picklefile=picklefile)
-    print(pred3)
+    #print(pred3)
 
+    """
     # predict using all samples and print to file
     trn_Csamp.merge_data(trn_samp)
     print(trn_Csamp)
@@ -64,3 +74,4 @@ if __name__ == '__main__':
     outfile3 = Handler(filename=outfile3).file_remove_check()
     pred3 = rf_model.sample_predictions(trn_Csamp.format_data(), outfile=outfile3, picklefile=picklefile)
     print(pred3)
+    """
