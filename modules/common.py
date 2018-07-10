@@ -154,7 +154,6 @@ class Sublist(list):
         else:
             return list(val for val in self if val != elem)
 
-
     @staticmethod
     def list_size(query_list):
         """Find size of a list object even if it is a one element non-list"""
