@@ -136,6 +136,7 @@ class Raster:
 
                 # band order present
                 else:
+                    print('Reading bands: {}'.format(" ".join([str(b) for b in band_order])))
 
                     # bands in array
                     n_array_bands = len(band_order)
@@ -146,8 +147,10 @@ class Raster:
 
                     # read array and store the band values and name in array
                     for i, b in enumerate(band_order):
+                        bandname = fileptr.GetRasterBand(b + 1).GetDescription()
+                        print('Reading band {}'.format(bandname))
                         array3d[i, :, :] = fileptr.GetRasterBand(b + 1).ReadAsArray()
-                        names.append(fileptr.GetRasterBand(b + 1).GetDescription())
+                        names.append(bandname)
 
                     # if flag for finite values is present
                     if finite_only:
@@ -159,12 +162,12 @@ class Raster:
                             print("Non-finite values absent in file")
 
                 # assign to empty class object
-                self.array = array3d,
-                self.bnames = names,
-                self.shape = [bands, rows, cols],
-                self.transform = fileptr.GetGeoTransform(),
-                self.crs_string = fileptr.GetProjection(),
-                self.dtype = fileptr.GetRasterBand(1).DataType,
+                self.array = array3d
+                self.bnames = names
+                self.shape = [bands, rows, cols]
+                self.transform = fileptr.GetGeoTransform()
+                self.crs_string = fileptr.GetProjection()
+                self.dtype = fileptr.GetRasterBand(1).DataType
                 self.metadict = Raster.get_raster_metadict(raster_name)
 
             # if get_array is false
@@ -175,12 +178,13 @@ class Raster:
                     names.append(fileptr.GetRasterBand(i + 1).GetDescription())
 
                 # assign to empty class object without the array
-                self.bnames = names,
-                self.shape = [bands, rows, cols],
-                self.transform = fileptr.GetGeoTransform(),
-                self.crs_string = fileptr.GetProjection(),
-                self.dtype = fileptr.GetRasterBand(1).DataType,
+                self.bnames = names
+                self.shape = [bands, rows, cols]
+                self.transform = fileptr.GetGeoTransform()
+                self.crs_string = fileptr.GetProjection()
+                self.dtype = fileptr.GetRasterBand(1).DataType
                 self.metadict = Raster.get_raster_metadict(raster_name)
+
             fileptr = None
 
             # remap band names
