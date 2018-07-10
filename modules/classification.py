@@ -28,6 +28,8 @@ class _Classifier(object):
                  **kwargs):
         self.data = data
         self.classifier = classifier
+        self.features = None
+        self.label = None
 
         if kwargs is not None:
             if 'timer' in kwargs:
@@ -45,6 +47,8 @@ class _Classifier(object):
         """
         self.data = data
         self.classifier.fit(data['features'], data['labels'])
+        self.features = data['feature_names']
+        self.label = data['label_name']
 
     def predict(self, *args, **kwargs):
         """Placeholder function"""
@@ -351,7 +355,7 @@ class RFRegressor(_Classifier):
 
             # strings to be printed for each attribute
             if attr_truth[0]:
-                print_str_list.append("Estmators: {}\n".format(len(self.classifier.estimators_)))
+                print_str_list.append("Estimators: {}\n".format(len(self.classifier.estimators_)))
 
             if attr_truth[1]:
                 print_str_list.append("Features: {}\n".format(self.classifier.n_features_))
@@ -377,7 +381,7 @@ class RFRegressor(_Classifier):
                 arr,
                 ntile_max=9,
                 tile_size=128,
-                output='mean',
+                output='pred',
                 **kwargs):
         """
         Calculate random forest model prediction, variance, or standard deviation.
@@ -419,6 +423,8 @@ class RFRegressor(_Classifier):
 
             for i in range(0, ntiles - 1):
 
+                print('Processing tile {} of {}'.format(str(i+1), ntiles))
+
                 # calculate tree predictions for each pixel in a 2d array
                 for j, tree in enumerate(self.classifier.estimators_):
                     temp = tree.predict(arr[i * npx_tile:(i + 1) * npx_tile, :])
@@ -436,18 +442,20 @@ class RFRegressor(_Classifier):
 
                 i = ntiles - 2
 
+                print('Processing tile {} of {}'.format(str(i+1), ntiles))
+
                 # calculate tree predictions for each pixel in a 2d array
                 for j, tree in enumerate(self.classifier.estimators_):
-                    temp = tree.predict(arr[i * npx_last:(i + 1) * npx_last, :])
-                    tile_arr[j, :] = temp
+                    temp = tree.predict(arr[i * npx_tile:(i * npx_tile + npx_last), :])
+                    tile_arr = temp
 
                 # calculate standard dev or variance or prediction for each tree
                 if output == 'sd':
-                    out_arr[i * npx_last:(i + 1) * npx_last] = np.sqrt(np.var(tile_arr, axis=0))
+                    out_arr[i * npx_tile:(i * npx_tile + npx_last)] = np.sqrt(np.var(tile_arr, axis=0))
                 elif output == 'var':
-                    out_arr[i * npx_last:(i + 1) * npx_last] = np.var(tile_arr, axis=0)
+                    out_arr[i * npx_tile:(i * npx_tile + npx_last)] = np.var(tile_arr, axis=0)
                 else:
-                    out_arr[i * npx_last:(i + 1) * npx_last] = np.mean(tile_arr, axis=0)
+                    out_arr[i * npx_tile:(i * npx_tile + npx_last)] = np.mean(tile_arr, axis=0)
 
         else:
 
@@ -492,6 +500,7 @@ class RFRegressor(_Classifier):
 
         # r-squared of predicted versus actual
         rsq = r2_score(dataarray['labels'], mean_y)
+        print(rsq)
 
         # if either one of outfile or pickle file are available
         # then raise error
