@@ -20,12 +20,7 @@ if __name__ == '__main__':
     # held out samples,
     # out file to write,
     # directory to store RF classifier
-    # script, infile, inCfile, outfile, pickledir = argv
-
-    infile = "C:/Users/rm885/Dropbox/projects/NAU/landsat_deciduous/data/ABoVE_CAN_AK_all_2010_trn_samp_clean_md{md}.csv".format(md=md_cutoff)
-    inCfile = "C:/Users/rm885/Dropbox/projects/NAU/landsat_deciduous/data/ABoVE_CAN_AK_all_2010_val_samp_clean_md{md}.csv".format(md=md_cutoff)
-    pickledir = "C:/Users/rm885/Dropbox/projects/NAU/landsat_deciduous/data/"
-    outfile = "C:/Users/rm885/Dropbox/projects/NAU/landsat_deciduous/data/ABoVE_CAN_AK_all_2010_md{md}.txt".format(md=md_cutoff)
+    script, infile, inCfile, outfile, pickledir = argv
 
     # prepare training samples
     trn_samp = Samples(csv_file=infile, label_colname='decid_frac')
