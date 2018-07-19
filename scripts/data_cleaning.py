@@ -6,18 +6,32 @@ import random
 if __name__ == '__main__':
 
     # static vars--------------------------------------------------------------------------------------------
-    md_cutoff = 95
-    ratio = 0.95
+    md_cutoff = 85  # cutoff for Mahalanobis distance
+    trn_perc = 75  # percentage of training samples
+    md_clean = True  # if the sample should be cleaned
 
+    # output file dirsctory
     outdir = "C:\\users\\rm885\\Dropbox\\projects\\NAU\\landsat_deciduous\\data\\"
 
+    # input file directory
     infile = outdir + "ABoVE_CAN_AK_all_2010_samp.csv"
-    trn_outfile = outdir + "ABoVE_CAN_AK_all_2010_trn_samp_clean_md{}.csv".format(str(md_cutoff))
-    val_outfile = outdir + "ABoVE_CAN_AK_all_2010_val_samp_clean_md{}.csv".format(str(md_cutoff))
 
+    # filenames
+    if md_clean:
+
+        trn_outfile = outdir + "ABoVE_CAN_AK_all_2010_trn_samp_clean_md{}.csv".format(str(md_cutoff))
+        val_outfile = outdir + "ABoVE_CAN_AK_all_2010_val_samp_clean_md{}.csv".format(str(md_cutoff))
+
+    else:
+
+        trn_outfile = outdir + "ABoVE_CAN_AK_all_2010_trn_samp_original.csv"
+        val_outfile = outdir + "ABoVE_CAN_AK_all_2010_val_samp_original.csv"
+
+    # names to append to samples' header
     header = ['site',
               'sample']
 
+    # bands used as features for cleaning the samples
     bandnames = ['NDVI',
                  'NDVI_1',
                  'NDVI_2']
@@ -62,9 +76,6 @@ if __name__ == '__main__':
 
         site_data.append(vals)
 
-    # for data in site_data:
-    #     print(data)
-
     data = None
     trn_data = list()
 
@@ -73,12 +84,16 @@ if __name__ == '__main__':
 
     print('Total {} sites'.format(str(len(sites))))
 
-    ntrn = int(ratio * len(sites))
+    ntrn = int((trn_perc * len(sites))/100.0)
     nval = len(sites) - ntrn
 
+    # randomly select training samples based on number
     trn_sites = random.sample(sites, ntrn)
+
+    # get the rest of samples as validation samples
     val_sites = Sublist(sites).remove(trn_sites)
 
+    # print IDs
     print(trn_sites)
     print(len(trn_sites))
 
@@ -95,39 +110,38 @@ if __name__ == '__main__':
         # collect samples for the site
         samples = list(elem for elem in site_data if elem['site'] == site)
 
-        """
-        print('-----------------------------------------------------------')
-        print(site)
-        for sample in samples:
-            print(sample)
-        """
+        # if the samples are to be cleaned
+        if md_clean:
 
-        if len(samples) > len(bandnames):
+            if len(samples) > len(bandnames):
 
-            # initialize mahalanobis class
-            md_data = Mahalanobis(samples=samples,
-                                  names=bandnames)
+                # initialize mahalanobis class
+                md_data = Mahalanobis(samples=samples,
+                                      names=bandnames)
 
-            md_data.sample_matrix()
-            md_data.cluster_center(method='median')
-            md_vec = md_data.calc_distance()
+                md_data.sample_matrix()
+                md_data.cluster_center(method='median')
+                md_vec = md_data.calc_distance()
 
-            # eliminate NaNs in Mahalanobis dist vector
-            num_list = list(i for i, x in enumerate(list(np.isnan(md_vec))) if not x)
-            if len(num_list) < 1:
-                continue
+                # eliminate NaNs in Mahalanobis dist vector
+                num_list = list(i for i, x in enumerate(list(np.isnan(md_vec))) if not x)
+                if len(num_list) < 1:
+                    continue
 
-            md_vec = [md_vec[x] for x in num_list]
+                md_vec = [md_vec[x] for x in num_list]
 
-            # find all MD values that as less than cutoff percentile
-            loc = list(i for i, x in enumerate(md_vec) if (x <= np.percentile(md_vec, md_cutoff) and x != np.nan))
+                # find all MD values that as less than cutoff percentile
+                loc = list(i for i, x in enumerate(md_vec) if (x <= np.percentile(md_vec, md_cutoff) and x != np.nan))
 
-            out_samples = list(samples[i] for i in loc)
+                out_samples = list(samples[i] for i in loc)
+
+            else:
+
+                print('Too few samples for cleaning')
+
+                out_samples = samples
 
         else:
-
-            print('Too few samples for cleaning')
-
             out_samples = samples
 
         # add all filtered samples to out list
@@ -142,31 +156,37 @@ if __name__ == '__main__':
 
         samples = list(elem for elem in site_data if elem['site'] == site)
 
-        if len(samples) > len(bandnames):
+        if md_clean:
 
-            # initialize mahalanobis class
-            md_data = Mahalanobis(samples=samples,
-                                  names=bandnames)
+            if len(samples) > len(bandnames):
 
-            md_data.sample_matrix()
-            md_data.cluster_center(method='median')
-            md_vec = md_data.calc_distance()
+                # initialize mahalanobis class
+                md_data = Mahalanobis(samples=samples,
+                                      names=bandnames)
 
-            # eliminate NaNs in Mahalanobis dist vector
-            num_list = list(i for i, x in enumerate(list(np.isnan(md_vec))) if not x)
-            if len(num_list) < 1:
-                continue
+                md_data.sample_matrix()
+                md_data.cluster_center(method='median')
+                md_vec = md_data.calc_distance()
 
-            md_vec = [md_vec[x] for x in num_list]
+                # eliminate NaNs in Mahalanobis dist vector
+                num_list = list(i for i, x in enumerate(list(np.isnan(md_vec))) if not x)
+                if len(num_list) < 1:
+                    continue
 
-            # find all MD values that as less than cutoff percentile
-            loc = list(i for i, x in enumerate(md_vec) if (x <= np.percentile(md_vec, md_cutoff) and x != np.nan))
+                md_vec = [md_vec[x] for x in num_list]
 
-            out_samples = list(samples[i] for i in loc)
+                # find all MD values that as less than cutoff percentile
+                loc = list(i for i, x in enumerate(md_vec) if (x <= np.percentile(md_vec, md_cutoff) and x != np.nan))
+
+                out_samples = list(samples[i] for i in loc)
+
+            else:
+
+                print('Too few samples for cleaning')
+
+                out_samples = samples
 
         else:
-
-            print('Too few samples for cleaning')
 
             out_samples = samples
 
@@ -211,9 +231,9 @@ if __name__ == '__main__':
         df[multiply_cols[i]] = df[multiply_cols[i]]*10000
     """
 
-    # write to csv file
+    # write training samples to csv file
     t_df.to_csv(trn_outfile,
                 index=False)
-
+    # write validation samples to csv file
     v_df.to_csv(val_outfile,
                 index=False)
