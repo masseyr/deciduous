@@ -1,5 +1,6 @@
 import pickle
 import numpy as np
+from scipy import stats
 from math import sqrt
 from osgeo import gdal
 from common import *
@@ -146,6 +147,14 @@ class _Classifier(object):
         # return raster object
         return out_ras
 
+    @staticmethod
+    def rsquare(x, y):
+        """
+        Calculate R-squared of the linear fit
+        """
+        slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
+        return r_value ** 2
+
 
 class MRegressor(_Classifier):
     """Multiple linear regressor object for scikit-learn linear model"""
@@ -271,7 +280,8 @@ class MRegressor(_Classifier):
         rmse = sqrt(mean_squared_error(dataarray['labels'], y))
 
         # r-squared of predicted versus actual
-        rsq = r2_score(dataarray['labels'], y)
+        rsq = self.rsquare(dataarray['labels'], y)
+        print(rsq)
 
         # if either one of outfile or pickle file are available
         # then raise error
@@ -499,7 +509,7 @@ class RFRegressor(_Classifier):
         rmse = sqrt(mean_squared_error(dataarray['labels'], mean_y))
 
         # r-squared of predicted versus actual
-        rsq = r2_score(dataarray['labels'], mean_y)
+        rsq = self.rsquare(dataarray['labels'], mean_y)
         print(rsq)
 
         # if either one of outfile or pickle file are available
