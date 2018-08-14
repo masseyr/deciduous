@@ -1,5 +1,6 @@
 import numpy as np
 from common import *
+import random
 from timer import Timer
 from resources import bname_dict
 from scipy.stats.stats import pearsonr
@@ -110,6 +111,8 @@ class Samples:
         else:
             self.nsamp = 0
             self.nvar = 0
+
+        self.index = list(range(0, self.nsamp))
 
     def __repr__(self):
         """
@@ -308,30 +311,36 @@ class Samples:
         Handler(out_file).write_numpy_array_to_file(np_array=out_arr,
                                                     colnames=out_names)
 
+    def random_partition(self,
+                         percentage=75):
 
-if __name__ == '__main__':
-    infile = "D:\\Shared\\Dropbox\\projects\\NAU\\landsat_deciduous\\data\\ABoVE_all_2010_sampV1.csv"
-    samp = Samples(csv_file=infile, label_colname='Decid_AVG')
-    samp.delete_column(column_name='.geo')
-    samp.delete_column(column_name='system:index')
+        """
+        Method to randomly partition the samples based on a percentage
+        :param percentage: Partition percentage (default: 75)
+        (e.g. 75 for 75% training samples and 25% validation samples)
+        :return: Tuple (Training sample object, validation sample object)
+        """
 
+        ntrn = int((percentage * self.nsamp) / 100.0)
 
+        # randomly select training samples based on number
+        trn_sites = random.sample(self.index, ntrn)
+        val_sites = Sublist(self.index).remove(trn_sites)
 
-    fsamp = samp.format_data()
+        # training sample object
+        trn_samp = Samples()
+        trn_samp.x_name = self.x_name
+        trn_samp.y_name = self.y_name
+        trn_samp.x = [self.x[i] for i in trn_sites]
+        trn_samp.y = [self.y[i] for i in trn_sites]
+        trn_samp.nsamp = len(trn_samp.x)
 
-    print(samp.columns)
+        # validation sample object
+        val_samp = Samples()
+        val_samp.x_name = self.x_name
+        val_samp.y_name = self.y_name
+        val_samp.x = [self.x[i] for i in val_sites]
+        val_samp.y = [self.y[i] for i in val_sites]
+        val_samp.nsamp = len(val_samp.x)
 
-    l=samp.format_data()['labels']
-    print(len(fsamp['features']))
-    print(len(l))
-    print(samp.format_data()['label_name'])
-    print(samp.format_data()['feature_names'])
-
-    # split system:index into site IDs
-    # For each unique site, find all the samples
-    # Find Mahalanobis distance
-    # remove the pixels with MD more than 90th percentile
-
-    # in Addition rather use one run of RF for cleaning the samples based on their proximity to actual value
-    # Then prune samples and re-run the RF classifier
-    # Then find the prediction uncertainty
+        return trn_samp, val_samp
