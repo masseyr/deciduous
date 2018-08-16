@@ -25,6 +25,8 @@ class Samples:
                  y=None,
                  x_name=None,
                  y_name=None,
+                 weights=None,
+                 weights_colname=None,
                  use_band_dict=None,
                  **kwargs):
 
@@ -43,6 +45,8 @@ class Samples:
         self.x_name = x_name
         self.y = y
         self.y_name = y_name
+        self.weights = weights
+        self.weights_colname = weights_colname
         self.use_band_dict = use_band_dict
         self.index = None
 
@@ -62,9 +66,9 @@ class Samples:
                 raise ValueError("Label name mismatch.\nAvailable names: " + ', '.join(temp['name']))
 
             # read from data dictionary
-            self.x_name = [elem.strip() for elem in temp['name'][:loc] + temp['name'][(loc + 1):]]
-            self.x = [feat[:loc] + feat[(loc + 1):] for feat in temp['feature']]
-            self.y = [feat[loc] for feat in temp['feature']]
+            self.x_name = list(elem.strip() for elem in temp['name'][:loc] + temp['name'][(loc + 1):])
+            self.x = list(feat[:loc] + feat[(loc + 1):] for feat in temp['feature'])
+            self.y = list(feat[loc] for feat in temp['feature'])
             self.y_name = temp['name'][loc].strip()
 
             # if band name dictionary is provided
@@ -76,11 +80,29 @@ class Samples:
             temp = Handler(filename=csv_file).read_from_csv()
 
             # read from data dictionary
-            self.x_name = [elem.strip() for elem in temp['name']]
-            self.x = [feat for feat in temp['feature']]
+            self.x_name = list(elem.strip() for elem in temp['name'])
+            self.x = list(feat for feat in temp['feature'])
 
         else:
             ValueError("No data found for label.")
+
+        if weights is None:
+            if weights_colname is not None:
+                if csv_file is not None:
+
+                    temp = Handler(filename=csv_file).read_from_csv()
+
+                    # label name doesn't match
+                    if any(weights_colname in n for n in temp['name']):
+                        loc = temp['name'].index(weights_colname)
+                    else:
+                        raise ValueError("Weight column name mismatch.\nAvailable names: " + ', '.join(temp['name']))
+
+                    self.weights = list(feat[loc] for feat in self.x)
+                    self.x = Sublist(self.x).remove_by_loc(loc)
+
+                else:
+                    raise ValueError("No csv_file specified for weights")
 
         # if keywords are supplied
         if kwargs is not None:
