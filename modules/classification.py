@@ -6,7 +6,6 @@ from osgeo import gdal
 from common import *
 from raster import Raster
 from timer import Timer
-from samples import Samples
 from sklearn import linear_model
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score
@@ -47,7 +46,12 @@ class _Classifier(object):
         :return:
         """
         self.data = data
-        self.classifier.fit(data['features'], data['labels'])
+
+        if 'weights' not in data:
+            self.classifier.fit(data['features'], data['labels'])
+        else:
+            self.classifier.fit(data['features'], data['labels'], data['weights'])
+
         self.features = data['feature_names']
         self.label = data['label_name']
 
