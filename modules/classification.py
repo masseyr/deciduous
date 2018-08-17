@@ -39,15 +39,17 @@ class _Classifier(object):
         return "<Classifier base class>"
 
     def fit_data(self,
-                 data):
+                 data,
+                 use_weights=False):
         """
         Train the classifier
         :param data: dictionary with values (generated using Samples.format_data())
-        :return:
+        :param use_weights: If the sample weights provided should be used? (default: False)
+        :return: Nonetype
         """
         self.data = data
 
-        if 'weights' not in data:
+        if 'weights' not in data or not use_weights:
             self.classifier.fit(data['features'], data['labels'])
         else:
             self.classifier.fit(data['features'], data['labels'], data['weights'])
