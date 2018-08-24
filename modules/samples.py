@@ -52,7 +52,7 @@ class Samples:
 
         # either of label name or csv file is provided without the other
         if (csv_file is None) and (label_colname is None):
-            print("Samples initiated without data file or label")
+            pass  # print("Samples initiated without data file or label")
 
         # label name or csv file are provided
         elif (label_colname is not None) and (csv_file is not None):
