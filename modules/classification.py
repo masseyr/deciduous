@@ -287,7 +287,6 @@ class MRegressor(_Classifier):
 
         # r-squared of predicted versus actual
         rsq = self.rsquare(dataarray['labels'], y)
-        print(rsq)
 
         # if either one of outfile or pickle file are available
         # then raise error
@@ -516,7 +515,6 @@ class RFRegressor(_Classifier):
 
         # r-squared of predicted versus actual
         rsq = self.rsquare(dataarray['labels'], mean_y)
-        print(rsq)
 
         # if either one of outfile or pickle file are available
         # then raise error
