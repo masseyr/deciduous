@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import datetime
 import fnmatch
+import random
 import psutil
 import ftplib
 import gzip
@@ -156,12 +157,27 @@ class Sublist(list):
 
     @staticmethod
     def list_size(query_list):
-        """Find size of a list object even if it is a one element non-list"""
+        """
+        Find size of a list object even if it is a one element non-list
+        :param query_list: List to be sized
+
+        """
 
         if isinstance(query_list, list):
             return len(query_list)
         else:
             return 1
+
+    def remove_by_percent(self,
+                          percent):
+        """
+        Method to remove randomly selected elements by percentage in a list
+        :param percent: Percentage (Range 0-100)
+        :return: list
+        """
+        nelem = len(self)
+        nelem_by_percent = int(round((float(nelem)*float(100 - percent))/float(100)))
+        return random.sample(self, nelem_by_percent)
 
     @classmethod
     def custom_list(cls,

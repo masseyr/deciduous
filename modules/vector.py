@@ -1,9 +1,11 @@
 from osgeo import ogr, osr
-from common import *
+from common import Sublist
 import csv
+import os
 
 __all__ = ['OGR_TYPE_DEF',
            'OGR_FIELD_DEF',
+           'OGR_GEOM_DEF',
            'Vector']
 
 
@@ -81,6 +83,9 @@ class Vector(object):
         self.width = 50  # Width is set for string characters
         self.epsg = 4326  # EPSG SRID, default: 4326 (geographic lat/lon, WGS84)
 
+        self.datasource = None
+        self.layer = None
+
     def __repr__(self):
         """
         object representation
@@ -90,6 +95,60 @@ class Vector(object):
                                                          OGR_GEOM_DEF[self.geometry_type].upper()) + \
                "with {} feature(s) and {} attribute(s) >".format(str(len(self.features)),
                                                                  str(len(self.fields)))
+
+    def write_to_file(self,
+                      outfile=None):
+        """
+        Method to write the vector object to memory or to file
+        :param outfile: File to write the vector object to
+        :return: NoneType
+        """
+
+        if outfile is None:
+            raise ValueError("No filename for output")
+
+        if outfile.split('.')[-1] == 'json':
+            driver_type = 'GeoJSON'
+        elif outfile.split('.')[-1] == 'csv':
+            driver_type = 'Comma Separated Value'
+        else:
+            driver_type = 'ESRI Shapefile'
+
+        out_driver = ogr.GetDriverByName(driver_type)
+        out_datasource = out_driver.CreateDataSource(outfile)
+
+        out_layer = out_datasource.CreateLayer(os.path.basename(outfile).split('.')[0],
+                                               srs=self.spref,
+                                               geom_type=self.geometry_type)
+
+        if self.attribute_def is not None:
+            for attribute, attribute_type in self.attribute_def.items():
+                field = ogr.FieldDefn(attribute, OGR_FIELD_DEF[attribute_type])
+                res = out_layer.CreateField(field)
+        else:
+            for field in self.fields:
+                res = out_layer.CreateField(field)
+
+        layer_defn = out_layer.GetLayerDefn()
+
+        if len(self.wktlist) > 0:
+            for i, wkt_geom in enumerate(self.wktlist):
+                geom = ogr.CreateGeometryFromWkt(wkt_geom)
+                feat = ogr.Feature(layer_defn)
+                feat.SetGeometry(geom)
+
+                for attr, val in self.attributes[i].items():
+                    feat.SetField(attr, val)
+
+                out_layer.CreateFeature(feat)
+
+        else:
+            for feature in self.features:
+                out_layer.CreateFeature(feature)
+
+        out_datasource = out_driver = None
+
+        print('Written file: {}'.format(outfile))
 
     def point_features_from_csv(self,
                                 csvfile=None,
@@ -154,7 +213,7 @@ class Vector(object):
         """
 
         if geom_type.upper() == 'POINT':
-            tempstring = ' '.join(coords)
+            tempstring = ' '.join([str(coord) for coord in coords])
             wktstring = 'POINT({})'.format(tempstring)
 
         elif geom_type.upper() == 'MULTIPOINT':
@@ -271,8 +330,10 @@ class Vector(object):
 
         if type(geom_strings).__name__ != 'list':
             geom_strings = [geom_strings]
-        if type(attributes).__name__ != 'list':
-            attributes = [attributes]
+
+        if attributes is not None:
+            if type(attributes).__name__ != 'list':
+                attributes = [attributes]
 
         if geom_string_type == 'wkt':
             geoms = list(ogr.CreateGeometryFromWkt(geom_string) for geom_string in geom_strings)
@@ -333,7 +394,7 @@ class Vector(object):
                 if attr_name not in attribute_types:
                     raise RuntimeError('Attribute values supplied for undefined attributes')
         else:
-            attribute_types = {'GeomID': ogr.OFTInteger}
+            attribute_types = {'GeomID': 'int'}
             attributes = list({'GeomID': i} for i in range(0, len(geom_strings)))
 
         # create the attribute fields in the layer
@@ -456,4 +517,108 @@ class Vector(object):
 
             return temp_vector
 
+    def reproject(self,
+                  epsg=4326,
+                  dest_spatial_ref_str=None,
+                  dest_spatial_ref_str_type=None,
+                  destination_spatial_ref=None):
+        """
+        Transfrom a geometry using OSR library (which is based on PROJ4)
+        :param dest_spatial_ref_str: Destination spatial reference string
+        :param dest_spatial_ref_str_type: Destination spatial reference string type
+        :param destination_spatial_ref: OSR spatial reference object for destination feature
+        :param epsg: Destination EPSG SRID code (default: 4326)
+        :return: Reprojected vector object
+        """
 
+        vector = Vector()
+        vector.type = self.geometry_type
+        vector.nfeat = self.nfeat
+
+        if destination_spatial_ref is None:
+            destination_spatial_ref = osr.SpatialReference()
+
+            if dest_spatial_ref_str is not None:
+                if dest_spatial_ref_str_type == 'wkt':
+                    res = destination_spatial_ref.ImportFromWkt(dest_spatial_ref_str)
+                elif dest_spatial_ref_str_type == 'proj4':
+                    res = destination_spatial_ref.ImportFromProj4(dest_spatial_ref_str)
+                elif dest_spatial_ref_str_type == 'epsg':
+                    res = destination_spatial_ref.ImportFromEPSG(dest_spatial_ref_str)
+                else:
+                    raise RuntimeError("No spatial reference string type specified")
+            elif epsg is not None:
+                res = destination_spatial_ref.ImportFromEPSG(epsg)
+
+            else:
+                raise ValueError("Destination spatial reference not specified")
+
+        vector.crs = destination_spatial_ref
+        vector.crs_string = destination_spatial_ref.ExportToWkt()
+
+        # get source spatial reference from Spatial reference WKT string in self
+        source_spatial_ref = self.spref
+
+        # create a transform tool (or driver)
+        transform_tool = osr.CoordinateTransformation(source_spatial_ref,
+                                                      destination_spatial_ref)
+
+        # Create a memory layer
+        memory_driver = ogr.GetDriverByName('Memory')
+        vector.data_source = memory_driver.CreateDataSource('out')
+
+        # create a layer in memory
+        vector.layer = vector.data_source.CreateLayer('temp',
+                                                      srs=source_spatial_ref,
+                                                      geom_type=self.geometry_type)
+
+        # initialize new feature list
+        vector.features = list()
+        vector.fields = list()
+
+        # input layer definition
+        in_layer_definition = self.layer.GetLayerDefn()
+
+        # add fields
+        for i in range(0, in_layer_definition.GetFieldCount()):
+            field_definition = in_layer_definition.GetFieldDefn(i)
+            vector.layer.CreateField(field_definition)
+            vector.fields.append(field_definition)
+
+        # layer definition with new fields
+        temp_layer_definition = vector.layer.GetLayerDefn()
+
+        vector.wkt_list = list()
+        vector.attributes = self.attributes
+
+        # convert each feature
+        for feat in self.features:
+
+            # transform geometry
+            temp_geom = feat.GetGeometryRef()
+            temp_geom.Transform(transform_tool)
+
+            vector.wkt_list.append(temp_geom.ExportToWkt())
+
+            # create new feature using geometry
+            temp_feature = ogr.Feature(temp_layer_definition)
+            temp_feature.SetGeometry(temp_geom)
+
+            # fill geometry fields
+            for i in range(0, temp_layer_definition.GetFieldCount()):
+                field_definition = temp_layer_definition.GetFieldDefn(i)
+                temp_feature.SetField(field_definition.GetNameRef(), feat.GetField(i))
+
+            # add the feature to the shapefile
+            vector.layer.CreateFeature(temp_feature)
+
+            vector.features.append(temp_feature)
+
+        self.layer = vector.layer
+        self.features = vector.features
+        self.fields = vector.fields
+        self.datasource = vector.data_source
+        self.wktlist = vector.wkt_list
+        self.spref = vector.crs
+        self.spref_str = vector.crs_string
+        self.epsg = None

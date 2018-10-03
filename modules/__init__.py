@@ -6,4 +6,4 @@ from raster import Raster
 from resources import *
 from distance import Mahalanobis, Distance
 from exceptions import ObjectNotFound, UninitializedError
-from vector import Vector
+from vector import Vector, OGR_GEOM_DEF, OGR_TYPE_DEF, OGR_FIELD_DEF
