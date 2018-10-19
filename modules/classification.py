@@ -154,12 +154,38 @@ class _Classifier(object):
         return out_ras
 
     @staticmethod
-    def rsquare(x, y):
+    def linear_regress(x,
+                       y,
+                       xlim=None,
+                       ylim=None):
         """
-        Calculate R-squared of the linear fit
+        Calculate linear regression attributes
+        :param x: Vector of independent variables
+        :param y: Vector of dependent variables
+        :param xlim: 2 element list [lower limit, upper limit] of starting and ending values for x vector
+        :param ylim: 2 element list [lower limit, upper limit] of starting and ending values for y vector
         """
+        if xlim is not None:
+            x_index_list = Sublist(x).range(*xlim,
+                                            index=True)
+            x = list(x[i] for i in x_index_list)
+            y = list(y[i] for i in x_index_list)
+
+        if ylim is not None:
+            y_index_list = Sublist(y).range(*ylim,
+                                            index=True)
+            x = list(x[i] for i in y_index_list)
+            y = list(y[i] for i in y_index_list)
+
         slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
-        return r_value ** 2
+        rsq = r_value ** 2
+        return {
+            'rsq': rsq,
+            'slope': slope,
+            'intercept': intercept,
+            'pval': p_value,
+            'stderr': std_err
+        }
 
 
 class MRegressor(_Classifier):
@@ -269,24 +295,24 @@ class MRegressor(_Classifier):
         return out_arr
 
     def sample_predictions(self,
-                           dataarray,
+                           data,
                            picklefile=None,
                            outfile=None):
         """
         Get tree predictions from the RF classifier
-        :param dataarray: Dictionary object from Samples.format_data
+        :param data: Dictionary object from Samples.format_data
         :param picklefile: Random Forest pickle file
         :param outfile: output csv file name
         """
 
         # calculate variance of tree predictions
-        y = self.predict(np.array(dataarray['features']))
+        y = self.predict(np.array(data['features']))
 
         # rms error of the predicted versus actual
-        rmse = sqrt(mean_squared_error(dataarray['labels'], y))
+        rmse = sqrt(mean_squared_error(data['labels'], y))
 
         # r-squared of predicted versus actual
-        rsq = self.rsquare(dataarray['labels'], y)
+        lm = self.linear_regress(data['labels'], y)
 
         # if either one of outfile or pickle file are available
         # then raise error
@@ -297,10 +323,12 @@ class MRegressor(_Classifier):
         # then write to file and proceed to return
         elif outfile is not None:
             # write y, y_hat_bar, var_y to file (<- rows in this order)
-            out_list = ['obs_y,' + ', '.join([str(elem) for elem in dataarray['labels']]),
+            out_list = ['obs_y,' + ', '.join([str(elem) for elem in data['labels']]),
                         'mean_y,' + ', '.join([str(elem) for elem in y]),
                         'rmse,' + str(rmse),
-                        'rsq,' + str(rsq),
+                        'rsq,' + str(lm['rsq']),
+                        'slope,' + str(lm['slope']),
+                        'intercept,' + str(lm['intercept']),
                         'rf_file,' + picklefile]
 
             # write the list to file
@@ -310,9 +338,11 @@ class MRegressor(_Classifier):
         # then only return values
         return {
             'mean_y': y,
-            'obs_y': dataarray['labels'],
+            'obs_y': data['labels'],
             'rmse': rmse,
-            'rsq': rsq
+            'rsq': lm['rsq'],
+            'slope': lm['slope'],
+            'intercept': lm['intercept']
         }
 
 
@@ -410,15 +440,43 @@ class RFRegressor(_Classifier):
                           You can choose any (small) number that suits the available memory.
         :param tile_size: Size of each square tile (default = 128)
         :param output: which output to produce,
-                       choices: ['sd', 'var', 'pred']
+                       choices: ['sd', 'var', 'pred', 'full']
                        where 'sd' is for standard deviation,
                        'var' is for variance
                        'pred' is for prediction or mean of tree outputs
+                       'full' is for the full spectrum of the leaf nodes' prediction
+        :param kwargs: Keyword arguments:
+                       'gain': Adjustment of the predicted output by linear adjustment of gain (slope)
+                       'bias': Adjustment of the predicted output by linear adjustment of bias (intercept)
+                       'upper_limit': Limit of maximum value of prediction
+                       'lower_limit': Limit of minimum value of prediction
         :return: 1d image array (that will need reshaping if image output)
         """
 
+        if 'gain' in kwargs:
+            gain = kwargs['gain']
+        else:
+            gain = None
+
+        if 'bias' in kwargs:
+            bias = kwargs['bias']
+        else:
+            bias = None
+
+        if 'upper_limit' in kwargs:
+            upper_limit = kwargs['upper_limit']
+        else:
+            upper_limit = None
+
+        if 'lower_limit' in kwargs:
+            lower_limit = kwargs['lower_limit']
+        else:
+            lower_limit = None
+
         # define output array
-        out_arr = arr[:, 0] * 0.0
+        out_arr = Opt.__copy__(arr[:, 0]) * 0.0
+        arr_shp = out_arr.shape
+        full_arr = np.empty([self.trees, arr_shp[0]])
 
         # input image size
         npx_inp = long(arr.shape[0])  # number of pixels in input image
@@ -450,8 +508,13 @@ class RFRegressor(_Classifier):
                     out_arr[i * npx_tile:(i + 1) * npx_tile] = np.sqrt(np.var(tile_arr, axis=0))
                 elif output == 'var':
                     out_arr[i * npx_tile:(i + 1) * npx_tile] = np.var(tile_arr, axis=0)
-                else:
+                elif output == 'pred':
                     out_arr[i * npx_tile:(i + 1) * npx_tile] = np.mean(tile_arr, axis=0)
+
+                elif output == 'full':
+                    full_arr[:, i * npx_tile:(i + 1) * npx_tile] = tile_arr
+                else:
+                    return RuntimeError("No output type specified")
 
             if npx_last > 0:  # number of total pixels for the last tile
 
@@ -469,9 +532,13 @@ class RFRegressor(_Classifier):
                     out_arr[i * npx_tile:(i * npx_tile + npx_last)] = np.sqrt(np.var(tile_arr, axis=0))
                 elif output == 'var':
                     out_arr[i * npx_tile:(i * npx_tile + npx_last)] = np.var(tile_arr, axis=0)
-                else:
+                elif output == 'pred':
                     out_arr[i * npx_tile:(i * npx_tile + npx_last)] = np.mean(tile_arr, axis=0)
 
+                elif output == 'full':
+                    full_arr[:, i * npx_tile:(i * npx_tile + npx_last)] = tile_arr
+                else:
+                    return RuntimeError("No output type specified")
         else:
 
             # initialize output array
@@ -486,35 +553,114 @@ class RFRegressor(_Classifier):
                 out_arr = np.sqrt(np.var(tree_pred_arr, axis=0))
             elif output == 'var':
                 out_arr = np.var(tree_pred_arr, axis=0)
-            else:
+            elif output == 'pred':
                 out_arr = np.mean(tree_pred_arr, axis=0)
 
-        return out_arr
+            elif output == 'full':
+                full_arr = tree_pred_arr
+            else:
+                return RuntimeError("No output type specified")
+
+        if output == 'full':
+            if gain is not None:
+                full_arr = full_arr * gain
+
+            if bias is not None:
+                full_arr = full_arr + bias
+
+            if upper_limit is not None:
+                full_arr[full_arr > upper_limit] = upper_limit
+
+            if lower_limit is not None:
+                full_arr[full_arr < lower_limit] = lower_limit
+
+            return full_arr
+
+        else:
+            if gain is not None:
+                out_arr = out_arr * gain
+
+            if bias is not None:
+                out_arr = out_arr + bias
+
+            if upper_limit is not None:
+                out_arr[out_arr > upper_limit] = upper_limit
+
+            if lower_limit is not None:
+                out_arr[out_arr < lower_limit] = lower_limit
+
+            return out_arr
 
     def sample_predictions(self,
-                           dataarray,
+                           data,
                            picklefile=None,
-                           outfile=None):
+                           outfile=None,
+                           **kwargs):
         """
         Get tree predictions from the RF classifier
-        :param dataarray: Dictionary object from Samples.format_data
+        :param data: Dictionary object from Samples.format_data
         :param picklefile: Random Forest pickle file
         :param outfile: output csv file name
+        :param kwargs: Keyword arguments:
+               'gain': Adjustment of the predicted output by linear adjustment of gain (slope)
+               'bias': Adjustment of the predicted output by linear adjustment of bias (intercept)
+               'upper_limit': Limit of maximum value of prediction
+               'lower_limit': Limit of minimum value of prediction
+               'regress_limit': 2 element list of Minimum and Maximum limits of the label array [min, max]
         """
 
+        if 'gain' in kwargs:
+            gain = kwargs['gain']
+        else:
+            gain = None
+
+        if 'bias' in kwargs:
+            bias = kwargs['bias']
+        else:
+            bias = None
+
+        if 'upper_limit' in kwargs:
+            upper_limit = kwargs['upper_limit']
+        else:
+            upper_limit = None
+
+        if 'lower_limit' in kwargs:
+            lower_limit = kwargs['lower_limit']
+        else:
+            lower_limit = None
+
+        if 'regress_limit' in kwargs:
+            regress_limit = kwargs['regress_limit']
+        else:
+            regress_limit = None
+
         # calculate variance of tree predictions
-        var_y = self.predict(np.array(dataarray['features']),
+        var_y = self.predict(np.array(data['features']),
                              output='var')
 
         # calculate mean of tree predictions
-        mean_y = self.predict(np.array(dataarray['features']),
-                              output='pred')
+        mean_y = self.predict(np.array(data['features']),
+                              output='pred',
+                              gain=gain,
+                              bias=bias,
+                              upper_limit=upper_limit,
+                              lower_limit=lower_limit)
+
+        # calculate mean of tree predictions
+        all_y = self.predict(np.array(data['features']),
+                             output='full',
+                             gain=gain,
+                             bias=bias,
+                             upper_limit=upper_limit,
+                             lower_limit=lower_limit)
 
         # rms error of the predicted versus actual
-        rmse = sqrt(mean_squared_error(dataarray['labels'], mean_y))
+        rmse = sqrt(mean_squared_error(data['labels'], mean_y))
 
         # r-squared of predicted versus actual
-        rsq = self.rsquare(dataarray['labels'], mean_y)
+        lm = self.linear_regress(data['labels'],
+                                 mean_y,
+                                 xlim=regress_limit)
 
         # if either one of outfile or pickle file are available
         # then raise error
@@ -525,11 +671,15 @@ class RFRegressor(_Classifier):
         # then write to file and proceed to return
         elif outfile is not None:
             # write y, y_hat_bar, var_y to file (<- rows in this order)
-            out_list = ['obs_y,' + ', '.join([str(elem) for elem in dataarray['labels']]),
+            out_list = ['obs_y,' + ', '.join([str(elem) for elem in data['labels']]),
                         'mean_y,' + ', '.join([str(elem) for elem in mean_y]),
                         'var_y,' + ', '.join([str(elem) for elem in var_y]),
+                        'all_y,' + '[' + ', '.join(['['+', '.join(str(elem) for
+                                                                  elem in arr)+']' for arr in list(all_y)]) + ']',
                         'rmse,' + str(rmse),
-                        'rsq,' + str(rsq),
+                        'rsq,' + str(lm['rsq']),
+                        'slope,' + str(lm['slope']),
+                        'intercept,' + str(lm['intercept']),
                         'rf_file,' + picklefile]
 
             # write the list to file
@@ -540,9 +690,12 @@ class RFRegressor(_Classifier):
         return {
             'var_y': var_y,
             'mean_y': mean_y,
-            'obs_y': dataarray['labels'],
+            'obs_y': data['labels'],
+            'all_y': all_y,
             'rmse': rmse,
-            'rsq': rsq
+            'rsq': lm['rsq'],
+            'slope': lm['slope'],
+            'intercept': lm['intercept']
         }
 
     def var_importance(self):
