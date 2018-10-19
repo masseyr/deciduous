@@ -6,6 +6,7 @@ import fnmatch
 import random
 import psutil
 import ftplib
+import copy
 import gzip
 import sys
 import os
@@ -115,6 +116,22 @@ class Sublist(list):
 
         except (TypeError, KeyError):
             print("List index not a number or list of numbers")
+
+    def range(self,
+              llim,
+              ulim,
+              index=False):
+        """
+        Make a subset of the list by only including elements between ulim and llim.
+        :param ulim: upper limit
+        :param llim: lower limit
+        :param index: If the function should return index of values that lie within the limits
+        :return: List
+        """
+        if index:
+            return [i for i, x in enumerate(self) if llim <= x <= ulim]
+        else:
+            return [x for x in self if llim <= x <= ulim]
 
     def add(self,
             elem):
@@ -702,6 +719,12 @@ class Opt:
     """
     Class to handle notices
     """
+    def __init__(self,
+                 obj=None):
+        self.obj = obj  # mutable object
+
+    def __repr__(self):
+        return "Optional helper and notice class"
 
     @staticmethod
     def print_memory_usage():
@@ -752,6 +775,10 @@ class Opt:
     def cprint(text):
         sys.stdout.write(str(text) + '\n')
         sys.stdout.flush()
+
+    @staticmethod
+    def __copy__(obj):
+        return copy.deepcopy(obj)
 
 
 class FTPHandler(Handler):
