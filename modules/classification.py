@@ -31,6 +31,8 @@ class _Classifier(object):
         self.features = None
         self.label = None
 
+        self.adjustment = dict()
+
         if kwargs is not None:
             if 'timer' in kwargs:
                 _Classifier.time_it = kwargs['timer']
@@ -258,8 +260,16 @@ class MRegressor(_Classifier):
                           input image or array is processed without tiling (default = 9).
                           You can choose any (small) number that suits the available memory.
         :param tile_size: Size of each square tile (default = 128)
+                :param kwargs: Keyword arguments:
+                       'gain': Adjustment of the predicted output by linear adjustment of gain (slope)
+                       'bias': Adjustment of the predicted output by linear adjustment of bias (intercept)
+                       'upper_limit': Limit of maximum value of prediction
+                       'lower_limit': Limit of minimum value of prediction
         :return: 1d image array (that will need reshaping if image output)
         """
+        if kwargs is not None:
+            for key, value in kwargs.items():
+                self.adjustment[key] = value
 
         # define output array
         out_arr = arr[:, 0] * 0.0
@@ -291,6 +301,18 @@ class MRegressor(_Classifier):
 
         else:
             out_arr = self.classifier.predict(arr)
+
+        if 'gain' in self.adjustment:
+            out_arr = out_arr * self.adjustment['gain']
+
+        if 'bias' in self.adjustment:
+            out_arr = out_arr + self.adjustment['bias']
+
+        if 'upper_limit' in self.adjustment:
+            out_arr[out_arr > self.adjustment['upper_limit']] = self.adjustment['upper_limit']
+
+        if 'lower_limit' in self.adjustment:
+            out_arr[out_arr < self.adjustment['lower_limit']] = self.adjustment['lower_limit']
 
         return out_arr
 
@@ -453,25 +475,9 @@ class RFRegressor(_Classifier):
         :return: 1d image array (that will need reshaping if image output)
         """
 
-        if 'gain' in kwargs:
-            gain = kwargs['gain']
-        else:
-            gain = None
-
-        if 'bias' in kwargs:
-            bias = kwargs['bias']
-        else:
-            bias = None
-
-        if 'upper_limit' in kwargs:
-            upper_limit = kwargs['upper_limit']
-        else:
-            upper_limit = None
-
-        if 'lower_limit' in kwargs:
-            lower_limit = kwargs['lower_limit']
-        else:
-            lower_limit = None
+        if kwargs is not None:
+            for key, value in kwargs.items():
+                self.adjustment[key] = value
 
         # define output array
         out_arr = Opt.__copy__(arr[:, 0]) * 0.0
@@ -562,32 +568,34 @@ class RFRegressor(_Classifier):
                 return RuntimeError("No output type specified")
 
         if output == 'full':
-            if gain is not None:
-                full_arr = full_arr * gain
 
-            if bias is not None:
-                full_arr = full_arr + bias
+            if 'gain' in self.adjustment:
+                full_arr = full_arr * self.adjustment['gain']
 
-            if upper_limit is not None:
-                full_arr[full_arr > upper_limit] = upper_limit
+            if 'bias' in self.adjustment:
+                full_arr = full_arr + self.adjustment['bias']
 
-            if lower_limit is not None:
-                full_arr[full_arr < lower_limit] = lower_limit
+            if 'upper_limit' in self.adjustment:
+                full_arr[full_arr > self.adjustment['upper_limit']] = self.adjustment['upper_limit']
+
+            if 'lower_limit' in self.adjustment:
+                full_arr[full_arr < self.adjustment['lower_limit']] = self.adjustment['lower_limit']
 
             return full_arr
 
         else:
-            if gain is not None:
-                out_arr = out_arr * gain
 
-            if bias is not None:
-                out_arr = out_arr + bias
+            if 'gain' in self.adjustment:
+                out_arr = out_arr * self.adjustment['gain']
 
-            if upper_limit is not None:
-                out_arr[out_arr > upper_limit] = upper_limit
+            if 'bias' in self.adjustment:
+                out_arr = out_arr + self.adjustment['bias']
 
-            if lower_limit is not None:
-                out_arr[out_arr < lower_limit] = lower_limit
+            if 'upper_limit' in self.adjustment:
+                out_arr[out_arr > self.adjustment['upper_limit']] = self.adjustment['upper_limit']
+
+            if 'lower_limit' in self.adjustment:
+                out_arr[out_arr < self.adjustment['lower_limit']] = self.adjustment['lower_limit']
 
             return out_arr
 
@@ -609,25 +617,9 @@ class RFRegressor(_Classifier):
                'regress_limit': 2 element list of Minimum and Maximum limits of the label array [min, max]
         """
 
-        if 'gain' in kwargs:
-            gain = kwargs['gain']
-        else:
-            gain = None
-
-        if 'bias' in kwargs:
-            bias = kwargs['bias']
-        else:
-            bias = None
-
-        if 'upper_limit' in kwargs:
-            upper_limit = kwargs['upper_limit']
-        else:
-            upper_limit = None
-
-        if 'lower_limit' in kwargs:
-            lower_limit = kwargs['lower_limit']
-        else:
-            lower_limit = None
+        if kwargs is not None:
+            for key, value in kwargs.items():
+                self.adjustment[key] = value
 
         if 'regress_limit' in kwargs:
             regress_limit = kwargs['regress_limit']
@@ -640,19 +632,11 @@ class RFRegressor(_Classifier):
 
         # calculate mean of tree predictions
         mean_y = self.predict(np.array(data['features']),
-                              output='pred',
-                              gain=gain,
-                              bias=bias,
-                              upper_limit=upper_limit,
-                              lower_limit=lower_limit)
+                              output='pred')
 
         # calculate mean of tree predictions
         all_y = self.predict(np.array(data['features']),
-                             output='full',
-                             gain=gain,
-                             bias=bias,
-                             upper_limit=upper_limit,
-                             lower_limit=lower_limit)
+                             output='full')
 
         # rms error of the predicted versus actual
         rmse = sqrt(mean_squared_error(data['labels'], mean_y))
