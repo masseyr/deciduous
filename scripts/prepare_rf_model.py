@@ -100,7 +100,7 @@ if __name__ == '__main__':
     print('Randomizing samples...')
 
     for i in range(0, n_iterations):
-        model_name = 'RF_V3_{}'.format(str(i+1))
+        model_name = 'RF_{}'.format(str(i+1))
         trn_samp, val_samp = samp.random_partition(sample_partition)
         samp_list.append([model_name, trn_samp, val_samp, infile, pickledir])
 
