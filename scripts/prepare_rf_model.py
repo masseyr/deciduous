@@ -1,5 +1,6 @@
 from modules import *
 import multiprocessing
+from sys import argv
 
 """
 This script initializes and fits training data to prepare models.
@@ -9,7 +10,7 @@ by classifying held-out samples using the RF model.
 """
 
 
-def fit_rf(args_list):
+def fit_regressor(args_list):
 
     """
     Method to train and validate classification models
@@ -41,14 +42,23 @@ def fit_rf(args_list):
         model.fit_data(train_samp.format_data())
 
         # predict using held out samples and print to file
-        pred = model.sample_predictions(valid_samp.format_data())
-        rsq = int(pred['rsq'] * 100)
+        pred = model.sample_predictions(valid_samp.format_data(),
+                                        regress_limit=[0.05, 0.95])
+        rsq = pred['rsq'] * 100.0
 
-        if rsq >= 40:
+        if rsq >= 60.0:
+
+            slope = pred['slope']
+            intercept = pred['intercept']
+
+            model.adjustment['gain'] = 1.0/slope
+            model.adjustment['bias'] = -1.0 * (intercept/slope)
+            model.adjustment['upper_limit'] = 1.0
+            model.adjustment['lower_limit'] = 0.0
 
             # file to write the model run output to
             outfile = pickle_dir + sep + \
-                      Handler(in_file).basename.split('.')[0] + name + '.csv'
+                Handler(in_file).basename.split('.')[0] + name + '.txt'
             outfile = Handler(filename=outfile).file_remove_check()
 
             # save RF classifier using pickle
@@ -61,7 +71,8 @@ def fit_rf(args_list):
             # predict using the model to store results in a file
             pred = model.sample_predictions(valid_samp.format_data(),
                                             outfile=outfile,
-                                            picklefile=picklefile)
+                                            picklefile=picklefile,
+                                            regress_limit=[0.05, 0.95])
 
         result_list.append((rsq, name))
 
@@ -71,20 +82,19 @@ def fit_rf(args_list):
 # main program
 if __name__ == '__main__':
 
-    n_iterations = 500
-    sample_partition = 75
+    script, infile, pickledir, codename = argv
+
+    label_colname = 'decid_frac'
+    n_iterations = 50000
+    sample_partition = 65
     display = 10
 
     cpus = multiprocessing.cpu_count()
 
-    infile = "D:\\shared\\Dropbox\\projects\\NAU\\landsat_deciduous\\data\\" \
-             "ABoVE_AK_CAN_all_2010_trn_samp_clean_md90_mean_v2.csv"
-    pickledir = "D:\\shared\\Dropbox\\projects\\NAU\\landsat_deciduous\\data\\pickle_data"
-
     Handler(dirname=pickledir).dir_create()
 
     # prepare training samples
-    samp = Samples(csv_file=infile, label_colname='decid_frac')
+    samp = Samples(csv_file=infile, label_colname=label_colname)
     samp_list = list()
 
     print('Randomizing samples...')
@@ -104,7 +114,7 @@ if __name__ == '__main__':
     print(' Distribution of chunks : {}'.format(', '.join(chunk_length)))
 
     pool = multiprocessing.Pool(processes=cpus)
-    results = pool.map(fit_rf, sample_chunks)
+    results = pool.map(fit_regressor, sample_chunks)
 
     print('Top {} models:'.format(str(display)))
     print('')
