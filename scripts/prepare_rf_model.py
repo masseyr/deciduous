@@ -85,6 +85,7 @@ if __name__ == '__main__':
     script, infile, pickledir, codename = argv
 
     label_colname = 'decid_frac'
+    model_initials = 'RF'
     n_iterations = 50000
     sample_partition = 65
     display = 10
@@ -100,9 +101,17 @@ if __name__ == '__main__':
     print('Randomizing samples...')
 
     for i in range(0, n_iterations):
-        model_name = 'RF_{}'.format(str(i+1))
+
+        model_name = '_{}_{}'.format(model_initials,
+                                     str(i+1))
+
         trn_samp, val_samp = samp.random_partition(sample_partition)
-        samp_list.append([model_name, trn_samp, val_samp, infile, pickledir])
+
+        samp_list.append([model_name,
+                          trn_samp,
+                          val_samp,
+                          infile,
+                          pickledir])
 
     print('Number of elements in sample list : {}'.format(str(len(samp_list))))
     print('Number of CPUs : {} '.format(str(cpus)))
@@ -114,7 +123,9 @@ if __name__ == '__main__':
     print(' Distribution of chunks : {}'.format(', '.join(chunk_length)))
 
     pool = multiprocessing.Pool(processes=cpus)
-    results = pool.map(fit_regressor, sample_chunks)
+
+    results = pool.map(fit_regressor,
+                       sample_chunks)
 
     print('Top {} models:'.format(str(display)))
     print('')
