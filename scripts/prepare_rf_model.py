@@ -1,6 +1,7 @@
 from modules import *
 import multiprocessing
 from sys import argv
+import pandas as pd
 
 """
 This script initializes and fits training data to prepare models.
@@ -45,11 +46,10 @@ def fit_regressor(args_list):
         pred = model.sample_predictions(valid_samp.format_data(),
                                         regress_limit=[0.05, 0.95])
         rsq = pred['rsq'] * 100.0
+        slope = pred['slope']
+        intercept = pred['intercept']
 
         if rsq >= 60.0:
-
-            slope = pred['slope']
-            intercept = pred['intercept']
 
             model.adjustment['gain'] = 1.0/slope
             model.adjustment['bias'] = -1.0 * (intercept/slope)
@@ -74,7 +74,10 @@ def fit_regressor(args_list):
                                             picklefile=picklefile,
                                             regress_limit=[0.05, 0.95])
 
-        result_list.append((rsq, name))
+        result_list.append({'name': name,
+                            'rsq': rsq,
+                            'slope': slope,
+                            'intercept': intercept})
 
     return result_list
 
@@ -89,6 +92,8 @@ if __name__ == '__main__':
     n_iterations = 50000
     sample_partition = 65
     display = 10
+
+    sep = Handler().sep
 
     cpus = multiprocessing.cpu_count()
 
@@ -141,3 +146,5 @@ if __name__ == '__main__':
         for output in out_list[0: (display-1)]:
             print(output)
 
+    df = pd.DataFrame(out_list)
+    df.to_csv(pickledir + sep + 'results_summary_' + codename)
