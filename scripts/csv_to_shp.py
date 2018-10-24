@@ -1,24 +1,44 @@
 from modules import Vector
+import pandas as pd
 
 
 if __name__ == '__main__':
 
-    csvfile = 'c:/temp/cafi_site_basal_area_deciduousness_smry_1994_2014.csv'
-    outfile = 'c:/temp/cafi_site_basal_area_deciduousness_smry_1994_2014.shp'
+    csvfile = "/projects/NAU/landsat_deciduous/data/RSN_Lat_Longs.csv"
+    outfile = "/projects/NAU/landsat_deciduous/data/RSN_Lat_Longs.shp"
 
-    vec = Vector(vectorfile=outfile,
-                 name='cafi_sites',
-                 source_type='ESRI Shapefile')
+    samp_data = pd.read_csv(csvfile)
+    headers = list(samp_data)
 
-    vec.geometry_type = 'point'
-    vec.epsg = 4326
-    vec.point_features_from_csv(csvfile=csvfile,
-                                geometry_columns=['lat',
-                                                  'lon'])
-    vec.attribute_def = {'site': 'int',
-                         'year': 'int',
-                         'decid_frac': 'float',
-                         'decid_sd': 'float'}
+    print(headers)
 
-    vec.construct_point_vector()
+    spref_str = '+proj=longlat +datum=WGS84'
 
+    wkt_list = list()
+    attr_list = list()
+    attribute_types = {'age': 'str',
+                       'rsn_name': 'str',
+                       'site_id': 'str'}
+
+    for _, row in samp_data.iterrows():
+        elem = dict()
+        for header in headers:
+            elem[header] = row[header]
+
+        wkt_list.append(Vector.wkt_from_coords((elem['lon'], elem['lat']),
+                                               geom_type='point'))
+
+        attr_list.append({'age': elem['age'],
+                          'rsn_name': elem['rsn_name'],
+                          'site_id': elem['site_id']})
+
+    vector = Vector.vector_from_string(wkt_list,
+                                       spref_string=spref_str,
+                                       spref_string_type='proj4',
+                                       vector_type='point',
+                                       attributes=attr_list,
+                                       attribute_types=attribute_types)
+
+    print(vector)
+
+    vector.write_to_file(outfile)
