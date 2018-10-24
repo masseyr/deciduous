@@ -89,7 +89,7 @@ if __name__ == '__main__':
 
     label_colname = 'decid_frac'
     model_initials = 'RF'
-    n_iterations = 50000
+    n_iterations = 100
     sample_partition = 65
     display = 10
 
@@ -141,10 +141,10 @@ if __name__ == '__main__':
         for result in results:
             for vals in result:
                 out_list.append(vals)
-        out_list.sort(reverse=True)
+        out_list.sort(reverse=True, key=lambda elem: elem['rsq'])
 
         for output in out_list[0: (display-1)]:
             print(output)
 
     df = pd.DataFrame(out_list)
-    df.to_csv(pickledir + sep + 'results_summary_' + codename)
+    df.to_csv(pickledir + sep + 'results_summary_' + codename + '.csv')
