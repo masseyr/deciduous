@@ -136,8 +136,8 @@ if __name__ == '__main__':
     print('')
     print('R-sq, Model name')
 
+    out_list = list()
     if len(results) > 0:
-        out_list = list()
         for result in results:
             for vals in result:
                 out_list.append(vals)
@@ -146,5 +146,8 @@ if __name__ == '__main__':
         for output in out_list[0: (display-1)]:
             print(output)
 
-    df = pd.DataFrame(out_list)
-    df.to_csv(pickledir + sep + 'results_summary_' + codename + '.csv')
+    if len(out_list) > 0:
+        df = pd.DataFrame(out_list)
+        df.to_csv(pickledir + sep + 'results_summary_' + codename + '.csv')
+    else:
+        print('No results to summarize!')
