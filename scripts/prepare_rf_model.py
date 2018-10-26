@@ -2,6 +2,8 @@ from modules import *
 import multiprocessing
 from sys import argv
 import pandas as pd
+import time
+
 
 """
 This script initializes and fits training data to prepare models.
@@ -38,6 +40,7 @@ def fit_regressor(args_list):
 
         # initialize RF classifier
         model = RFRegressor(trees=200, samp_split=2, oob_score=False)
+        model.time_it = True
 
         # fit RF classifier using training data
         model.fit_data(train_samp.format_data())
@@ -45,6 +48,7 @@ def fit_regressor(args_list):
         # predict using held out samples and print to file
         pred = model.sample_predictions(valid_samp.format_data(),
                                         regress_limit=[0.05, 0.95])
+
         rsq = pred['rsq'] * 100.0
         slope = pred['slope']
         intercept = pred['intercept']
@@ -87,15 +91,21 @@ if __name__ == '__main__':
 
     script, infile, pickledir, codename = argv
 
+    Handler(dirname=pickledir).dir_create()
+
+    Opt.cprint(infile)
+    Opt.cprint(pickledir)
+    Opt.cprint(codename)
+
     label_colname = 'decid_frac'
     model_initials = 'RF'
-    n_iterations = 100
-    sample_partition = 65
+    n_iterations = 10
+    sample_partition = 70
     display = 10
 
     sep = Handler().sep
 
-    cpus = multiprocessing.cpu_count()
+    cpus = 1  # multiprocessing.cpu_count()
 
     Handler(dirname=pickledir).dir_create()
 
@@ -103,7 +113,7 @@ if __name__ == '__main__':
     samp = Samples(csv_file=infile, label_colname=label_colname)
     samp_list = list()
 
-    print('Randomizing samples...')
+    Opt.cprint('Randomizing samples...')
 
     for i in range(0, n_iterations):
 
@@ -118,23 +128,23 @@ if __name__ == '__main__':
                           infile,
                           pickledir])
 
-    print('Number of elements in sample list : {}'.format(str(len(samp_list))))
-    print('Number of CPUs : {} '.format(str(cpus)))
+    Opt.cprint('Number of elements in sample list : {}'.format(str(len(samp_list))))
+    Opt.cprint('Number of CPUs : {} '.format(str(cpus)))
 
     sample_chunks = [samp_list[i::cpus] for i in xrange(cpus)]
 
     chunk_length = list(str(len(chunk)) for chunk in sample_chunks)
 
-    print(' Distribution of chunks : {}'.format(', '.join(chunk_length)))
+    Opt.cprint(' Distribution of chunks : {}'.format(', '.join(chunk_length)))
 
     pool = multiprocessing.Pool(processes=cpus)
 
     results = pool.map(fit_regressor,
                        sample_chunks)
 
-    print('Top {} models:'.format(str(display)))
-    print('')
-    print('R-sq, Model name')
+    Opt.cprint('Top {} models:'.format(str(display)))
+    Opt.cprint('')
+    Opt.cprint('R-sq, Model name')
 
     out_list = list()
     if len(results) > 0:
@@ -144,10 +154,10 @@ if __name__ == '__main__':
         out_list.sort(reverse=True, key=lambda elem: elem['rsq'])
 
         for output in out_list[0: (display-1)]:
-            print(output)
+            Opt.cprint(output)
 
     if len(out_list) > 0:
         df = pd.DataFrame(out_list)
         df.to_csv(pickledir + sep + 'results_summary_' + codename + '.csv')
     else:
-        print('No results to summarize!')
+        Opt.cprint('No results to summarize!')
