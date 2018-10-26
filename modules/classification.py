@@ -482,7 +482,10 @@ class RFRegressor(_Classifier):
         # define output array
         out_arr = Opt.__copy__(arr[:, 0]) * 0.0
         arr_shp = out_arr.shape
-        full_arr = np.empty([self.trees, arr_shp[0]])
+
+        full_arr = None
+        if output == 'full':
+            full_arr = np.empty([self.trees, arr_shp[0]])
 
         # input image size
         npx_inp = long(arr.shape[0])  # number of pixels in input image
@@ -515,7 +518,7 @@ class RFRegressor(_Classifier):
                 elif output == 'var':
                     out_arr[i * npx_tile:(i + 1) * npx_tile] = np.var(tile_arr, axis=0)
                 elif output == 'pred':
-                    out_arr[i * npx_tile:(i + 1) * npx_tile] = np.mean(tile_arr, axis=0)
+                    out_arr[i * npx_tile:(i + 1) * npx_tile] = np.median(tile_arr, axis=0)
 
                 elif output == 'full':
                     full_arr[:, i * npx_tile:(i + 1) * npx_tile] = tile_arr
@@ -615,6 +618,9 @@ class RFRegressor(_Classifier):
                'upper_limit': Limit of maximum value of prediction
                'lower_limit': Limit of minimum value of prediction
                'regress_limit': 2 element list of Minimum and Maximum limits of the label array [min, max]
+               'all_y': Boolean (if all lef outputs should be calculated)
+               'var_y': Boolean (if variance of leaf nodes should be calculated)
+
         """
 
         if kwargs is not None:
@@ -627,23 +633,29 @@ class RFRegressor(_Classifier):
             regress_limit = None
 
         # calculate variance of tree predictions
-        var_y = self.predict(np.array(data['features']),
-                             output='var')
+        var_y = None
+        if 'var_y' in self.adjustment:
+            if self.adjustment['var_y']:
+                var_y = self.predict(np.array(data['features']),
+                                     output='var')
 
         # calculate mean of tree predictions
-        mean_y = self.predict(np.array(data['features']),
+        pred_y = self.predict(np.array(data['features']),
                               output='pred')
 
         # calculate mean of tree predictions
-        all_y = self.predict(np.array(data['features']),
-                             output='full')
+        all_y = None
+        if 'all_y' in self.adjustment:
+            if self.adjustment['all_y']:
+                all_y = self.predict(np.array(data['features']),
+                                     output='full')
 
         # rms error of the predicted versus actual
-        rmse = sqrt(mean_squared_error(data['labels'], mean_y))
+        rmse = sqrt(mean_squared_error(data['labels'], pred_y))
 
         # r-squared of predicted versus actual
         lm = self.linear_regress(data['labels'],
-                                 mean_y,
+                                 pred_y,
                                  xlim=regress_limit)
 
         # if either one of outfile or pickle file are available
@@ -656,31 +668,39 @@ class RFRegressor(_Classifier):
         elif outfile is not None:
             # write y, y_hat_bar, var_y to file (<- rows in this order)
             out_list = ['obs_y,' + ', '.join([str(elem) for elem in data['labels']]),
-                        'mean_y,' + ', '.join([str(elem) for elem in mean_y]),
-                        'var_y,' + ', '.join([str(elem) for elem in var_y]),
-                        'all_y,' + '[' + ', '.join(['['+', '.join(str(elem) for
-                                                                  elem in arr)+']' for arr in list(all_y)]) + ']',
+                        'pred_y,' + ', '.join([str(elem) for elem in pred_y]),
                         'rmse,' + str(rmse),
                         'rsq,' + str(lm['rsq']),
                         'slope,' + str(lm['slope']),
                         'intercept,' + str(lm['intercept']),
                         'rf_file,' + picklefile]
 
+            if all_y is not None:
+                out_list.append('all_y,' + '[' + ', '.join(['[' + ', '.join(str(elem) for
+                                                            elem in arr) + ']' for arr in list(all_y)]) + ']')
+            if var_y is not None:
+                out_list.append('var_y,' + ', '.join([str(elem) for elem in var_y]))
+
             # write the list to file
             Handler(filename=outfile).write_list_to_file(out_list)
 
         # if outfile and pickle file are not provided,
         # then only return values
-        return {
-            'var_y': var_y,
-            'mean_y': mean_y,
+        out_dict = {
+            'pred_y': pred_y,
             'obs_y': data['labels'],
-            'all_y': all_y,
             'rmse': rmse,
             'rsq': lm['rsq'],
             'slope': lm['slope'],
             'intercept': lm['intercept']
         }
+
+        if all_y is not None:
+            out_dict['all_y'] = all_y
+        if var_y is not None:
+            out_dict['var_y'] = var_y
+
+        return out_dict
 
     def var_importance(self):
         """
