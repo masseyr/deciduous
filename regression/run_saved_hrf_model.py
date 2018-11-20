@@ -1,3 +1,7 @@
+from geosoupML import RFRegressor, HRFRegressor
+from geosoup import Opt, Handler, Raster, Sublist
+import sys
+
 """
 This script is used to classify a raster using a selected RF model.
 This script also generates the uncertainty raster.
@@ -51,29 +55,12 @@ def make_final_regressor(pickle_file,
 
 # main program
 if __name__ == '__main__':
-    import sys
-    import os
-    module_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    sys.path.append(module_path)
-    from modules import *
 
     # read in the input files
-    # script, infile, outdir, rf_picklefile1, rf_picklefile2 = sys.argv
+    script, infile, outdir, rf_picklefile1, rf_picklefile2 = sys.argv
 
     ulim = 1.0
     llim = 0.0
-
-    active_dir = "D:/shared/"
-
-    infile = active_dir + "Dropbox/projects/NAU/landsat_deciduous/data/temp/" + \
-        "ABoVE_median_SR_NDVI_boreal_2015-0000023808-0000134912_subset.tif"
-
-    outdir = active_dir + "Dropbox/projects/NAU/landsat_deciduous/data/temp/"
-
-    rf_picklefile1 = active_dir + "Dropbox/projects/NAU/landsat_deciduous/data/SAMPLES/rf_test/" + \
-        "gee_data_cleaning_v28_median2_RF_7.pickle"
-    rf_picklefile2 = active_dir + "Dropbox/projects/NAU/landsat_deciduous/data/SAMPLES/rf_test/" + \
-        "gee_data_cleaning_v28_median2_summer_RF_3.pickle"
 
     # ------------------common parameters-----------------
     over_adjust_ = 1.0
@@ -180,5 +167,3 @@ if __name__ == '__main__':
         Opt.print_memory_usage()
 
     Opt.cprint('Done!')
-
-
