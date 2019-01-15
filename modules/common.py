@@ -1,5 +1,5 @@
 from decimal import *
-import pandas as pd
+import csv
 import numpy as np
 import datetime
 import fnmatch
@@ -691,17 +691,38 @@ class Handler(object):
         :param: csv file
         :returns: dictionary of data
         """
-        dataframe = pd.read_csv(self.filename, sep=',')
+        lines = list()
+        with open(self.filename, 'r') as ds:
+            for line in csv.reader(ds, delimiter=','):
+                lines.append(line)
 
         # convert col names to list of strings
-        names = dataframe.columns.values.tolist()
+        names = lines[0]
 
         # convert pixel samples to list
-        features = dataframe.values.tolist()
+        features = list(list(self.string_to_type(elem) for elem in feat) for feat in lines[1:])
+
         return {
             'feature': features,
             'name': names,
         }
+
+    @staticmethod
+    def write_to_csv(list_of_dicts,
+                     outfile=None,
+                     delimiter=','):
+
+        if outfile is None:
+            raise ValueError("No file name for writing")
+
+        lines = list()
+        lines.append(delimiter.join(list(list_of_dicts[0])))
+        for data_dict in list_of_dicts:
+            lines.append(delimiter.join(list(str(val) for _, val in data_dict.items())))
+
+        with open(outfile, 'w') as f:
+            for line in lines:
+                f.write(line + '\n')
 
     def find_all(self, pattern):
         """Find all the names that match pattern"""
@@ -713,6 +734,27 @@ class Handler(object):
                 if fnmatch.fnmatch(name, '*' + pattern + '*'):
                     result.append(os.path.join(root, name))
         return result  # list
+
+    @staticmethod
+    def string_to_type(x):
+        """
+        Method to return name of the data type
+        :param x: input item
+        :return: string
+        """
+        if type(x).__name__ == 'str':
+            try:
+                val = int(x)
+            except ValueError:
+                try:
+                    val = float(x)
+                except ValueError:
+                    try:
+                        val = str(x)
+                    except:
+                        val = None
+            x = val
+        return x
 
 
 class Opt:

@@ -6,9 +6,11 @@ import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 import seaborn as sns
 
-plt.rcParams['agg.path.chunksize'] = 100000
-plt.rcParams["patch.force_edgecolor"] = True
-plt.interactive(False)
+# plt.rcParams['agg.path.chunksize'] = 100000
+# plt.rcParams["patch.force_edgecolor"] = True
+# plt.interactive(False)
+plt.rcParams.update({'font.size': 16, 'font.family': 'Times New Roman'})
+plt.rcParams['axes.labelweight'] = 'bold'
 
 """
 plot_dictionary = {
@@ -43,12 +45,12 @@ class Plot:
     """
     Class to plot data
     """
-    def __init__(self, dict):
+    def __init__(self, in_dict):
         """
         Initialize the plot class
         :param dict: Input dictionary of parameters
         """
-        self.dict = dict
+        self.dict = in_dict
 
         if 'plotfile' in self.dict:
             self.filename = self.dict['plotfile']
@@ -82,7 +84,7 @@ class Plot:
                 # save to file or show in window
                 if self.filename is not None:
                     self.filename = Handler(self.dict['plotfile']).file_remove_check()
-                    plot.savefig(self.filename)
+                    plot.savefig(self.filename, dpi=1200)
                     plot.close()
                 else:
                     plot.show()

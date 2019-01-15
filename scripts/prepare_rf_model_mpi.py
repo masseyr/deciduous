@@ -1,7 +1,7 @@
 from modules import *
 from mpi4py import MPI
 from sys import argv
-import pandas as pd
+
 
 """
 This script initializes and fits training data to prepare models.
@@ -53,10 +53,13 @@ def fit_regressor(args_list):
         rsq = pred['rsq'] * 100.0
         slope = pred['slope']
         intercept = pred['intercept']
+        rmse = pred['rmse']
 
         if rsq >= 60.0:
+            if intercept > 0.05:
+                model.adjustment['bias'] = -1.0 * (intercept / slope)
+
             model.adjustment['gain'] = 1.0 / slope
-            model.adjustment['bias'] = -1.0 * (intercept / slope)
             model.adjustment['upper_limit'] = 1.0
             model.adjustment['lower_limit'] = 0.0
 
@@ -80,6 +83,7 @@ def fit_regressor(args_list):
 
         result_list.append({'name': name,
                             'rsq': rsq,
+                            'rmse': rmse,
                             'slope': slope,
                             'intercept': intercept})
 
@@ -135,11 +139,13 @@ if __name__ == '__main__':
     else:
         sample_chunks = None
 
-    samples = comm.scatter(sample_chunks, root=0)
+    samples = comm.scatter(sample_chunks,
+                           root=0)
 
     result = fit_regressor(samples)
 
-    result_array = comm.gather(result, root=0)
+    result_array = comm.gather(result,
+                               root=0)
 
     if rank == 0:
 
@@ -169,8 +175,9 @@ if __name__ == '__main__':
             summary_file = pickledir + sep + 'results_summary_' + codename + '.csv'
             Opt.cprint('\nSummary file: {}\n'.format(summary_file))
 
-            df = pd.DataFrame(out_list)
-            df.to_csv(summary_file)
+            Handler.write_to_csv(out_list,
+                                 outfile=summary_file,
+                                 delimiter=',')
 
         else:
             Opt.cprint('\nNo results to summarize!\n')

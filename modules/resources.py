@@ -3,7 +3,6 @@ import fnmatch
 import json
 import numpy as np
 from shapely.geometry import Polygon, mapping
-import pandas as pd
 from osgeo import ogr, gdal
 import sys
 
@@ -12,7 +11,6 @@ This module houses functions specific to the data used
 """
 
 __all__ = ['bname_dict',
-           'get_rfpickle_info',
            'get_TCdata_filepath',
            'TCserver',
            'read_y_param_from_summary',
@@ -132,16 +130,6 @@ def get_TCdata_filepath(path, row, year):
             r=str(row).zfill(3),
             y=str(year).zfill(4))
     }
-
-
-def get_rfpickle_info(infile):
-    """
-    Read statistics of random forest performance from csv file
-    :param infile:
-    :return:
-    """
-    jumble = pd.read_csv(infile)
-    return {'name': jumble.iloc[4, 0], 'rsq': jumble.iloc[3, 0], 'rmse': jumble.iloc[2, 0]}
 
 
 def read_y_param_from_summary(csv_file):
