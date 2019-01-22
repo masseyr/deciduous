@@ -53,15 +53,17 @@ class Vector(object):
 
     def __init__(self,
                  filename=None,
+                 name='Empty',
                  spref_str=None,
                  epsg=None,
                  proj4=None,
                  layer_index=0,
-                 geom_type=3,
+                 geom_type=None,
                  in_memory=False,
                  verbose=False,
                  primary_key='fid',
-                 feat_limit=None):
+                 feat_limit=None,
+                 attr_def=None):
         """
         Constructor for class Vector
         :param filename: Name of the vector file (shapefile) with full path
@@ -83,13 +85,14 @@ class Vector(object):
         self.layer = None
         self.spref = None
         self.spref_str = None
-        self.type = None
+        self.type = self.ogr_geom_type(geom_type)
 
-        self.name = 'Empty'
+        self.name = name
         self.nfeat = 0
         self.bounds = None
         self.fields = list()
         self.data = dict()
+        self.attr_def = attr_def
 
         if filename is not None and os.path.isfile(filename):
 
@@ -207,7 +210,6 @@ class Vector(object):
                 out_driver = ogr.GetDriverByName('Memory')
                 out_datasource = out_driver.CreateDataSource('mem_source')
                 self.datasource = out_datasource
-                self.type = geom_type
 
                 if self.spref_str is not None:
                     self.spref = osr.SpatialReference()
@@ -225,12 +227,24 @@ class Vector(object):
 
                 self.layer = self.datasource.CreateLayer('mem_layer',
                                                          srs=self.spref,
-                                                         geom_type=geom_type)
+                                                         geom_type=self.type)
+
+                if attr_def is not None:
+                    for attr_name, attr_type in attr_def.items():
+                        temp_attr = ogr.FieldDefn(attr_name, OGR_FIELD_DEF[attr_type])
+                        if attr_type == 'str':
+                            temp_attr.SetWidth(self.width)
+                        if attr_type in ('float', 'int'):
+                            temp_attr.SetPrecision(self.precision)
+
+                        self.layer.CreateField(temp_attr)
+                        self.fields.append(temp_attr)
+
                 if primary_key is not None:
-                    fid = ogr.FieldDefn(primary_key, ogr.OFTInteger)
+                    fid = ogr.FieldDefn(primary_key, )
                     fid.SetPrecision(9)
                     self.layer.CreateField(fid)
-                    self.fields = [fid]
+                    self.fields.append(fid)
 
             if verbose:
                 sys.stdout.write("\nInitialized empty Vector\n")
