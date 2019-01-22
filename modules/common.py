@@ -684,11 +684,12 @@ class Handler(object):
                                 colnames=colnames,
                                 delim=delim)
 
-    def read_from_csv(self):
+    def read_from_csv(self,
+                      return_dicts=False):
         """
         Read csv as list of lists with header.
         Each row is a list and a sample point.
-        :param: csv file
+        :param return_dicts: If list of dictionaries should be returned
         :returns: dictionary of data
         """
         lines = list()
@@ -700,29 +701,39 @@ class Handler(object):
         names = lines[0]
 
         # convert pixel samples to list
-        features = list(list(self.string_to_type(elem) for elem in feat) for feat in lines[1:])
+        if return_dicts:
+            return list(dict(zip(names, list(self.string_to_type(elem) for elem in feat))) for feat in lines[1:])
 
-        return {
-            'feature': features,
-            'name': names,
-        }
+        else:
+            return {
+                'feature': list(list(self.string_to_type(elem) for elem in feat) for feat in lines[1:]),
+                'name': names,
+            }
 
     @staticmethod
     def write_to_csv(list_of_dicts,
                      outfile=None,
-                     delimiter=','):
+                     delimiter=',',
+                     append=False,
+                     header=True):
 
         if outfile is None:
             raise ValueError("No file name for writing")
 
         lines = list()
-        lines.append(delimiter.join(list(list_of_dicts[0])))
+        if header:
+            lines.append(delimiter.join(list(list_of_dicts[0])))
         for data_dict in list_of_dicts:
             lines.append(delimiter.join(list(str(val) for _, val in data_dict.items())))
 
-        with open(outfile, 'w') as f:
-            for line in lines:
-                f.write(line + '\n')
+        if append:
+            with open(outfile, 'a') as f:
+                for line in lines:
+                    f.write(line + '\n')
+        else:
+            with open(outfile, 'w') as f:
+                for line in lines:
+                    f.write(line + '\n')
 
     def find_all(self, pattern):
         """Find all the names that match pattern"""
