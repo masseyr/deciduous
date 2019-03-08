@@ -6,6 +6,7 @@ import fnmatch
 import random
 import psutil
 import ftplib
+import time
 import copy
 import gzip
 import sys
@@ -196,6 +197,14 @@ class Sublist(list):
         nelem_by_percent = int(round((float(nelem)*float(100 - percent))/float(100)))
         return random.sample(self, nelem_by_percent)
 
+    def tuple_by_pairs(self):
+        """
+        Make a list of tuple pairs of consequetive list elements
+        :return: List of tuples
+        """
+
+        return Sublist((self[i], self[i+1]) for i in range(len(self) - 1))
+
     @classmethod
     def custom_list(cls,
                     start,
@@ -309,6 +318,51 @@ class Sublist(list):
         """
         mat = matrix[i].tolist()
         return Sublist(mat[0])
+
+    def mean(self):
+        """
+        calculate mean of an array
+        :return: float
+        """
+        return np.mean(self)
+
+    def median(self):
+        """
+        calculate median of an array
+        :return: float
+        """
+        return np.median(self)
+
+    @staticmethod
+    def percentile(arr, pctl=95.0):
+        """
+        Method to output percentile in an array
+        :param arr: input numpy array or iterable
+        :param pctl: percentile value
+        :return:
+        """
+
+        pctl_calc = np.percentile(arr, pctl)
+        diff = np.abs(np.array(arr) - pctl_calc)
+        closest_vals = np.array(arr)[diff == min(diff)]
+        if len(closest_vals) > 1:
+            return min(closest_vals)
+        else:
+            return closest_vals.item()
+
+    @staticmethod
+    def pctl_interval(arr, intvl=95.0):
+        """
+        Method to calculate the width of a percentile interval
+        :param arr: input numpy array or iterable
+        :param intvl: Interval to calculate (default: 95th percentile)
+        :return: scalar
+        """
+
+        lower = Sublist.percentile(arr, (100.0 - intvl)/2.0)
+        upper = Sublist.percentile(arr, 100.0 - (100.0 - intvl)/2.0)
+
+        return np.abs((upper - lower)/2.0)
 
 
 class Handler(object):
@@ -557,7 +611,8 @@ class Handler(object):
                            input_list,
                            rownames=None,
                            colnames=None,
-                           delim=", "):
+                           delim=", ",
+                           append=False):
         """
         Function to write list to file
         with each list item as one line
@@ -565,6 +620,7 @@ class Handler(object):
         :param rownames: list of row names strings
         :param colnames: list of column name strings
         :param delim: delimiter (default: ", ")
+        :param append: if the lines should be appended to the file
         :return: write to file
         """
         # add rownames and colnames
@@ -585,9 +641,14 @@ class Handler(object):
         self.filename = self.file_remove_check()
 
         # write to file
-        with open(self.filename, 'w') as fileptr:
+        if append:
+            open_type = 'a'  # append
+        else:
+            open_type = 'w'  # write
+
+        with open(self.filename, open_type) as fileptr:
             for line in input_list:
-                fileptr.write('%s\n' % line)
+                fileptr.write('{}\n'.format(str(line)))
 
     def write_slurm_script(self,
                            job_name='pyscript',
@@ -685,29 +746,48 @@ class Handler(object):
                                 delim=delim)
 
     def read_from_csv(self,
-                      return_dicts=False):
+                      return_dicts=False,
+                      num_tries=10,
+                      wait_time=2):
         """
         Read csv as list of lists with header.
         Each row is a list and a sample point.
-        :param return_dicts: If list of dictionaries should be returned
+        :param return_dicts: If list of dictionaries should be returned (default: False)
+        :param num_tries: Number of tries for reading the csv file (default: 10)
+        :param wait_time: Time to wait between tries(default: 2 seconds)
         :returns: dictionary of data
         """
         lines = list()
-        with open(self.filename, 'r') as ds:
-            for line in csv.reader(ds, delimiter=','):
-                lines.append(line)
+        tries = 0
+        while len(lines) == 0 and tries < num_tries:
+            try:
+                with open(self.filename, 'r') as ds:
+                    for line in csv.reader(ds, delimiter=','):
+                        lines.append(line)
+            except Exception as e:
+                print(e)
+                time.sleep(wait_time)
+            tries += 1
 
         # convert col names to list of strings
-        names = lines[0]
+        names = list(name.strip() for name in lines[0])
 
-        # convert pixel samples to list
-        if return_dicts:
-            return list(dict(zip(names, list(self.string_to_type(elem) for elem in feat))) for feat in lines[1:])
+        if len(lines) > 0:
+            # convert pixel samples to list
+            if return_dicts:
+                return list(dict(zip(names, list(self.string_to_type(elem) for elem in feat)))
+                            for feat in lines[1:])
 
+            else:
+                return {
+                    'feature': list(list(self.string_to_type(elem) for elem in feat)
+                                    for feat in lines[1:]),
+                    'name': names,
+                }
         else:
             return {
-                'feature': list(list(self.string_to_type(elem) for elem in feat) for feat in lines[1:]),
-                'name': names,
+                'feature': list(),
+                'name': list(),
             }
 
     @staticmethod
@@ -735,15 +815,25 @@ class Handler(object):
                 for line in lines:
                     f.write(line + '\n')
 
-    def find_all(self, pattern):
-        """Find all the names that match pattern"""
-
+    def find_all(self,
+                 pattern='*'):
+        """
+        Find all the names that match pattern
+        :param pattern: pattern to look for in the folder
+        """
         result = []
         # search for a given pattern in a folder path
+        if pattern == '*':
+            search_str = '*'
+        else:
+            search_str = '*' + pattern + '*'
+
         for root, dirs, files in os.walk(self.dirname):
             for name in files:
-                if fnmatch.fnmatch(name, '*' + pattern + '*'):
-                    result.append(os.path.join(root, name))
+                if fnmatch.fnmatch(name, search_str):
+                    if str(root) in str(self.dirname) or str(self.dirname) in str(root):
+                        result.append(os.path.join(root, name))
+
         return result  # list
 
     @staticmethod
