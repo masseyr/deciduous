@@ -2,7 +2,7 @@ import pickle
 import numpy as np
 from scipy import stats
 from math import sqrt
-from osgeo import gdal
+from osgeo import gdal, gdal_array
 from common import *
 from raster import Raster
 from timer import Timer
@@ -30,6 +30,7 @@ class _Classifier(object):
         self.classifier = classifier
         self.features = None
         self.label = None
+        self.output = None
 
         self.adjustment = dict()
 
@@ -94,20 +95,28 @@ class _Classifier(object):
                         output_type='pred',
                         array_multiplier=1.0,
                         array_additive=0.0,
-                        data_type=gdal.GDT_Float32):
+                        out_data_type=gdal.GDT_Float32,
+                        nodatavalue=-32768.0,
+                        **kwargs):
 
         """Tree variance from the RF classifier
         :param raster_obj: Initialized Raster object with a 3d array
         :param outfile: name of output classification file
         :param array_multiplier: rescale data using this value
         :param array_additive: Rescale data using this value
-        :param data_type: output raster data type
+        :param out_data_type: output raster data type
+        :param nodatavalue: No data value for output raster
         :param band_name: Name of the output raster band
         :param outdir: output folder
         :param output_type: Should the output be standard deviation ('sd'),
-                            variance ('var'), or prediction ('pred')
+                            variance ('var'), or prediction ('pred'),
+                            or 'conf' for confidence interval
         :returns: classification as raster object
         """
+        if 'z_val' in kwargs:
+            z_val = kwargs['z_val']
+        else:
+            z_val = 1.96
 
         # file handler object
         handler = Handler(raster_obj.name)
@@ -141,16 +150,21 @@ class _Classifier(object):
 
         # apply the variance calculating function on the array
         out_arr = self.predict(temp_arr,
-                               output=output_type)
+                               output=output_type,
+                               z_val=z_val)
 
         # output raster and metadata
-        out_ras.dtype = data_type
+        if out_data_type != gdal_array.NumericTypeCodeToGDALTypeCode(out_arr.dtype):
+            out_arr = out_arr.astype(gdal_array.GDALTypeCodeToNumericTypeCode(out_data_type))
+
+        out_ras.dtype = out_data_type
         out_ras.transform = raster_obj.transform
         out_ras.crs_string = raster_obj.crs_string
 
         out_ras.array = out_arr.reshape([nrows, ncols])
         out_ras.shape = [1, nrows, ncols]
         out_ras.bnames = [band_name]
+        out_ras.nodatavalue = nodatavalue
 
         # return raster object
         return out_ras
@@ -302,17 +316,20 @@ class MRegressor(_Classifier):
         else:
             out_arr = self.classifier.predict(arr)
 
-        if 'gain' in self.adjustment:
-            out_arr = out_arr * self.adjustment['gain']
+        if len(self.adjustment) > 0:
+            print('Applying model adjustments ...')
 
-        if 'bias' in self.adjustment:
-            out_arr = out_arr + self.adjustment['bias']
+            if 'gain' in self.adjustment:
+                out_arr = out_arr * self.adjustment['gain']
 
-        if 'upper_limit' in self.adjustment:
-            out_arr[out_arr > self.adjustment['upper_limit']] = self.adjustment['upper_limit']
+            if 'bias' in self.adjustment:
+                out_arr = out_arr + self.adjustment['bias']
 
-        if 'lower_limit' in self.adjustment:
-            out_arr[out_arr < self.adjustment['lower_limit']] = self.adjustment['lower_limit']
+            if 'upper_limit' in self.adjustment:
+                out_arr[out_arr > self.adjustment['upper_limit']] = self.adjustment['upper_limit']
+
+            if 'lower_limit' in self.adjustment:
+                out_arr[out_arr < self.adjustment['lower_limit']] = self.adjustment['lower_limit']
 
         return out_arr
 
@@ -378,8 +395,12 @@ class RFRegressor(_Classifier):
                  classifier=None,
                  trees=10,
                  samp_split=2,
-                 oob_score=True,
+                 samp_leaf=1,
+                 max_depth=None,
+                 max_feat='auto',
+                 oob_score=False,
                  criterion='mse',
+                 n_jobs=1,
                  **kwargs):
         """
         Initialize RF classifier using class parameters
@@ -396,13 +417,21 @@ class RFRegressor(_Classifier):
 
         if self.classifier is None:
             self.classifier = RandomForestRegressor(n_estimators=trees,
+                                                    max_depth=max_depth,
                                                     min_samples_split=samp_split,
+                                                    min_samples_leaf=samp_leaf,
+                                                    max_features=max_feat,
                                                     criterion=criterion,
-                                                    oob_score=oob_score)
+                                                    oob_score=oob_score,
+                                                    n_jobs=n_jobs)
         self.trees = trees
+        self.max_depth = max_depth
         self.samp_split = samp_split
+        self.samp_leaf = samp_leaf
+        self.max_feat = max_feat
         self.oob_score = oob_score
         self.criterion = criterion
+        self.n_jobs = n_jobs
 
         if kwargs is not None:
             if 'timer' in kwargs:
@@ -449,6 +478,7 @@ class RFRegressor(_Classifier):
                 ntile_max=9,
                 tile_size=128,
                 output='pred',
+                intvl=95.0,
                 **kwargs):
         """
         Calculate random forest model prediction, variance, or standard deviation.
@@ -461,23 +491,30 @@ class RFRegressor(_Classifier):
                           input image or array is processed without tiling (default = 9).
                           You can choose any (small) number that suits the available memory.
         :param tile_size: Size of each square tile (default = 128)
+
         :param output: which output to produce,
-                       choices: ['sd', 'var', 'pred', 'full']
+                       choices: ['sd', 'var', 'pred', 'full', 'conf']
                        where 'sd' is for standard deviation,
                        'var' is for variance
                        'pred' is for prediction or mean of tree outputs
                        'full' is for the full spectrum of the leaf nodes' prediction
+                       'conf' stands for confidence interval
+
+        :param intvl: Prediction interval width (default: 95 percentile)
+
         :param kwargs: Keyword arguments:
                        'gain': Adjustment of the predicted output by linear adjustment of gain (slope)
                        'bias': Adjustment of the predicted output by linear adjustment of bias (intercept)
                        'upper_limit': Limit of maximum value of prediction
                        'lower_limit': Limit of minimum value of prediction
+
         :return: 1d image array (that will need reshaping if image output)
         """
 
         if kwargs is not None:
             for key, value in kwargs.items():
-                self.adjustment[key] = value
+                if key in ('gain', 'bias', 'upper_limit', 'lower_limit'):
+                    self.adjustment[key] = value
 
         # define output array
         out_arr = Opt.__copy__(arr[:, 0]) * 0.0
@@ -514,7 +551,7 @@ class RFRegressor(_Classifier):
 
                 # calculate standard dev or variance or prediction for each tree
                 if output == 'sd':
-                    out_arr[i * npx_tile:(i + 1) * npx_tile] = np.sqrt(np.var(tile_arr, axis=0))
+                    out_arr[i * npx_tile:(i + 1) * npx_tile] = np.std(tile_arr, axis=0)
                 elif output == 'var':
                     out_arr[i * npx_tile:(i + 1) * npx_tile] = np.var(tile_arr, axis=0)
                 elif output == 'pred':
@@ -522,6 +559,13 @@ class RFRegressor(_Classifier):
 
                 elif output == 'full':
                     full_arr[:, i * npx_tile:(i + 1) * npx_tile] = tile_arr
+
+                elif output == 'conf':
+                    out_arr[i * npx_tile:(i + 1) * npx_tile] = \
+                        np.apply_along_axis(Sublist.pctl_interval, 0, tile_arr, intvl)
+                elif output == 'se':
+                    out_arr[i * npx_tile:(i + 1) * npx_tile] = 2.0 * (np.std(tile_arr, axis=0)/np.sqrt(self.trees))
+
                 else:
                     return RuntimeError("No output type specified")
 
@@ -529,16 +573,18 @@ class RFRegressor(_Classifier):
 
                 i = ntiles - 2
 
+                tile_arr = np.array([list(range(0, npx_last)) for _ in range(0, self.trees)], dtype=float)
+
                 print('Processing tile {} of {}'.format(str(i+1), ntiles))
 
                 # calculate tree predictions for each pixel in a 2d array
                 for j, tree in enumerate(self.classifier.estimators_):
                     temp = tree.predict(arr[i * npx_tile:(i * npx_tile + npx_last), :])
-                    tile_arr = temp
+                    tile_arr[j, :] = temp
 
                 # calculate standard dev or variance or prediction for each tree
                 if output == 'sd':
-                    out_arr[i * npx_tile:(i * npx_tile + npx_last)] = np.sqrt(np.var(tile_arr, axis=0))
+                    out_arr[i * npx_tile:(i * npx_tile + npx_last)] = np.std(tile_arr, axis=0)
                 elif output == 'var':
                     out_arr[i * npx_tile:(i * npx_tile + npx_last)] = np.var(tile_arr, axis=0)
                 elif output == 'pred':
@@ -546,6 +592,14 @@ class RFRegressor(_Classifier):
 
                 elif output == 'full':
                     full_arr[:, i * npx_tile:(i * npx_tile + npx_last)] = tile_arr
+
+                elif output == 'conf':
+                    out_arr[i * npx_tile:(i * npx_tile + npx_last)] = \
+                        np.apply_along_axis(Sublist.pctl_interval, 0, tile_arr, intvl)
+                elif output == 'se':
+                    out_arr[i * npx_tile:(i * npx_tile + npx_last)] = \
+                        2.0 * (np.std(tile_arr, axis=0)/np.sqrt(self.trees))
+
                 else:
                     return RuntimeError("No output type specified")
         else:
@@ -559,7 +613,7 @@ class RFRegressor(_Classifier):
 
             # calculate standard dev or variance or prediction for each tree
             if output == 'sd':
-                out_arr = np.sqrt(np.var(tree_pred_arr, axis=0))
+                out_arr = np.std(tree_pred_arr, axis=0)
             elif output == 'var':
                 out_arr = np.var(tree_pred_arr, axis=0)
             elif output == 'pred':
@@ -567,38 +621,51 @@ class RFRegressor(_Classifier):
 
             elif output == 'full':
                 full_arr = tree_pred_arr
+
+            elif output == 'conf':
+                out_arr = \
+                    np.apply_along_axis(Sublist.pctl_interval, 0, tree_pred_arr, intvl)
+            elif output == 'se':
+                out_arr = 2.0 * (np.std(tree_pred_arr, axis=0) / np.sqrt(self.trees))
+
             else:
                 return RuntimeError("No output type specified")
 
         if output == 'full':
 
-            if 'gain' in self.adjustment:
-                full_arr = full_arr * self.adjustment['gain']
+            if len(self.adjustment) > 0:
+                print('Applying model adjustments ...')
 
-            if 'bias' in self.adjustment:
-                full_arr = full_arr + self.adjustment['bias']
+                if 'gain' in self.adjustment:
+                    full_arr = full_arr * self.adjustment['gain']
 
-            if 'upper_limit' in self.adjustment:
-                full_arr[full_arr > self.adjustment['upper_limit']] = self.adjustment['upper_limit']
+                if 'bias' in self.adjustment:
+                    full_arr = full_arr + self.adjustment['bias']
 
-            if 'lower_limit' in self.adjustment:
-                full_arr[full_arr < self.adjustment['lower_limit']] = self.adjustment['lower_limit']
+                if 'upper_limit' in self.adjustment:
+                    full_arr[full_arr > self.adjustment['upper_limit']] = self.adjustment['upper_limit']
+
+                if 'lower_limit' in self.adjustment:
+                    full_arr[full_arr < self.adjustment['lower_limit']] = self.adjustment['lower_limit']
 
             return full_arr
 
         else:
 
-            if 'gain' in self.adjustment:
-                out_arr = out_arr * self.adjustment['gain']
+            if len(self.adjustment) > 0:
+                print('Applying model adjustments ...')
 
-            if 'bias' in self.adjustment:
-                out_arr = out_arr + self.adjustment['bias']
+                if 'gain' in self.adjustment:
+                    out_arr = out_arr * self.adjustment['gain']
 
-            if 'upper_limit' in self.adjustment:
-                out_arr[out_arr > self.adjustment['upper_limit']] = self.adjustment['upper_limit']
+                if 'bias' in self.adjustment:
+                    out_arr = out_arr + self.adjustment['bias']
 
-            if 'lower_limit' in self.adjustment:
-                out_arr[out_arr < self.adjustment['lower_limit']] = self.adjustment['lower_limit']
+                if 'upper_limit' in self.adjustment:
+                    out_arr[out_arr > self.adjustment['upper_limit']] = self.adjustment['upper_limit']
+
+                if 'lower_limit' in self.adjustment:
+                    out_arr[out_arr < self.adjustment['lower_limit']] = self.adjustment['lower_limit']
 
             return out_arr
 
@@ -625,7 +692,8 @@ class RFRegressor(_Classifier):
 
         if kwargs is not None:
             for key, value in kwargs.items():
-                self.adjustment[key] = value
+                if key in ('gain', 'bias', 'upper_limit', 'lower_limit'):
+                    self.adjustment[key] = value
 
         if 'regress_limit' in kwargs:
             regress_limit = kwargs['regress_limit']
@@ -634,29 +702,58 @@ class RFRegressor(_Classifier):
 
         # calculate variance of tree predictions
         var_y = None
-        if 'var_y' in self.adjustment:
-            if self.adjustment['var_y']:
+        if 'var_y' in kwargs:
+            if kwargs['var_y']:
                 var_y = self.predict(np.array(data['features']),
                                      output='var')
+
+        # calculate mean of tree predictions
+        all_y = None
+        if 'all_y' in kwargs:
+            if kwargs['all_y']:
+                all_y = self.predict(np.array(data['features']),
+                                     output='full')
+
+        # calculate sd of tree predictions
+        sd_y = None
+        if 'sd_y' in kwargs:
+            if kwargs['sd_y']:
+                sd_y = self.predict(np.array(data['features']),
+                                    output='sd')
+
+        # calculate sd of tree predictions
+        se_y = None
+        if 'se_y' in kwargs:
+            if kwargs['se_y']:
+                se_y = self.predict(np.array(data['features']),
+                                    output='se')
+
+        conf_y = None
+        if 'conf_y' in kwargs:
+            if kwargs['conf_y']:
+                if 'intvl' in kwargs:
+                    intvl = kwargs['intvl']
+                else:
+                    intvl = 95.0
+                conf_y = self.predict(np.array(data['features']),
+                                      intvl=intvl,
+                                      output='conf')
 
         # calculate mean of tree predictions
         pred_y = self.predict(np.array(data['features']),
                               output='pred')
 
-        # calculate mean of tree predictions
-        all_y = None
-        if 'all_y' in self.adjustment:
-            if self.adjustment['all_y']:
-                all_y = self.predict(np.array(data['features']),
-                                     output='full')
-
         # rms error of the predicted versus actual
         rmse = sqrt(mean_squared_error(data['labels'], pred_y))
 
         # r-squared of predicted versus actual
-        lm = self.linear_regress(data['labels'],
-                                 pred_y,
-                                 xlim=regress_limit)
+        if regress_limit is not None:
+            lm = self.linear_regress(data['labels'],
+                                     pred_y,
+                                     xlim=regress_limit)
+        else:
+            lm = self.linear_regress(data['labels'],
+                                     pred_y)
 
         # if either one of outfile or pickle file are available
         # then raise error
@@ -681,6 +778,15 @@ class RFRegressor(_Classifier):
             if var_y is not None:
                 out_list.append('var_y,' + ', '.join([str(elem) for elem in var_y]))
 
+            if sd_y is not None:
+                out_list.append('sd_y,' + ', '.join([str(elem) for elem in sd_y]))
+
+            if conf_y is not None:
+                out_list.append('conf_y,' + ', '.join([str(elem) for elem in conf_y]))
+
+            if se_y is not None:
+                out_list.append('se_y,' + ', '.join([str(elem) for elem in se_y]))
+
             # write the list to file
             Handler(filename=outfile).write_list_to_file(out_list)
 
@@ -692,13 +798,19 @@ class RFRegressor(_Classifier):
             'rmse': rmse,
             'rsq': lm['rsq'],
             'slope': lm['slope'],
-            'intercept': lm['intercept']
+            'intercept': lm['intercept'],
         }
 
         if all_y is not None:
             out_dict['all_y'] = all_y
         if var_y is not None:
             out_dict['var_y'] = var_y
+        if sd_y is not None:
+            out_dict['sd_y'] = sd_y
+        if conf_y is not None:
+            out_dict['conf_y'] = conf_y
+        if se_y is not None:
+            out_dict['se_y'] = se_y
 
         return out_dict
 
