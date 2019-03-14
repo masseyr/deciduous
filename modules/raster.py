@@ -28,6 +28,7 @@ class Raster:
 
         self.array = array
         self.bnames = bnames
+        self.datasource = None
         self.shape = shape
         self.transform = transform
         self.crs_string = crs_string
@@ -35,6 +36,9 @@ class Raster:
         self.dtype = dtype
         self.metadict = metadict
         self.nodatavalue = None
+        self.tile_grid = list()
+        self.ntiles = None
+        self.init = False
 
     def __repr__(self):
         if self.shape is not None:
@@ -73,7 +77,10 @@ class Raster:
             for i in range(0, nbands):
                 fileptr.GetRasterBand(i + 1).WriteArray(self.array[i, :, :], 0, 0)
                 fileptr.GetRasterBand(i + 1).SetDescription(self.bnames[i])
-                # fileptr.GetRasterBand(i + 1).SetNoDataValue(-32759)
+
+                if self.nodatavalue is not None:
+                    fileptr.GetRasterBand(i + 1).SetNoDataValue(self.nodatavalue)
+
                 print('Writing band: ' + self.bnames[i])
 
         fileptr.FlushCache()
@@ -86,7 +93,7 @@ class Raster:
                    finite_only=True,
                    nan_replacement=0.0,
                    use_dict=None,
-                   sensor='ls57'):
+                   sensor=None):
 
         """
         Initialize a raster object from a file
@@ -99,12 +106,14 @@ class Raster:
         (ignored if finite_only, get_array is false)
         :return raster object
         """
+        self.init = True
         raster_name = self.name
 
         if Handler(raster_name).file_exists():
 
             # open file
             fileptr = gdal.Open(raster_name)
+            self.datasource = fileptr
 
             # get shape metadata
             bands = fileptr.RasterCount
@@ -184,8 +193,6 @@ class Raster:
                 self.crs_string = fileptr.GetProjection()
                 self.dtype = fileptr.GetRasterBand(1).DataType
                 self.metadict = Raster.get_raster_metadict(raster_name)
-
-            fileptr = None
 
             # remap band names
             if use_dict is not None:
@@ -272,7 +279,7 @@ class Raster:
                             # get/calculate spatial parameters
                             new_ul = [ulx + i * px, uly + j * py]
                             new_lr = [new_ul[0] + px * tile_size_x, new_ul[1] + py * tile_size_y]
-                            new_transform = (new_ul[0], px, rotx, new_ul[1], py, roty)
+                            new_transform = (new_ul[0], px, rotx, new_ul[1], roty, py)
 
                             # initiate output file
                             driver = gdal.GetDriverByName("GTiff")
@@ -358,6 +365,28 @@ class Raster:
 
         return meta_dict
 
+    def change_type(self,
+                    out_type='int16'):
+
+        """
+        Method to change the raster data type
+        :param out_type: Out data type. Options: int, int8, int16, int32, int64,
+                                                float, float, float32, float64,
+                                                uint, uint8, uint16, uint32, etc.
+        :return: None
+        """
+        if gdal_array.NumericTypeCodeToGDALTypeCode(np.dtype(out_type)) != self.dtype:
+
+            self.array = self.array.astype(out_type)
+            self.dtype = gdal_array.NumericTypeCodeToGDALTypeCode(self.array.dtype)
+
+            if self.nodatavalue is not None:
+                self.nodatavalue = np.array(self.nodatavalue).astype(out_type).item()
+
+            print('Changed raster data type to {}\n'.format(out_type))
+        else:
+            print('Raster data type already {}\n'.format(out_type))
+
     def make_polygon_geojson_feature(self):
         """
         Make a feature geojson for the raster using its metaDict data
@@ -384,3 +413,99 @@ class Raster:
                     }
         else:
             raise AttributeError("Metadata dictionary does not exist.")
+
+    @staticmethod
+    def get_coords(xy_list,
+                   pixel_size=None,
+                   tie_point=None,
+                   pixel_center=True):
+
+        """
+        Method to convert pixel coord to image coords
+        :param xy_list: List of tuples [(x1,y1), (x2,y2)....]
+        :param pixel_size: tuple of x and y pixel size
+        :param tie_point: tuple of x an y coordinates of tie point for the xy list
+        :param pixel_center: If the center of the pixels should be returned instead of the top corners (default: True)
+        :return: List of coordinates in tie point coordinate system
+        """
+
+        if type(xy_list).__name__ != 'list':
+            xy_list = list(xy_list)
+
+        if pixel_center:
+            add_const = (float(pixel_size[0])/2.0, float(pixel_size[1])/2.0)
+        else:
+            add_const = (0.0, 0.0)
+
+        coord_list = list()
+        for xy in xy_list:
+
+            xcoord = float(xy[0]) * float(pixel_size[0]) + tie_point[0] + add_const[0]
+            ycoord = float(xy[1]) * float(pixel_size[1]) + tie_point[1] + add_const[1]
+
+            coord_list.append([xcoord, ycoord])
+
+        return coord_list
+
+    def make_tile_grid(self,
+                       tile_xsize=1024,
+                       tile_ysize=1024):
+        """
+        Returns the coordinates of the blocks to be extracted
+        :param tile_xsize: Number of columns in the tile block
+        :param tile_ysize: Number of rows in the tile block
+        :return: list of lists
+        """
+        if not self.init:
+            self.initialize()
+
+        for y in xrange(0, self.shape[1], tile_ysize):
+            if y + tile_ysize < self.shape[1]:
+                rows = tile_ysize
+            else:
+                rows = self.shape[1] - y
+            for x in xrange(0, self.shape[2], tile_xsize):
+                if x + tile_xsize < self.shape[2]:
+                    cols = tile_xsize
+                else:
+                    cols = self.shape[2] - x
+
+                self.tile_grid.append({'block_coords': (x, y, cols, rows),
+                                       'tie_point': self.get_coords([(x, y)],
+                                                                    pixel_size=(self.transform[1], self.transform[5]),
+                                                                    tie_point=(self.transform[0], self.transform[3]),
+                                                                    pixel_center=False)[0]})
+
+        self.ntiles = len(self.tile_grid)
+
+    def get_next_tile(self,
+                      tile_xsize=1024,
+                      tile_ysize=1024,
+                      band=1):
+
+        """
+        Generator to extract raster tile by tile
+        :param tile_xsize: Number of columns in the tile block
+        :param tile_ysize: Number of rows in the tile block
+        :param band: Band to extract (default: 1)
+        :return: Yields tuple: (tiepoint xy tuple, tile numpy array)
+        """
+
+        if not self.init:
+            self.initialize()
+
+        if self.ntiles is None:
+            self.make_tile_grid(tile_xsize,
+                                tile_ysize)
+
+        temp_band = self.datasource.GetRasterBand(band)
+
+        i = 0
+        while i < self.ntiles:
+
+            tile_arr = temp_band.ReadAsArray(*self.tile_grid[i]['block_coords'])
+
+            yield self.tile_grid[i]['tie_point'], tile_arr
+
+            i += 1
+
