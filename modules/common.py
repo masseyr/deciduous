@@ -197,6 +197,20 @@ class Sublist(list):
         nelem_by_percent = int(round((float(nelem)*float(100 - percent))/float(100)))
         return random.sample(self, nelem_by_percent)
 
+    def random_selection(self,
+                         num=10):
+
+        """
+        Method to select a smaller number of samples from the Samples object
+        :param num: Number of samples to select
+        :return: Samples object
+        """
+
+        if num >= len(self):
+            return self
+        else:
+            return random.sample(self, num)
+
     def tuple_by_pairs(self):
         """
         Make a list of tuple pairs of consequetive list elements
@@ -922,6 +936,11 @@ class Opt:
     @staticmethod
     def __copy__(obj):
         return copy.deepcopy(obj)
+
+    @staticmethod
+    def temp_name():
+        return 'T' + datetime.datetime.now().isoformat().replace(':', '')\
+            .replace('.', '').replace('-', '').replace('T', '') + '.tmp'
 
 
 class FTPHandler(Handler):
