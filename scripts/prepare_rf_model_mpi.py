@@ -1,6 +1,7 @@
 from modules import *
 from mpi4py import MPI
 from sys import argv
+import json
 
 
 """
@@ -35,33 +36,48 @@ def fit_regressor(args_list):
 
     Opt.cprint('Length of arguments at {} is {}'.format(str(rank), len(args_list)))
 
+    if args_list is None:
+        args_list = list()
+
     for args in args_list:
 
-        name, train_samp, valid_samp, in_file, pickle_dir = args
+        name, train_samp, valid_samp, in_file, pickle_dir, llim, ulim, param = args
 
         # initialize RF classifier
-        model = RFRegressor(trees=200, samp_split=2, oob_score=False)
+        model = RFRegressor(**param)
         model.time_it = True
+
+        regress_limit = [0.025*ulim, 0.975*ulim]
+        rsq_limit = 60.0
 
         # fit RF classifier using training data
         model.fit_data(train_samp.format_data())
 
         # predict using held out samples and print to file
         pred = model.sample_predictions(valid_samp.format_data(),
-                                        regress_limit=[0.05, 0.95])
+                                        regress_limit=regress_limit)
+
+        out_dict = dict()
+        out_dict['name'] = Handler(in_file).basename.split('.')[0] + name
+        out_dict['rsq'] = pred['rsq'] * 100.0
+        out_dict['slope'] = pred['slope']
+        out_dict['intercept'] = pred['intercept']
+        out_dict['rmse'] = pred['rmse']
+
+        model.output = out_dict
 
         rsq = pred['rsq'] * 100.0
         slope = pred['slope']
         intercept = pred['intercept']
         rmse = pred['rmse']
 
-        if rsq >= 60.0:
-            if intercept > 0.05:
+        if rsq >= rsq_limit:
+            if intercept > regress_limit[0]:
                 model.adjustment['bias'] = -1.0 * (intercept / slope)
 
             model.adjustment['gain'] = 1.0 / slope
-            model.adjustment['upper_limit'] = 1.0
-            model.adjustment['lower_limit'] = 0.0
+            model.adjustment['upper_limit'] = ulim
+            model.adjustment['lower_limit'] = llim
 
             # file to write the model run output to
             outfile = pickle_dir + sep + \
@@ -73,36 +89,45 @@ def fit_regressor(args_list):
                          Handler(in_file).basename.split('.')[0] + name + '.pickle'
             picklefile = Handler(filename=picklefile).file_remove_check()
 
-            model.pickle_it(picklefile)
-
             # predict using the model to store results in a file
             pred = model.sample_predictions(valid_samp.format_data(),
                                             outfile=outfile,
                                             picklefile=picklefile,
-                                            regress_limit=[0.05, 0.95])
+                                            regress_limit=regress_limit)
 
-        result_list.append({'name': name,
-                            'rsq': rsq,
-                            'rmse': rmse,
-                            'slope': slope,
-                            'intercept': intercept})
+            out_dict['rsq'] = pred['rsq'] * 100.0
+            out_dict['slope'] = pred['slope']
+            out_dict['intercept'] = pred['intercept']
+            out_dict['rmse'] = pred['rmse']
+
+            out_dict['regress_low_limit'] = regress_limit[0]
+            out_dict['regress_up_limit'] = regress_limit[1]
+
+            model.output.update(out_dict)
+            model.pickle_it(picklefile)
+
+        result_list.append(out_dict)
 
     return result_list
 
 
 if __name__ == '__main__':
 
-    script, infile, pickledir, codename = argv
+    script, infile, pickledir, codename, n_iterations = argv
 
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
 
-    label_colname = 'decid_frac'
+    min_decid = 0
+    max_decid = 10000
+
+    label_colname = 'DECID_FRAC'
     model_initials = 'RF'
     sample_partition = 70
-    n_iterations = 100000
+    n_iterations = int(n_iterations)
     display = 10
+    param = {"samp_split": 10, "max_feat": 19, "trees": 500, "samp_leaf": 1}
 
     if rank == 0:
 
@@ -112,6 +137,22 @@ if __name__ == '__main__':
 
         # prepare training samples
         samp = Samples(csv_file=infile, label_colname=label_colname)
+
+        # limit int values to 16 bit
+        corr_samp = list()
+        for elem in samp.x:
+            corr_elem = list()
+            for number in elem:
+                if number < -32767:
+                    number = -32767
+                elif number > 32767:
+                    number = 32767
+
+                corr_elem.append(number)
+            corr_samp.append(corr_elem)
+
+        samp.x = corr_samp
+
         samp_list = list()
 
         Opt.cprint('Randomizing samples...')
@@ -126,7 +167,10 @@ if __name__ == '__main__':
                               trn_samp,
                               val_samp,
                               infile,
-                              pickledir])
+                              pickledir,
+                              min_decid,
+                              max_decid,
+                              param])
 
         Opt.cprint('Number of elements in sample list : {}'.format(str(len(samp_list))))
 
@@ -139,8 +183,12 @@ if __name__ == '__main__':
     else:
         sample_chunks = None
 
-    samples = comm.scatter(sample_chunks,
-                           root=0)
+    try:
+        samples = comm.scatter(sample_chunks,
+                               root=0)
+    except OverflowError:
+        Opt.cprint('Overflow error while scattering samples at rank {}'.format(rank))
+        samples = None
 
     result = fit_regressor(samples)
 
