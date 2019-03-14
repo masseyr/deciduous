@@ -4,6 +4,7 @@ import random
 from timer import Timer
 from resources import bname_dict
 from scipy.stats.stats import pearsonr
+import warnings
 
 __all__ = ['Samples']
 
@@ -45,14 +46,22 @@ class Samples:
         self.x_name = x_name
         self.y = y
         self.y_name = y_name
+
         self.weights = weights
         self.weights_colname = weights_colname
         self.use_band_dict = use_band_dict
+
         self.index = None
+        self.nfeat = None
+
+        self.xmin = None
+        self.xmax = None
+        self.ymin = None
+        self.ymax = None
 
         # either of label name or csv file is provided without the other
         if (csv_file is None) and (label_colname is None):
-            pass  # print("Samples initiated without data file or label")
+            pass  # warnings.warn("Samples initiated without data file or label")
 
         # label name or csv file are provided
         elif (label_colname is not None) and (csv_file is not None):
@@ -66,9 +75,9 @@ class Samples:
                 raise ValueError("Label name mismatch.\nAvailable names: " + ', '.join(temp['name']))
 
             # read from data dictionary
-            self.x_name = list(elem.strip() for elem in temp['name'][:loc] + temp['name'][(loc + 1):])
-            self.x = list(feat[:loc] + feat[(loc + 1):] for feat in temp['feature'])
-            self.y = list(feat[loc] for feat in temp['feature'])
+            self.x_name = Sublist(elem.strip() for elem in temp['name'][:loc] + temp['name'][(loc + 1):])
+            self.x = Sublist(feat[:loc] + feat[(loc + 1):] for feat in temp['feature'])
+            self.y = Sublist(feat[loc] for feat in temp['feature'])
             self.y_name = temp['name'][loc].strip()
 
             # if band name dictionary is provided
@@ -80,8 +89,8 @@ class Samples:
             temp = Handler(filename=csv_file).read_from_csv()
 
             # read from data dictionary
-            self.x_name = list(elem.strip() for elem in temp['name'])
-            self.x = list(feat for feat in temp['feature'])
+            self.x_name = Sublist(elem.strip() for elem in temp['name'])
+            self.x = Sublist(feat for feat in temp['feature'])
 
         else:
             ValueError("No data found for label.")
@@ -98,7 +107,7 @@ class Samples:
                     else:
                         raise ValueError("Weight column name mismatch.\nAvailable names: " + ', '.join(temp['name']))
 
-                    self.weights = list(feat[loc] for feat in self.x)
+                    self.weights = Sublist(feat[loc] for feat in self.x)
                     self.x = Sublist(self.x).remove_by_loc(loc)
 
                 else:
@@ -126,7 +135,7 @@ class Samples:
         if self.x is not None:
 
             if self.columns is None:
-                self.columns = list(range(0, len(self.x[0])))
+                self.columns = Sublist(range(0, len(self.x[0])))
 
             self.nsamp = len(self.x)
             self.nvar = len(self.x[0])
@@ -134,7 +143,21 @@ class Samples:
             self.nsamp = 0
             self.nvar = 0
 
-        self.index = list(range(0, self.nsamp))
+        self.index = Sublist(range(0, self.nsamp))
+
+        if self.x is not None:
+            self.nfeat = len(self.x[0])
+
+            self.xmin = list()
+            self.xmax = list()
+
+            for i in range(0, self.nfeat):
+                self.xmin.append(min(list(x_elem[i] for x_elem in self.x)))
+                self.xmax.append(max(list(x_elem[i] for x_elem in self.x)))
+
+        if self.y is not None:
+            self.ymin = min(self.y)
+            self.ymax = max(self.y)
 
     def __repr__(self):
         """
@@ -162,16 +185,16 @@ class Samples:
                 tsamp = Sublist(tsamp)[self.columns]
                 out_x.append(tsamp)
 
-            out_x_name = Sublist(self.x_name)[self.columns]
+            out_x_name = self.x_name[self.columns]
         else:
             out_x = self.x
             out_x_name = self.x_name
 
         return {
-            'features': out_x,
-            'labels': self.y,
-            'label_name': self.y_name,
-            'feature_names': out_x_name
+            'features': Opt.__copy__(out_x),
+            'labels': Opt.__copy__(self.y),
+            'label_name': Opt.__copy__(self.y_name),
+            'feature_names': Opt.__copy__(out_x_name),
         }
 
     def correlation_matrix(self,
@@ -347,7 +370,7 @@ class Samples:
 
         # randomly select training samples based on number
         trn_sites = random.sample(self.index, ntrn)
-        val_sites = Sublist(self.index).remove(trn_sites)
+        val_sites = self.index.remove(trn_sites)
 
         # training sample object
         trn_samp = Samples()
@@ -356,6 +379,18 @@ class Samples:
         trn_samp.x = [self.x[i] for i in trn_sites]
         trn_samp.y = [self.y[i] for i in trn_sites]
         trn_samp.nsamp = len(trn_samp.x)
+        trn_samp.index = Sublist(range(0, trn_samp.nsamp))
+        trn_samp.nfeat = len(trn_samp.x[0])
+
+        trn_samp.xmin = list()
+        trn_samp.xmax = list()
+
+        for i in range(0, trn_samp.nfeat):
+            trn_samp.xmin.append(min(list(x_elem[i] for x_elem in trn_samp.x)))
+            trn_samp.xmax.append(max(list(x_elem[i] for x_elem in trn_samp.x)))
+
+        trn_samp.ymin = min(trn_samp.y)
+        trn_samp.ymax = max(trn_samp.y)
 
         # validation sample object
         val_samp = Samples()
@@ -364,5 +399,54 @@ class Samples:
         val_samp.x = [self.x[i] for i in val_sites]
         val_samp.y = [self.y[i] for i in val_sites]
         val_samp.nsamp = len(val_samp.x)
+        val_samp.index = Sublist(range(0, val_samp.nsamp))
+        val_samp.nfeat = len(val_samp.x[0])
+
+        val_samp.xmin = list()
+        val_samp.xmax = list()
+
+        for i in range(0, val_samp.nfeat):
+            val_samp.xmin.append(min(list(x_elem[i] for x_elem in val_samp.x)))
+            val_samp.xmax.append(max(list(x_elem[i] for x_elem in val_samp.x)))
+
+        val_samp.ymin = min(val_samp.y)
+        val_samp.ymax = max(val_samp.y)
 
         return trn_samp, val_samp
+
+    def random_selection(self,
+                         num=10):
+
+        """
+        Method to select a smaller number of samples from the Samples object
+        :param num: Number of samples to select
+        :return: Samples object
+        """
+
+        if num >= len(self.index):
+            print('Number larger than population: {} specified for {} samples'.format(str(num),
+                                                                                      str(len(self.index))))
+            ran_samp_n = self.index
+        else:
+            ran_samp_n = random.sample(self.index, num)
+
+        # training sample object
+        ran_samp = Samples()
+        ran_samp.x_name = self.x_name
+        ran_samp.y_name = self.y_name
+        ran_samp.x = [self.x[i] for i in ran_samp_n]
+        ran_samp.y = [self.y[i] for i in ran_samp_n]
+        ran_samp.nsamp = len(ran_samp.x)
+        ran_samp.index = Sublist(range(0, ran_samp.nsamp))
+
+        ran_samp.xmin = list()
+        ran_samp.xmax = list()
+
+        for i in range(0, ran_samp.nfeat):
+            ran_samp.xmin.append(min(list(x_elem[i] for x_elem in ran_samp.x)))
+            ran_samp.xmax.append(max(list(x_elem[i] for x_elem in ran_samp.x)))
+
+        ran_samp.ymin = min(ran_samp.y)
+        ran_samp.ymax = max(ran_samp.y)
+
+        return ran_samp
