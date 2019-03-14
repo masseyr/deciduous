@@ -2,6 +2,7 @@ from osgeo import ogr, osr
 import json
 import sys
 import os
+from common import *
 
 __all__ = ['OGR_TYPE_DEF',
            'OGR_FIELD_DEF',
@@ -54,6 +55,7 @@ class Vector(object):
     def __init__(self,
                  filename=None,
                  name='Empty',
+                 spref=None,
                  spref_str=None,
                  epsg=None,
                  proj4=None,
@@ -83,13 +85,12 @@ class Vector(object):
         self.proj4 = proj4
 
         self.layer = None
-        self.spref = None
-        self.spref_str = None
-        self.type = self.ogr_geom_type(geom_type)
+        self.spref = spref
+        self.spref_str = spref_str
+        self.type = self.ogr_geom_type(geom_type) if geom_type is not None else None
 
         self.name = name
         self.nfeat = 0
-        self.bounds = None
         self.fields = list()
         self.data = dict()
         self.attr_def = attr_def
@@ -140,12 +141,6 @@ class Vector(object):
             # get field defintions
             layer_definition = self.layer.GetLayerDefn()
             self.fields = [layer_definition.GetFieldDefn(i) for i in range(0, layer_definition.GetFieldCount())]
-
-            # coordinates for bounds
-            xmin = 0.0
-            ymin = 0.0
-            xmax = 0.0
-            ymax = 0.0
 
             # if the vector should be initialized in some other spatial reference
             if dest_spref is not None:
@@ -324,7 +319,7 @@ class Vector(object):
         :param coords: List of tuples [(x1,y1),(x2,y2),...] for multipoint
                        or a single tuple (x, y) in case of 'point'
                        x=longitude, y=latitude and so on
-        :param geom_type: multipoint or point
+        :param geom_type: multipoint, point,
         :return: WKT string representation
         """
 
@@ -350,6 +345,33 @@ class Vector(object):
             raise ValueError("Unknown geometry type")
 
         return wktstring
+
+    @staticmethod
+    def get_osgeo_geom(geom_string,
+                       geom_type='wkt'):
+        """
+        Method to return a osgeo geometry object
+        :param geom_string: Wkt or json string
+        :param geom_type: 'wkt', 'json', or 'wkb
+        :return: osgeo geometry object
+        """
+        if geom_type == 'wkt':
+            try:
+                return ogr.CreateGeometryFromWkt(geom_string)
+            except:
+                return
+        elif geom_type == 'json':
+            try:
+                return ogr.CreateGeometryFromJson(geom_string)
+            except:
+                return
+        elif geom_type == 'wkb':
+            try:
+                return ogr.CreateGeometryFromWkb(geom_string)
+            except:
+                return
+        else:
+            raise ValueError("Unsupported geometry type")
 
     def add_feat(self,
                  geom,
@@ -792,6 +814,7 @@ class Vector(object):
             temp_vector.nfeat = len(out_feat_list)
             temp_vector.type = out_type
             temp_vector.crs = self.spref
+            temp_vector.spref = self.spref
             temp_vector.layer = temp_layer
             temp_vector.data_source = temp_datasource
             temp_vector.wkt_list = list()
@@ -856,7 +879,12 @@ class Vector(object):
         if verbose:
             print('Creating Vector...')
 
-        vector.nfeat = len(geom_strings)
+        if type(geom_strings).__name__ == 'str':
+            vector.nfeat = 1
+        elif type(geom_strings).__name__ == 'list':
+            vector.nfeat = len(geom_strings)
+        else:
+            raise ValueError('Number of features not attributable')
 
         if type(geom_strings).__name__ != 'list':
             geom_strings = [geom_strings]
