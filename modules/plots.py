@@ -118,10 +118,19 @@ class Plot:
         else:
             color = self.dict['color']
 
+        if 'binwidth' in self.dict:
+            binwidth = self.dict['binwidth']
+        elif 'nbins' in self.dict:
+            binwidth = float(max(dataset)-min(dataset))/float(self.dict['nbins'])
+        else:
+            binwidth = 1
+
         # plot histogram
         plt.hist(dataset,
                  alpha=0.8,
-                 color=color)
+                 color=color,
+                 ec='k',
+                 bins=Sublist.frange(min(dataset), max(dataset), binwidth))
 
         # add labels
         if 'xtitle' in self.dict:
@@ -163,7 +172,7 @@ class Plot:
                     max_freq = count
 
             # find ylim
-            ylim = [0, max_freq]
+            ylim = [0, max_freq*1.01]
 
             # plot with default
             plt.axis(xlim + ylim)
