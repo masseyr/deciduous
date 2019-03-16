@@ -447,6 +447,20 @@ class Raster:
 
         return coord_list
 
+    def get_bounds(self):
+        """
+        Method to return a list of raster coordinates
+        :return: List of lists
+        """
+        tie_pt = [self.transform[0], self.transform[3]]
+        rast_coords = [tie_pt,
+                       [tie_pt[0] + self.metadict['xpixel'] * self.shape[2], tie_pt[1]],
+                       [tie_pt[0] + self.metadict['xpixel'] * self.shape[2],
+                        tie_pt[1] - self.metadict['ypixel'] * self.shape[1]],
+                       [tie_pt[0], tie_pt[1] - self.metadict['ypixel'] * self.shape[1]],
+                       tie_pt]
+        return rast_coords
+
     def make_tile_grid(self,
                        tile_xsize=1024,
                        tile_ysize=1024):
