@@ -294,7 +294,7 @@ class Sublist(list):
         if end > start:
 
             if div is not None:
-                step = (end-start)/float(div)
+                step = (end-start)/float(div + 1)
             elif step is not None:
                 if (end - start) % step > 0.0:
                     div = long((end - start) / step) + 2
@@ -303,12 +303,12 @@ class Sublist(list):
             else:
                 raise ValueError("No step or division defined")
 
-            temp = Sublist(0.0 for _ in range(div))
+            temp = Sublist(0.0 for _ in range(div + 1))
 
-            for i in range(0, div - 1):
+            for i in range(0, div):
                 temp[i] = start + i * step
 
-            temp[div - 1] = end
+            temp[div] = end
 
             return temp
 
