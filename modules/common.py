@@ -281,28 +281,36 @@ class Sublist(list):
     def frange(cls,
                start,
                end,
-               step):
+               step=None,
+               div=None):
         """
         To make list from float arguments
         :param start: start number
         :param end: end number
         :param step: step
+        :param div: Division between start and end
         :return: list
         """
         if end > start:
-            if (end-start) % step > 0.0:
-                n = long((end-start) / step) + 2
+
+            if div is not None:
+                step = (end-start)/float(div)
+            elif step is not None:
+                if (end - start) % step > 0.0:
+                    div = long((end - start) / step) + 2
+                else:
+                    div = long((end - start) / step) + 1
             else:
-                n = long((end - start) / step) + 1
+                raise ValueError("No step or division defined")
 
-            temp = np.zeros(n, dtype=float)
+            temp = Sublist(0.0 for _ in range(div))
 
-            for i in range(0, n - 1):
+            for i in range(0, div - 1):
                 temp[i] = start + i * step
 
-            temp[n - 1] = end
+            temp[div - 1] = end
 
-            return Sublist(temp)
+            return temp
 
         else:
             raise ValueError("Start value is less than end value")
