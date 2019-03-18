@@ -294,12 +294,12 @@ class Sublist(list):
         if end > start:
 
             if div is not None:
-                step = (end-start)/float(div + 1)
+                step = (end-start)/float(div)
             elif step is not None:
                 if (end - start) % step > 0.0:
-                    div = long((end - start) / step) + 2
+                    div = long((end - start) / step)
                 else:
-                    div = long((end - start) / step) + 1
+                    div = long((end - start) / step) - 1
             else:
                 raise ValueError("No step or division defined")
 
