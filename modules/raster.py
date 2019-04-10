@@ -38,6 +38,7 @@ class Raster:
         self.nodatavalue = None
         self.tile_grid = list()
         self.ntiles = None
+        self.bounds = None
         self.init = False
 
     def __repr__(self):
@@ -193,6 +194,8 @@ class Raster:
                 self.crs_string = fileptr.GetProjection()
                 self.dtype = fileptr.GetRasterBand(1).DataType
                 self.metadict = Raster.get_raster_metadict(raster_name)
+
+            self.bounds = self.get_bounds()
 
             # remap band names
             if use_dict is not None:
@@ -452,6 +455,8 @@ class Raster:
         Method to return a list of raster coordinates
         :return: List of lists
         """
+        if not self.init:
+            self.initialize()
         tie_pt = [self.transform[0], self.transform[3]]
         rast_coords = [tie_pt,
                        [tie_pt[0] + self.metadict['xpixel'] * self.shape[2], tie_pt[1]],
@@ -495,14 +500,14 @@ class Raster:
     def get_next_tile(self,
                       tile_xsize=1024,
                       tile_ysize=1024,
-                      band=1):
+                      bands=(1,)):
 
         """
         Generator to extract raster tile by tile
         :param tile_xsize: Number of columns in the tile block
         :param tile_ysize: Number of rows in the tile block
-        :param band: Band to extract (default: 1)
-        :return: Yields tuple: (tiepoint xy tuple, tile numpy array)
+        :param bands: Band to extract (default: (1,))
+        :return: Yields tuple: (tiepoint xy tuple, tile numpy array(2d array if only one band, else 3d array)
         """
 
         if not self.init:
@@ -512,12 +517,21 @@ class Raster:
             self.make_tile_grid(tile_xsize,
                                 tile_ysize)
 
-        temp_band = self.datasource.GetRasterBand(band)
+        temp_bands = list(self.datasource.GetRasterBand(band) for band in bands)
 
         i = 0
         while i < self.ntiles:
 
-            tile_arr = temp_band.ReadAsArray(*self.tile_grid[i]['block_coords'])
+            if len(temp_bands) == 1:
+                tile_arr = temp_bands[0].ReadAsArray(*self.tile_grid[i]['block_coords'])
+            else:
+                tile_arr = np.zeros((len(temp_bands),
+                                     self.tile_grid[i]['block_coords'][3],
+                                     self.tile_grid[i]['block_coords'][2]),
+                                    gdal_array.GDALTypeCodeToNumericTypeCode(self.dtype))
+
+                for j, temp_band in temp_bands:
+                    tile_arr[j, :, :] = temp_band.ReadAsArray(*self.tile_grid[i]['block_coords'])
 
             yield self.tile_grid[i]['tie_point'], tile_arr
 
