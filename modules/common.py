@@ -157,9 +157,9 @@ class Sublist(list):
         :return: Sublist
         """
         if isinstance(elem, list):
-            return list(val for j, val in enumerate(self) for loc in elem if j != loc)
+            return Sublist(val for j, val in enumerate(self) for loc in elem if j != loc)
         else:
-            return list(val for j, val in enumerate(self) if j != elem)
+            return Sublist(val for j, val in enumerate(self) if j != elem)
 
     def remove(self,
                elem):
@@ -169,9 +169,9 @@ class Sublist(list):
         :return: list
         """
         if isinstance(elem, list):
-            return list(val for val in self if val not in elem)
+            return Sublist(val for val in self if val not in elem)
         else:
-            return list(val for val in self if val != elem)
+            return Sublist(val for val in self if val != elem)
 
     @staticmethod
     def list_size(query_list):
@@ -315,6 +315,10 @@ class Sublist(list):
         else:
             raise ValueError("Start value is less than end value")
 
+    def reverse(self):
+        """reversed list"""
+        return Sublist(reversed(self))
+
     @classmethod
     def column(cls,
                matrix,
@@ -346,14 +350,24 @@ class Sublist(list):
         calculate mean of an array
         :return: float
         """
-        return np.mean(self)
+        return float(sum(self)) / max(len(self), 1)
+
+    def max(self):
+        """
+        Calculate max of the list
+        :return:
+        """
+        if type(max(self)).__name__ == 'list':
+            return max(self)[0]
+        else:
+            return max(self)
 
     def median(self):
         """
         calculate median of an array
         :return: float
         """
-        return np.median(self)
+        return self.percentile(self, pctl=50)
 
     @staticmethod
     def percentile(arr, pctl=95.0):
@@ -849,6 +863,9 @@ class Handler(object):
             search_str = '*'
         else:
             search_str = '*' + pattern + '*'
+
+        if self.dirname[-1] != self.sep:
+            self.dirname += self.sep
 
         for root, dirs, files in os.walk(self.dirname):
             for name in files:
