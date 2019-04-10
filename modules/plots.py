@@ -1,10 +1,13 @@
 from common import Handler, Sublist
+from classification import _Classifier
 from exceptions import ObjectNotFound
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 import seaborn as sns
+from scipy.interpolate import interpn
+from scipy.signal import savgol_filter
 
 # plt.rcParams['agg.path.chunksize'] = 100000
 # plt.rcParams["patch.force_edgecolor"] = True
@@ -77,6 +80,8 @@ class Plot:
                 plot = self.matrix_heatmap()
             elif self.dict['type'] == 'rheatmap':
                 plot = self.regression_heatmap()
+            elif self.dict['type'] == 'rheatmap2':
+                plot = self.regression_heatmap2()
             else:
                 plot = None
 
@@ -255,7 +260,7 @@ class Plot:
         yticklabels = [''] + var_names[1:]
 
         font = FontProperties()
-        font.set_family('serif')
+        font.set_family('Times')
         font.set_style('normal')
         font.set_variant('normal')
         font.set_weight('bold')
@@ -271,7 +276,7 @@ class Plot:
 
         if 'show_values' in self.dict:
             plot_dict['annot'] = self.dict['show_values']
-            plot_dict['annot_kws'] = {"size": 15}
+            plot_dict['annot_kws'] = {"size": 16}
 
         if 'heat_range' in self.dict:
             plot_dict['vmin'] = self.dict['heat_range'][0]
@@ -347,9 +352,9 @@ class Plot:
         if 'color' in self.dict:
             color = self.dict['color']
         else:
-            color = plt.cm.gnuplot2_r
+            color = plt.cm.ocean_r
 
-        plt.pcolormesh(xi, yi, zi, cmap=color)
+        plt.pcolormesh(xi, yi, zi, cmap=color, vmin=zi.min(), vmax=int(0.8*zi.max()))
 
         if 'xlabel' in self.dict:
             xlabel = self.dict['xlabel']
@@ -377,7 +382,89 @@ class Plot:
                 fit = np.polyfit(x, y, 1)
                 print('Fitting coefficients: ' + ' '.join([str(i) for i in fit]))
                 plt.plot(x_, [fit[0] * x_[i] + fit[1] for i in range(0, len(x_))], 'r-', lw=0.5)
-                plt.xlim(xlim)
-                plt.ylim(ylim)
+
+                res = _Classifier.linear_regress(x, y, xlim, ylim)
+                rsq = res['rsq']
+
+                if 'legend' in self.dict:
+                    if self.dict['legend']:
+                        out_str = 'Y = {:3.2f} x + {:3.2f}'.format(fit[0], fit[1]) + \
+                            '\n$R^2$ = {:3.2f}'.format(rsq) +\
+                            '\nN = {:,}'.format(len(x_))
+
+                        plt.text(0.05*xlim[1], 0.95*ylim[1], out_str,
+                                 horizontalalignment='left',
+                                 verticalalignment='top',)
+        plt.xlim(xlim)
+        plt.ylim(ylim)
 
         return plt
+
+    def regression_heatmap2(self):
+
+        if 'bins' in self.dict:
+            bins = self.dict['bins']
+        else:
+            bins = (25, 25)
+
+        if 'points' in self.dict:
+            x_p = [pt[0] for pt in self.dict['points']]
+            y_p = [pt[1] for pt in self.dict['points']]
+        else:
+            raise ValueError('No data found')
+
+        if 'xlim' in self.dict:
+            xlim = self.dict['xlim']
+            xloc = list(k for k in range(0, len(self.dict['points'])) if xlim[0] <= x_p[k] <= xlim[1])
+
+        else:
+            xloc = list(range(0, len(self.dict['points'])))
+            xlim = (min(x_p), max(x_p))
+
+        if 'ylim' in self.dict:
+            ylim = self.dict['ylim']
+            yloc = list(k for k in range(0, len(self.dict['points'])) if ylim[0] <= y_p[k] <= ylim[1])
+
+        else:
+            yloc = list(range(0, len(self.dict['points'])))
+            ylim = (min(y_p), max(y_p))
+
+        loc = list(set(xloc) & set(yloc))
+
+        points_ = list(self.dict['points'][k] for k in loc)
+
+        x_ = list(pt[0] for pt in points_)
+        y_ = list(pt[1] for pt in points_)
+
+        if 'fill_value' in self.dict:
+            fill_value = self.dict['fill_value']
+        else:
+            fill_value = 0
+
+        data, x_e, y_e = np.histogram2d(x_, y_, bins=bins)
+
+        z = interpn((0.5 * (x_e[1:] + x_e[:-1]), 0.5 * (y_e[1:] + y_e[:-1])), data, np.vstack([x_p, y_p]).T,
+                    method="splinef2d",
+                    bounds_error=False,
+                    fill_value=fill_value)
+
+        # Sort the points by density, so that the densest points are plotted last
+        idx = np.array(z).argsort()
+
+        x = list(x_p[i] for i in idx)
+        y = list(y_p[i] for i in idx)
+        z = list(z[i] for i in idx)
+
+        plt.scatter(x, y, c=z, alpha=0.75, s=1)
+
+        if 'line' in self.dict:
+            if self.dict['line']:
+                fit = np.polyfit(x, y, 1)
+                print('Fitting coefficients: ' + ' '.join([str(i) for i in fit]))
+                plt.plot(x_, [fit[0] * x_[i] + fit[1] for i in range(0, len(x_))], 'r-', lw=0.5)
+
+        plt.xlim(xlim)
+        plt.ylim(ylim)
+
+        return plt
+
