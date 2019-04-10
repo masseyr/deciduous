@@ -27,10 +27,14 @@ class _Classifier(object):
                  classifier=None,
                  **kwargs):
         self.data = data
+        self.vdata = None
         self.classifier = classifier
         self.features = None
         self.label = None
         self.output = None
+        self.training_results = dict()
+        self.fit = False
+        self.all_cv_results = None
 
         self.adjustment = dict()
 
@@ -59,6 +63,7 @@ class _Classifier(object):
 
         self.features = data['feature_names']
         self.label = data['label_name']
+        self.fit = True
 
     def predict(self, *args, **kwargs):
         """Placeholder function"""
@@ -181,13 +186,22 @@ class _Classifier(object):
         :param xlim: 2 element list [lower limit, upper limit] of starting and ending values for x vector
         :param ylim: 2 element list [lower limit, upper limit] of starting and ending values for y vector
         """
+
         if xlim is not None:
+            value_arr = list(xlim[0] <= elem <= xlim[1] for elem in x)
+            if not any(value_arr):
+                raise ValueError("Minimum or maximum argument for regression outside data limits")
+
             x_index_list = Sublist(x).range(*xlim,
                                             index=True)
             x = list(x[i] for i in x_index_list)
             y = list(y[i] for i in x_index_list)
 
         if ylim is not None:
+            value_arr = list(ylim[0] <= elem <= ylim[1] for elem in y)
+            if not any(value_arr):
+                raise ValueError("Minimum or maximum argument for regression outside data limits")
+
             y_index_list = Sublist(y).range(*ylim,
                                             index=True)
             x = list(x[i] for i in y_index_list)
@@ -264,7 +278,7 @@ class MRegressor(_Classifier):
                 tile_size=128,
                 **kwargs):
         """
-        Calculate random forest model prediction, variance, or standard deviation.
+        Calculate multiple regression model prediction, variance, or standard deviation.
         Variance or standard deviation is calculated across all trees.
         Tiling is necessary in this step because large numpy arrays can cause
         memory issues during creation.
@@ -317,7 +331,6 @@ class MRegressor(_Classifier):
             out_arr = self.classifier.predict(arr)
 
         if len(self.adjustment) > 0:
-            print('Applying model adjustments ...')
 
             if 'gain' in self.adjustment:
                 out_arr = out_arr * self.adjustment['gain']
@@ -336,9 +349,10 @@ class MRegressor(_Classifier):
     def sample_predictions(self,
                            data,
                            picklefile=None,
-                           outfile=None):
+                           outfile=None,
+                           **kwargs):
         """
-        Get tree predictions from the RF classifier
+        Get predictions from the multiple regressor
         :param data: Dictionary object from Samples.format_data
         :param picklefile: Random Forest pickle file
         :param outfile: output csv file name
@@ -383,6 +397,54 @@ class MRegressor(_Classifier):
             'slope': lm['slope'],
             'intercept': lm['intercept']
         }
+
+    def get_training_fit(self,
+                         regress_limit=None):
+
+        """
+        Find out how well the training samples fit the model
+        :param regress_limit: List of upper and lower regression limits for training fit prediction
+        :return: None
+        """
+        if self.fit:
+            # predict using held out samples and print to file
+            pred = self.sample_predictions(self.data,
+                                           regress_limit=regress_limit)
+
+            self.training_results['rsq'] = pred['rsq'] * 100.0
+            self.training_results['slope'] = pred['slope']
+            self.training_results['intercept'] = pred['intercept']
+            self.training_results['rmse'] = pred['rmse']
+        else:
+            raise ValueError("Model not initialized with samples")
+
+    def get_adjustment_param(self,
+                             clip=0.025,
+                             data_limits=None,
+                             over_adjust=1.0):
+        """
+        get the model adjustment parameters based on training fit
+        :param clip:
+        :param data_limits:
+        :param over_adjust
+
+        :return: None
+        """
+
+        if data_limits is None:
+            data_limits = [max(self.data['labels']), min(self.data['labels'])]
+
+        regress_limit = [clip * data_limits[0],
+                         (1.0 - clip) * data_limits[0]]
+
+        self.get_training_fit(regress_limit=regress_limit)
+
+        if self.training_results['intercept'] > regress_limit[0]:
+            self.adjustment['bias'] = -1.0 * (self.training_results['intercept'] / self.training_results['slope'])
+
+        self.adjustment['gain'] = (1.0 / self.training_results['slope']) * over_adjust
+        self.adjustment['upper_limit'] = data_limits[0]
+        self.adjustment['lower_limit'] = data_limits[1]
 
 
 class RFRegressor(_Classifier):
@@ -653,7 +715,6 @@ class RFRegressor(_Classifier):
         else:
 
             if len(self.adjustment) > 0:
-                print('Applying model adjustments ...')
 
                 if 'gain' in self.adjustment:
                     out_arr = out_arr * self.adjustment['gain']
@@ -822,3 +883,50 @@ class RFRegressor(_Classifier):
         return [(band, importance) for band, importance in
                 zip(self.data['feature_names'], self.classifier.feature_importances_)]
 
+    def get_training_fit(self,
+                         regress_limit=None):
+
+        """
+        Find out how well the training samples fit the model
+        :param regress_limit: List of upper and lower regression limits for training fit prediction
+        :return: None
+        """
+        if self.fit:
+            # predict using held out samples and print to file
+            pred = self.sample_predictions(self.data,
+                                           regress_limit=regress_limit)
+
+            self.training_results['rsq'] = pred['rsq'] * 100.0
+            self.training_results['slope'] = pred['slope']
+            self.training_results['intercept'] = pred['intercept']
+            self.training_results['rmse'] = pred['rmse']
+        else:
+            raise ValueError("Model not initialized with samples")
+
+    def get_adjustment_param(self,
+                             clip=0.025,
+                             data_limits=None,
+                             over_adjust=1.0):
+        """
+        get the model adjustment parameters based on training fit
+        :param clip:
+        :param data_limits:
+        :param over_adjust
+
+        :return: None
+        """
+
+        if data_limits is None:
+            data_limits = [max(self.data['labels']), min(self.data['labels'])]
+
+        regress_limit = [clip * data_limits[0],
+                         (1.0-clip) * data_limits[0]]
+
+        self.get_training_fit(regress_limit=regress_limit)
+
+        if self.training_results['intercept'] > regress_limit[0]:
+            self.adjustment['bias'] = -1.0 * (self.training_results['intercept'] / self.training_results['slope'])
+
+        self.adjustment['gain'] = (1.0 / self.training_results['slope'])*over_adjust
+        self.adjustment['upper_limit'] = data_limits[0]
+        self.adjustment['lower_limit'] = data_limits[1]
