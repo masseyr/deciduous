@@ -517,23 +517,24 @@ class Raster:
             self.make_tile_grid(tile_xsize,
                                 tile_ysize)
 
-        temp_bands = list(self.datasource.GetRasterBand(band) for band in bands)
+        ii = 0
+        while ii < self.ntiles:
 
-        i = 0
-        while i < self.ntiles:
+            if len(bands) == 1:
+                temp_band = self.datasource.GetRasterBand(bands[0])
+                tile_arr = temp_band.ReadAsArray(*self.tile_grid[ii]['block_coords'])
 
-            if len(temp_bands) == 1:
-                tile_arr = temp_bands[0].ReadAsArray(*self.tile_grid[i]['block_coords'])
             else:
-                tile_arr = np.zeros((len(temp_bands),
-                                     self.tile_grid[i]['block_coords'][3],
-                                     self.tile_grid[i]['block_coords'][2]),
+                tile_arr = np.zeros((len(bands),
+                                     self.tile_grid[ii]['block_coords'][3],
+                                     self.tile_grid[ii]['block_coords'][2]),
                                     gdal_array.GDALTypeCodeToNumericTypeCode(self.dtype))
 
-                for j, temp_band in temp_bands:
-                    tile_arr[j, :, :] = temp_band.ReadAsArray(*self.tile_grid[i]['block_coords'])
+                for jj, band in bands:
+                    temp_band = self.datasource.GetRasterBand(band)
+                    tile_arr[jj, :, :] = temp_band.ReadAsArray(*self.tile_grid[ii]['block_coords'])
 
-            yield self.tile_grid[i]['tie_point'], tile_arr
+            yield self.tile_grid[ii]['tie_point'], tile_arr
 
-            i += 1
+            ii += 1
 
