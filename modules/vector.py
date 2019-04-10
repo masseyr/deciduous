@@ -514,6 +514,7 @@ class Vector(object):
 
     def get_intersecting_vector(self,
                                 query_vector,
+                                filter_query=False,
                                 index=False):
         """
         Gets tiles intersecting with the given geometry (any type).
@@ -540,12 +541,18 @@ class Vector(object):
                     geom = feat.GetGeometryRef()
 
                     if geom.Intersects(qgeom):
-                        index_list.append(i)
+                        if filter_query:
+                            index_list.append(j)
+                        else:
+                            index_list.append(i)
 
             intersect_index = sorted(set(index_list))
 
             for feat_index in intersect_index:
-                feat = self.features[feat_index]
+                if filter_query:
+                    feat = query_vector.features[feat_index]
+                else:
+                    feat = self.features[feat_index]
 
                 temp_feature = dict()
                 temp_feature['feat'] = feat
@@ -567,19 +574,21 @@ class Vector(object):
 
             # update features and crs
             out_vector.nfeat = len(query_list)
-            out_vector.type = self.type
-            out_vector.spref = self.spref
-            out_vector.fields = self.fields
-            out_vector.name = self.name
+            out_vector.type = query_vector.type if filter_query else self.type
+            out_vector.spref = query_vector.spref if filter_query else self.spref
+            out_vector.fields = query_vector.fields if filter_query else self.fields
+            out_vector.name = query_vector.name if filter_query else self.name
 
             # create layer in memory
             temp_layer = temp_datasource.CreateLayer('temp_layer',
-                                                     srs=self.spref,
-                                                     geom_type=self.type)
+                                                     srs=query_vector.spref if filter_query else self.spref,
+                                                     geom_type=query_vector.type if filter_query else self.type)
+
+            out_fields = query_vector.fields if filter_query else self.fields
 
             # create the same attributes in the temp layer as the input Vector layer
-            for k in range(0, len(self.fields)):
-                temp_layer.CreateField(self.fields[k])
+            for k in range(0, len(out_fields)):
+                temp_layer.CreateField(out_fields[k])
 
             # fill the features in output layer
             for i in range(0, len(query_list)):
@@ -595,12 +604,13 @@ class Vector(object):
                 attr_dict = dict(query_list[i]['attr'].items())
 
                 # set attributes for the feature
-                for j in range(0, len(self.fields)):
-                    name = self.fields[j].GetName()
+                for j in range(0, len(out_fields)):
+                    name = out_fields[j].GetName()
                     temp_feature.SetField(name, attr_dict[name])
 
                 out_vector.features.append(temp_feature)
                 out_vector.wktlist.append(temp_geom.ExportToWkt())
+                out_vector.attributes.append(attr_dict)
 
                 # create new feature in output layer
                 temp_layer.CreateFeature(temp_feature)
@@ -989,3 +999,61 @@ class Vector(object):
             vector.wktlist.append(geom.ExportToWkt())
 
         return vector
+
+    @staticmethod
+    def polygon_bound_grid(coords_list,
+                           div=10,
+                           intersect_check=False):
+
+        """
+        Method to get square grid intersecting a polygon
+        This function only accepts a list of coordinates: [[x1,y1],[x2,y2],...]
+        :param coords_list: list of coordinates: [[x1,y1],[x2,y2],...]
+        :param div: Number of divisions along x or y (default: 10)
+        :param intersect_check: If only the intersecting coordinates should be returned
+        :return: List of list of coordinates (square)
+        """
+
+        temp_coords_list = Opt.__copy__(coords_list)
+
+        if temp_coords_list[-1][0] != temp_coords_list[0][0] or temp_coords_list[-1][1] != temp_coords_list[0][1]:
+            temp_coords_list.append(temp_coords_list[0])
+
+        bounds_wkt = Vector.wkt_from_coords(temp_coords_list,
+                                            geom_type='polygon')
+        bounds_geom = Vector.get_osgeo_geom(bounds_wkt)
+
+        bounds_maxx = max(list(coord[0] for coord in temp_coords_list))
+        bounds_minx = min(list(coord[0] for coord in temp_coords_list))
+        bounds_maxy = max(list(coord[1] for coord in temp_coords_list))
+        bounds_miny = min(list(coord[1] for coord in temp_coords_list))
+
+        xcoords = Sublist.frange(bounds_minx, bounds_maxx, div=div)
+        ycoords = Sublist.frange(bounds_miny, bounds_maxy, div=div).reverse()
+
+        geom_list = list()
+
+        for i in range(len(xcoords) - 1):
+            for j in range(len(ycoords) - 1):
+                geom_list.append([[xcoords[i], ycoords[j]],
+                                  [xcoords[i + 1], ycoords[j]],
+                                  [xcoords[i + 1], ycoords[j + 1]],
+                                  [xcoords[i], ycoords[j + 1]],
+                                  [xcoords[i], ycoords[j]]])
+
+        if intersect_check:
+            wkt_list = list(Vector.wkt_from_coords(geom_coords, geom_type='polygon')
+                            for geom_coords in geom_list)
+
+            index = list()
+
+            for i, geom_wkt in enumerate(wkt_list):
+                temp_geom = Vector.get_osgeo_geom(geom_wkt)
+                if temp_geom.Intersects(bounds_geom):
+                    index.append(i)
+
+            return list(geom_list[i] for i in index)
+
+        else:
+            return geom_list
+
