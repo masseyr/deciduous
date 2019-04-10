@@ -36,7 +36,7 @@ class Samples:
         :param label_colname: column in csv file that contains the feature label (output value)
         :param x: 2d array containing features (samples) without the label
         :param y: 1d array of feature labels (same order as x)
-        :param x_name: 1d array of feature attributes (bands)
+        :param x_name: 1d array of feature names (bands)
         :param y_name: name of label
         :param use_band_dict: list of attribute (band) names
         """
@@ -437,6 +437,7 @@ class Samples:
         ran_samp.x = [self.x[i] for i in ran_samp_n]
         ran_samp.y = [self.y[i] for i in ran_samp_n]
         ran_samp.nsamp = len(ran_samp.x)
+        ran_samp.nfeat = len(ran_samp.x[0])
         ran_samp.index = Sublist(range(0, ran_samp.nsamp))
 
         ran_samp.xmin = list()
@@ -450,3 +451,96 @@ class Samples:
         ran_samp.ymax = max(ran_samp.y)
 
         return ran_samp
+
+    def selection(self,
+                  index_list):
+        """
+        Method to select samples based on an index list
+        :param index_list:
+        :return: Samples object
+        """
+
+        samp = Samples()
+        samp.x_name = self.x_name
+        samp.y_name = self.y_name
+        samp.x = [self.x[i] for i in index_list]
+        samp.y = [self.y[i] for i in index_list]
+        samp.nsamp = len(samp.x)
+        samp.nfeat = len(samp.x[0])
+        samp.index = Sublist(range(0, samp.nsamp))
+
+        samp.xmin = list()
+        samp.xmax = list()
+
+        for i in range(0, samp.nfeat):
+            samp.xmin.append(min(list(x_elem[i] for x_elem in samp.x)))
+            samp.xmax.append(max(list(x_elem[i] for x_elem in samp.x)))
+
+        samp.ymin = min(samp.y)
+        samp.ymax = max(samp.y)
+
+        return samp
+
+    def add_samp(self,
+                 samp):
+        """
+        merge s Samples object into another
+        :param samp:
+        :return: None
+        """
+
+        for i in range(samp.nsamp):
+            self.x.append(samp.x[i])
+            self.y.append(samp.y[i])
+
+        self.nsamp += samp.nsamp
+        self.index = Sublist(range(0, self.nsamp))
+
+        for i in range(0, self.nfeat):
+            self.xmin.append(min(list(x_elem[i] for x_elem in self.x)))
+            self.xmax.append(max(list(x_elem[i] for x_elem in self.x)))
+
+        self.ymin = min(self.y)
+        self.ymax = max(self.y)
+
+    def make_folds(self,
+                   n_folds=5):
+
+        """
+        Make n folds in sample sets
+        :param n_folds:
+        :return: list of tuples [(training samp, validation samp)...]
+        """
+
+        nsamp_list = list(len(self.index) // n_folds for _ in range(n_folds))
+        if len(self.index) % n_folds > 0:
+            nsamp_list[-1] += len(self.index) % n_folds
+
+        index_list = Opt.__copy__(self.index)
+        fold_samples = list()
+
+        for fold_samp in nsamp_list:
+
+            val_index = random.sample(index_list, fold_samp)
+
+            index_list = index_list.remove(val_index)
+
+            trn_index = self.index.remove(val_index)
+
+            fold_samples.append((self.selection(trn_index), self.selection(val_index)))
+
+        return fold_samples
+
+
+
+
+
+
+
+
+
+
+
+
+
+
