@@ -659,22 +659,25 @@ class Handler(object):
         :param append: if the lines should be appended to the file
         :return: write to file
         """
+        input_list = list(delim.join(list(str(elem) for elem in line)) for line in input_list)
+
         # add rownames and colnames
-        if rownames is not None and colnames is not None:
-            input_list = [str(rownames[i]) + delim + input_list[i] for i in range(0, len(input_list))]
-            header = delim + ", ".join([str(elem) for elem in colnames])
+        if rownames is not None:
+            if len(rownames) != len(input_list):
+                raise ValueError('Row name list does not have sufficient elements')
+
+            input_list = list(str(rownames[i]) + delim + elem for i, elem in enumerate(input_list))
+
+            header_add = delim
+        else:
+            header_add = ""
+
+        if colnames is not None:
+            header = header_add + ", ".join(list(str(elem) for elem in colnames))
             input_list = [header] + input_list
-        if rownames is None and colnames is not None:
-            header = ", ".join([str(elem) for elem in colnames])
-            input_list = [header] + input_list
-        if rownames is not None and colnames is None:
-            input_list = [rownames[i] + delim + input_list[i] for i in range(0, len(input_list))]
 
         # create dir path if it does not exist
         self.dir_create()
-
-        # if file exists, delete it
-        self.filename = self.file_remove_check()
 
         # write to file
         if append:
