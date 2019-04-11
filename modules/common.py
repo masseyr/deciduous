@@ -673,7 +673,7 @@ class Handler(object):
             header_add = ""
 
         if colnames is not None:
-            header = header_add + ", ".join(list(str(elem) for elem in colnames))
+            header = header_add + delim.join(list(str(elem) for elem in colnames))
             input_list = [header] + input_list
 
         # create dir path if it does not exist
