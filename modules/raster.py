@@ -530,7 +530,7 @@ class Raster:
                                      self.tile_grid[ii]['block_coords'][2]),
                                     gdal_array.GDALTypeCodeToNumericTypeCode(self.dtype))
 
-                for jj, band in bands:
+                for jj, band in enumerate(bands):
                     temp_band = self.datasource.GetRasterBand(band)
                     tile_arr[jj, :, :] = temp_band.ReadAsArray(*self.tile_grid[ii]['block_coords'])
 
