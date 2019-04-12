@@ -149,7 +149,12 @@ class _Classifier(object):
         new_shape = [nbands, nrows * ncols]
 
         print('New Shape: ' + ', '.join([str(elem) for elem in new_shape]))
+
         temp_arr = raster_obj.array
+
+        for ii in range(nbands):
+            temp_arr = np.where(temp_arr[ii, :, :] == nodatavalue, nodatavalue, temp_arr)
+
         temp_arr = temp_arr.reshape(new_shape) * array_multiplier + array_additive
         temp_arr = temp_arr.swapaxes(0, 1)
 
@@ -295,9 +300,15 @@ class MRegressor(_Classifier):
                        'lower_limit': Limit of minimum value of prediction
         :return: 1d image array (that will need reshaping if image output)
         """
+        nodatavalue = None
+
         if kwargs is not None:
             for key, value in kwargs.items():
-                self.adjustment[key] = value
+                if key in ('gain', 'bias', 'upper_limit', 'lower_limit'):
+                    self.adjustment[key] = value
+
+                if key == 'nodatavalue':
+                    nodatavalue = value
 
         # define output array
         out_arr = arr[:, 0] * 0.0
@@ -344,7 +355,13 @@ class MRegressor(_Classifier):
             if 'lower_limit' in self.adjustment:
                 out_arr[out_arr < self.adjustment['lower_limit']] = self.adjustment['lower_limit']
 
-        return out_arr
+        output = out_arr
+
+        if nodatavalue is not None:
+            for ii in range(arr.shape[0]):
+                output = np.where(arr[ii, :, :] == nodatavalue, nodatavalue, output)
+
+        return output
 
     def sample_predictions(self,
                            data,
@@ -572,11 +589,14 @@ class RFRegressor(_Classifier):
 
         :return: 1d image array (that will need reshaping if image output)
         """
+        nodatavalue = None
 
         if kwargs is not None:
             for key, value in kwargs.items():
                 if key in ('gain', 'bias', 'upper_limit', 'lower_limit'):
                     self.adjustment[key] = value
+                if key == 'nodatavalue':
+                    nodatavalue = value
 
         # define output array
         out_arr = Opt.__copy__(arr[:, 0]) * 0.0
@@ -629,7 +649,7 @@ class RFRegressor(_Classifier):
                     out_arr[i * npx_tile:(i + 1) * npx_tile] = 2.0 * (np.std(tile_arr, axis=0)/np.sqrt(self.trees))
 
                 else:
-                    return RuntimeError("No output type specified")
+                    raise RuntimeError("No output type specified")
 
             if npx_last > 0:  # number of total pixels for the last tile
 
@@ -663,7 +683,7 @@ class RFRegressor(_Classifier):
                         2.0 * (np.std(tile_arr, axis=0)/np.sqrt(self.trees))
 
                 else:
-                    return RuntimeError("No output type specified")
+                    raise RuntimeError("No output type specified")
         else:
 
             # initialize output array
@@ -691,7 +711,7 @@ class RFRegressor(_Classifier):
                 out_arr = 2.0 * (np.std(tree_pred_arr, axis=0) / np.sqrt(self.trees))
 
             else:
-                return RuntimeError("No output type specified")
+                raise RuntimeError("No output type specified")
 
         if output == 'full':
 
@@ -710,7 +730,7 @@ class RFRegressor(_Classifier):
                 if 'lower_limit' in self.adjustment:
                     full_arr[full_arr < self.adjustment['lower_limit']] = self.adjustment['lower_limit']
 
-            return full_arr
+            output = full_arr
 
         else:
 
@@ -728,7 +748,12 @@ class RFRegressor(_Classifier):
                 if 'lower_limit' in self.adjustment:
                     out_arr[out_arr < self.adjustment['lower_limit']] = self.adjustment['lower_limit']
 
-            return out_arr
+            output = out_arr
+
+        if nodatavalue is not None:
+            output = np.where(arr[0, :] == nodatavalue, nodatavalue, output)
+
+        return output
 
     def sample_predictions(self,
                            data,
