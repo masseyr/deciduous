@@ -787,7 +787,8 @@ class Handler(object):
     def read_from_csv(self,
                       return_dicts=False,
                       num_tries=10,
-                      wait_time=2):
+                      wait_time=2,
+                      line_limit=None):
         """
         Read csv as list of lists with header.
         Each row is a list and a sample point.
@@ -801,8 +802,11 @@ class Handler(object):
         while len(lines) == 0 and tries < num_tries:
             try:
                 with open(self.filename, 'r') as ds:
+                    counter = 0
                     for line in csv.reader(ds, delimiter=','):
                         lines.append(line)
+                        counter += 1
+
             except Exception as e:
                 print(e)
                 time.sleep(wait_time)
@@ -812,7 +816,7 @@ class Handler(object):
         names = list(name.strip() for name in lines[0])
 
         if len(lines) > 0:
-            # convert pixel samples to list
+            # convert to list
             if return_dicts:
                 return list(dict(zip(names, list(self.string_to_type(elem) for elem in feat)))
                             for feat in lines[1:])
