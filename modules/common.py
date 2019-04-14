@@ -1,5 +1,5 @@
 from decimal import *
-import csv
+from itertools import takewhile, repeat
 import numpy as np
 import datetime
 import fnmatch
@@ -7,6 +7,7 @@ import random
 import psutil
 import ftplib
 import time
+import csv
 import copy
 import gzip
 import sys
@@ -198,18 +199,29 @@ class Sublist(list):
         return random.sample(self, nelem_by_percent)
 
     def random_selection(self,
-                         num=10):
+                         num=1,
+                         systematic=False):
 
         """
         Method to select a smaller number of samples from the Samples object
         :param num: Number of samples to select
+        :param systematic: If the numbers returned should be systematic
+                           Used only for large number of samples
         :return: Samples object
         """
 
+        arr = np.array(self)
+
         if num >= len(self):
             return self
+
+        elif systematic:
+            diff_seq = self.custom_list(0, len(self)-1, step=int(float(len(self))/float(num)))
+            temp = arr[np.array(diff_seq)]
+            return Sublist(temp)
+
         else:
-            return random.sample(self, num)
+            return Sublist(np.random.choice(arr, size=num, replace=False))
 
     def tuple_by_pairs(self):
         """
@@ -522,6 +534,31 @@ class Handler(object):
         """
         os.remove(self.filename)
 
+    def file_lines(self,
+                   nlines=True):
+        """
+        Find number of lines or get text lines in a text or csv file
+        :param nlines: If only the number of lines in a file should be returned
+        :return:
+        """
+        with open(self.filename, 'r') as f:
+            bufgen = takewhile(lambda x: x, (f.read(1024 * 1024) for _ in repeat(None)))
+
+            if nlines:
+                val = sum(buf.count(b'\n') for buf in bufgen if buf)
+            else:
+                val = list()
+                remaining = ''
+                for buf in bufgen:
+                    if buf:
+                        temp_lines = (remaining + buf).split(b'\n')
+                        if len(temp_lines) <= 1:
+                            remaining += temp_lines
+                        else:
+                            val += temp_lines[:-1]
+                            remaining = temp_lines[-1]
+        return val
+
     def read_csv_as_array(self):
         """
         Read csv file as numpy array
@@ -786,41 +823,110 @@ class Handler(object):
 
     def read_from_csv(self,
                       return_dicts=False,
-                      num_tries=10,
-                      wait_time=2,
-                      line_limit=None):
+                      line_limit=None,
+                      read_random=False,
+                      percent_random=50.0,
+                      systematic=False):
         """
         Read csv as list of lists with header.
         Each row is a list and a sample point.
         :param return_dicts: If list of dictionaries should be returned (default: False)
-        :param num_tries: Number of tries for reading the csv file (default: 10)
-        :param wait_time: Time to wait between tries(default: 2 seconds)
+        :param line_limit: Limits on the number of lines returned (default: None)
+        :param read_random: If lines to be read should be randomly selected
+        :param percent_random: What percentage of lines should be randomly selected (default: 50%)
+        :param systematic: If the samples should be systematic instead of random (used only if read_random is True)
         :returns: dictionary of data
         """
         lines = list()
-        tries = 0
-        while len(lines) == 0 and tries < num_tries:
-            try:
-                with open(self.filename, 'r') as ds:
-                    counter = 0
-                    for line in csv.reader(ds, delimiter=','):
-                        lines.append(line)
+        index_list = list()
+
+        n_lines = self.file_lines(nlines=True)
+
+        sys.stdout.write('Lines in file: {}\n'.format(str(n_lines)))
+
+        if read_random:
+            if 0.0 < percent_random <= 100.0:
+                sys.stdout.write('Randomizing index ... \n')
+                n_rand_lines = int((float(percent_random)/100.0)*float(n_lines))
+                index_list = sorted([0] + Sublist(range(1, n_lines)).random_selection(num=n_rand_lines,
+                                                                                      systematic=systematic))
+
+        sys.stdout.write('Reading file : ')
+
+        counter = 0
+        index = 0
+        perc_ = 0
+        with open(self.filename, 'r') as f:
+            if line_limit:
+                if len(index_list) > 0:
+                    if 0 < len(index_list) <= line_limit:
+                        pass
+                    elif len(index_list) > line_limit:
+                        index_list = index_list[:(line_limit+1)]
+
+                    for i, line in enumerate(f):
+                        if counter > line_limit:
+                            break
+                        if i == index_list[counter]:
+                            lines.append(list(elem.strip() for elem in line.split(',')))
+                            counter += 1
+
+                            if counter > int((float(perc_) / 100.0) * float(len(index_list))):
+                                sys.stdout.write('{}..'.format(str(perc_)))
+                                perc_ += 10
+
+                    sys.stdout.write('100!\n')
+
+                else:
+                    for line in f:
+                        if counter > line_limit:
+                            break
+                        lines.append(list(elem.strip() for elem in line.split(',')))
                         counter += 1
 
-            except Exception as e:
-                print(e)
-                time.sleep(wait_time)
-            tries += 1
+                        if counter > int((float(perc_) / 100.0) * float(line_limit)):
+                            sys.stdout.write('{}..'.format(str(perc_)))
+                            perc_ += 10
+
+                    sys.stdout.write('100!\n')
+
+            else:
+                if len(index_list) > 0:
+
+                    for i, line in enumerate(f):
+                        if counter >= len(index_list):
+                            break
+
+                        if index_list[counter] == i:
+                            lines.append(list(elem.strip() for elem in line.split(',')))
+                            counter += 1
+
+                            if counter > int((float(perc_) / 100.0) * float(len(index_list))):
+                                sys.stdout.write('{}..'.format(str(perc_)))
+                                perc_ += 10
+
+                    sys.stdout.write('100!\n')
+
+                else:
+                    for line in f:
+                        lines.append(list(elem.strip() for elem in line.split(',')))
+                        counter += 1
+
+                        if counter > int((float(perc_)/100.0) * float(n_lines)):
+                            sys.stdout.write('{}..'.format(str(perc_)))
+                            perc_ += 10
+
+                    sys.stdout.write('100!\n')
 
         # convert col names to list of strings
-        names = list(name.strip() for name in lines[0])
+        names = lines[0]
 
         if len(lines) > 0:
             # convert to list
             if return_dicts:
+                sys.stdout.write('Converting to Dictionaries...\n')
                 return list(dict(zip(names, list(self.string_to_type(elem) for elem in feat)))
                             for feat in lines[1:])
-
             else:
                 return {
                     'feature': list(list(self.string_to_type(elem) for elem in feat)
@@ -890,6 +996,7 @@ class Handler(object):
         :return: string
         """
         if type(x).__name__ == 'str':
+            x = x.strip()
             try:
                 val = int(x)
             except ValueError:
