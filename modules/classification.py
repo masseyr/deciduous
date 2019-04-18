@@ -359,7 +359,7 @@ class MRegressor(_Classifier):
 
         if nodatavalue is not None:
             for ii in range(arr.shape[0]):
-                output = np.where(arr[ii, :, :] == nodatavalue, nodatavalue, output)
+                output[np.unique(np.where(arr[ii, :, :] == nodatavalue)[1])] = nodatavalue
 
         return output
 
@@ -751,7 +751,7 @@ class RFRegressor(_Classifier):
             output = out_arr
 
         if nodatavalue is not None:
-            output = np.where(arr[0, :] == nodatavalue, nodatavalue, output)
+            output[np.unique(np.where(arr == nodatavalue)[1])] = nodatavalue
 
         return output
 
