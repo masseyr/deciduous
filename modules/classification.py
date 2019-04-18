@@ -123,6 +123,11 @@ class _Classifier(object):
         else:
             z_val = 1.96
 
+        if 'band_multiplier' in kwargs:
+            band_multiplier = kwargs['band_multiplier']
+        else:
+            band_multiplier = zip(list((elem, 1.0) for elem in raster_obj.bnames))
+
         # file handler object
         handler = Handler(raster_obj.name)
 
@@ -150,7 +155,10 @@ class _Classifier(object):
 
         print('New Shape: ' + ', '.join([str(elem) for elem in new_shape]))
 
-        temp_arr = raster_obj.array
+        multiplier = np.array([band_multiplier[elem] if elem in band_multiplier else 1.0
+                               for elem in raster_obj.bnames])
+
+        temp_arr = np.apply_along_axis(lambda x: x*multiplier, 0, raster_obj.array)
 
         for ii in range(nbands):
             temp_arr = np.where(temp_arr[ii, :, :] == nodatavalue, nodatavalue, temp_arr)
@@ -161,7 +169,8 @@ class _Classifier(object):
         # apply the variance calculating function on the array
         out_arr = self.predict(temp_arr,
                                output=output_type,
-                               z_val=z_val)
+                               z_val=z_val,
+                               nodatavalue=nodatavalue)
 
         # output raster and metadata
         if out_data_type != gdal_array.NumericTypeCodeToGDALTypeCode(out_arr.dtype):
