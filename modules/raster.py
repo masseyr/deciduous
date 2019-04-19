@@ -148,6 +148,8 @@ class Raster:
                 else:
                     print('Reading bands: {}'.format(" ".join([str(b) for b in band_order])))
 
+                    bands = len(band_order)
+
                     # bands in array
                     n_array_bands = len(band_order)
 
