@@ -158,9 +158,10 @@ class _Classifier(object):
         multiplier = np.array([band_multiplier[elem] if elem in band_multiplier else 1.0
                                for elem in raster_obj.bnames])
 
-        temp_arr = np.apply_along_axis(lambda x: x*multiplier, 0, raster_obj.array)
+        temp_arr = np.apply_along_axis(lambda x: x[np.where(x != nodatavalue)]*multiplier[np.where(x != nodatavalue)],
+                                       0, raster_obj.array.astype(out_data_type))
 
-        for ii in range(nbands):
+        for ii in range(0, nbands):
             temp_arr = np.where(temp_arr[ii, :, :] == nodatavalue, nodatavalue, temp_arr)
 
         temp_arr = temp_arr.reshape(new_shape) * array_multiplier + array_additive
@@ -943,10 +944,9 @@ class RFRegressor(_Classifier):
                              over_adjust=1.0):
         """
         get the model adjustment parameters based on training fit
-        :param clip:
-        :param data_limits:
-        :param over_adjust
-
+        :param clip: Ratio of samples not to be used at each tailend
+        :param data_limits: Limits of output data
+        :param over_adjust: Amount of over adjustment needed to slope
         :return: None
         """
 
