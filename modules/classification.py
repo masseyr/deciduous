@@ -25,10 +25,12 @@ class _Classifier(object):
     def __init__(self,
                  data=None,
                  classifier=None,
+                 classifier2=None,
                  **kwargs):
         self.data = data
         self.vdata = None
         self.classifier = classifier
+        self.classifier2 = classifier2
         self.features = None
         self.label = None
         self.output = None
@@ -56,10 +58,12 @@ class _Classifier(object):
         """
         self.data = data
 
-        if 'weights' not in data or not use_weights:
-            self.classifier.fit(data['features'], data['labels'])
-        else:
-            self.classifier.fit(data['features'], data['labels'], data['weights'])
+        if self.classifier is not None:
+
+            if 'weights' not in data or not use_weights:
+                self.classifier.fit(data['features'], data['labels'])
+            else:
+                self.classifier.fit(data['features'], data['labels'], data['weights'])
 
         self.features = data['feature_names']
         self.label = data['label_name']
