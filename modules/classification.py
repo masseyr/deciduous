@@ -163,7 +163,7 @@ class _Classifier(object):
                                for elem in raster_obj.bnames])
 
         temp_arr = np.apply_along_axis(lambda x: x[np.where(x != nodatavalue)]*multiplier[np.where(x != nodatavalue)],
-                                       0, raster_obj.array.astype(out_data_type))
+                                       0, raster_obj.array.astype(np.float32))
 
         for ii in range(0, nbands):
             temp_arr = np.where(temp_arr[ii, :, :] == nodatavalue, nodatavalue, temp_arr)
