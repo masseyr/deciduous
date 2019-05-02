@@ -301,8 +301,8 @@ class MRegressor(_Regressor):
     @Timer.timing(time_it)
     def predict(self,
                 arr,
-                ntile_max=9,
-                tile_size=128,
+                ntile_max=5,
+                tile_size=1024,
                 **kwargs):
         """
         Calculate multiple regression model prediction, variance, or standard deviation.
@@ -660,8 +660,8 @@ class RFRegressor(_Regressor):
     @Timer.timing(time_it)
     def predict(self,
                 arr,
-                ntile_max=9,
-                tile_size=128,
+                ntile_max=5,
+                tile_size=1024,
                 output_type='pred',
                 intvl=95.0,
                 **kwargs):
