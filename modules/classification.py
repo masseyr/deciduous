@@ -352,16 +352,16 @@ class MRegressor(_Regressor):
 
                 # calculate predictions for each pixel in a 2d array
                 out_arr[i * npx_tile:(i + 1) * npx_tile] = \
-                    self.regressor.predict(arr[i * npx_tile:(i + 1) * npx_tile, :])
+                    self.regressor.predict(arr[i * npx_tile:(i + 1) * npx_tile, self.feature_index])
 
             if npx_last > 0:  # number of total pixels for the last tile
 
                 i = ntiles - 2
                 out_arr[i * npx_last:(i + 1) * npx_last] = \
-                    self.regressor.predict(arr[i * npx_tile:(i * npx_tile + npx_last), :])
+                    self.regressor.predict(arr[i * npx_tile:(i * npx_tile + npx_last), self.feature_index])
 
         else:
-            out_arr = self.regressor.predict(arr)
+            out_arr = self.regressor.predict(arr[:, self.feature_index])
 
         if len(self.adjustment) > 0:
 
@@ -396,6 +396,8 @@ class MRegressor(_Regressor):
         :param picklefile: Random Forest pickle file
         :param outfile: output csv file name
         """
+
+        self.feature_index = list(data['feature_names'].index(feat) for feat in self.features)
 
         # calculate variance of tree predictions
         y = self.predict(np.array(data['features']))
