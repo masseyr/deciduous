@@ -829,13 +829,14 @@ class RFRegressor(_Regressor):
                'regress_limit': 2 element list of Minimum and Maximum limits of the label array [min, max]
                'all_y': Boolean (if all lef outputs should be calculated)
                'var_y': Boolean (if variance of leaf nodes should be calculated)
-
         """
 
         if kwargs is not None:
             for key, value in kwargs.items():
                 if key in ('gain', 'bias', 'upper_limit', 'lower_limit'):
                     self.adjustment[key] = value
+
+        self.feature_index = list(data['feature_names'].index(feat) for feat in self.features)
 
         if 'regress_limit' in kwargs:
             regress_limit = kwargs['regress_limit']
