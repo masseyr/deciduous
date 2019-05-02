@@ -8,7 +8,7 @@ from raster import Raster
 from timer import Timer
 from sklearn import linear_model
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.metrics import mean_squared_error
 
 
 __all__ = ['RFRegressor',
@@ -18,20 +18,19 @@ __all__ = ['RFRegressor',
 sep = Handler().sep
 
 
-class _Classifier(object):
+class _Regressor(object):
 
     time_it = False
 
     def __init__(self,
                  data=None,
-                 classifier=None,
-                 classifier2=None,
+                 regressor=None,
                  **kwargs):
         self.data = data
         self.vdata = None
-        self.classifier = classifier
-        self.classifier2 = classifier2
+        self.regressor = regressor
         self.features = None
+        self.feature_index = None
         self.label = None
         self.output = None
         self.training_results = dict()
@@ -42,7 +41,7 @@ class _Classifier(object):
 
         if kwargs is not None:
             if 'timer' in kwargs:
-                _Classifier.time_it = kwargs['timer']
+                _Regressor.time_it = kwargs['timer']
 
     def __repr__(self):
         return "<Classifier base class>"
@@ -51,19 +50,19 @@ class _Classifier(object):
                  data,
                  use_weights=False):
         """
-        Train the classifier
+        Train the regressor
         :param data: dictionary with values (generated using Samples.format_data())
         :param use_weights: If the sample weights provided should be used? (default: False)
         :return: Nonetype
         """
         self.data = data
 
-        if self.classifier is not None:
+        if self.regressor is not None:
 
             if 'weights' not in data or not use_weights:
-                self.classifier.fit(data['features'], data['labels'])
+                self.regressor.fit(data['features'], data['labels'])
             else:
-                self.classifier.fit(data['features'], data['labels'], data['weights'])
+                self.regressor.fit(data['features'], data['labels'], data['weights'])
 
         self.features = data['feature_names']
         self.label = data['label_name']
@@ -76,41 +75,42 @@ class _Classifier(object):
     def pickle_it(self,
                   outfile):
         """
-        Save classifier
-        :param outfile: File to save the classifier to
+        Save regressor
+        :param outfile: File to save the regressor to
         """
         outfile = Handler(filename=outfile).file_remove_check()
         with open(outfile, 'wb') as fileptr:
             pickle.dump(self, fileptr)
 
     @classmethod
-    @Timer.timing(time_it)
     def load_from_pickle(cls,
                          infile):
         """
-        Reload classifier from file
-        :param infile: File to load classifier from
+        Reload regressor from file
+        :param infile: File to load regressor from
         """
         with open(infile, 'rb') as fileptr:
-            classifier_obj = pickle.load(fileptr)
-            return classifier_obj
+            regressor_obj = pickle.load(fileptr)
+            return regressor_obj
 
+    @staticmethod
     @Timer.timing(time_it)
-    def classify_raster(self,
-                        raster_obj,
-                        outfile=None,
-                        outdir=None,
-                        band_name='prediction',
-                        output_type='pred',
-                        array_multiplier=1.0,
-                        array_additive=0.0,
-                        out_data_type=gdal.GDT_Float32,
-                        nodatavalue=-32768.0,
-                        **kwargs):
+    def regress_raster(regressor,
+                       raster_obj,
+                       outfile=None,
+                       outdir=None,
+                       band_name='prediction',
+                       output_type='median',
+                       array_multiplier=1.0,
+                       array_additive=0.0,
+                       out_data_type=gdal.GDT_Float32,
+                       nodatavalue=-32768.0,
+                       **kwargs):
 
-        """Tree variance from the RF classifier
+        """Tree variance from the RF regressor
+        :param regressor: _Regressor object
         :param raster_obj: Initialized Raster object with a 3d array
-        :param outfile: name of output classification file
+        :param outfile: name of output file
         :param array_multiplier: rescale data using this value
         :param array_additive: Rescale data using this value
         :param out_data_type: output raster data type
@@ -118,9 +118,9 @@ class _Classifier(object):
         :param band_name: Name of the output raster band
         :param outdir: output folder
         :param output_type: Should the output be standard deviation ('sd'),
-                            variance ('var'), or prediction ('pred'),
+                            variance ('var'), or median ('median'), or mean ('mean')
                             or 'conf' for confidence interval
-        :returns: classification as raster object
+        :returns: Output as raster object
         """
         if 'z_val' in kwargs:
             z_val = kwargs['z_val']
@@ -131,6 +131,11 @@ class _Classifier(object):
             band_multiplier = kwargs['band_multiplier']
         else:
             band_multiplier = zip(list((elem, 1.0) for elem in raster_obj.bnames))
+
+        if 'out_nodatavalue' in kwargs:
+            out_nodatavalue = kwargs['out_nodatavalue']
+        else:
+            out_nodatavalue = nodatavalue
 
         # file handler object
         handler = Handler(raster_obj.name)
@@ -152,30 +157,33 @@ class _Classifier(object):
         nrows = raster_obj.shape[1]
         ncols = raster_obj.shape[2]
 
-        print('Shape: ' + ', '.join([str(elem) for elem in raster_obj.shape]))
+        if regressor.feature_index is None:
+            regressor.feature_index = list(raster_obj.bnames.index(feat) for feat in regressor.features)
 
         # reshape into a long 2d array (nband, nrow * ncol) for classification,
         new_shape = [nbands, nrows * ncols]
 
-        print('New Shape: ' + ', '.join([str(elem) for elem in new_shape]))
-
         multiplier = np.array([band_multiplier[elem] if elem in band_multiplier else 1.0
                                for elem in raster_obj.bnames])
 
-        temp_arr = np.apply_along_axis(lambda x: x[np.where(x != nodatavalue)]*multiplier[np.where(x != nodatavalue)],
-                                       0, raster_obj.array.astype(np.float32))
+        def _with_data(pixel_vec):
+            pixel_vec[np.where(pixel_vec != nodatavalue)] = \
+                pixel_vec[np.where(pixel_vec != nodatavalue)] * multiplier[np.where(pixel_vec != nodatavalue)]
+            return pixel_vec
 
-        for ii in range(0, nbands):
-            temp_arr = np.where(temp_arr[ii, :, :] == nodatavalue, nodatavalue, temp_arr)
+        temp_arr = np.apply_along_axis(_with_data,
+                                       0,
+                                       raster_obj.array.astype(gdal_array.GDALTypeCodeToNumericTypeCode(out_data_type)))
 
         temp_arr = temp_arr.reshape(new_shape) * array_multiplier + array_additive
         temp_arr = temp_arr.swapaxes(0, 1)
 
         # apply the variance calculating function on the array
-        out_arr = self.predict(temp_arr,
-                               output=output_type,
-                               z_val=z_val,
-                               nodatavalue=nodatavalue)
+        out_arr = regressor.predict(temp_arr,
+                                    output_type=output_type,
+                                    z_val=z_val,
+                                    nodatavalue=nodatavalue,
+                                    out_nodatavalue=out_nodatavalue)
 
         # output raster and metadata
         if out_data_type != gdal_array.NumericTypeCodeToGDALTypeCode(out_arr.dtype):
@@ -188,7 +196,7 @@ class _Classifier(object):
         out_ras.array = out_arr.reshape([nrows, ncols])
         out_ras.shape = [1, nrows, ncols]
         out_ras.bnames = [band_name]
-        out_ras.nodatavalue = nodatavalue
+        out_ras.nodatavalue = out_nodatavalue
 
         # return raster object
         return out_ras
@@ -237,29 +245,29 @@ class _Classifier(object):
         }
 
 
-class MRegressor(_Classifier):
+class MRegressor(_Regressor):
     """Multiple linear regressor object for scikit-learn linear model"""
 
     time_it = False
 
     def __init__(self,
                  data=None,
-                 classifier=None,
+                 regressor=None,
                  intercept=True,
                  jobs=1,
                  normalize=False,
                  **kwargs):
 
         super(MRegressor, self).__init__(data,
-                                         classifier)
-        if self.classifier is None:
-            self.classifier = linear_model.LinearRegression(copy_X=True,
-                                                            fit_intercept=intercept,
-                                                            n_jobs=jobs,
-                                                            normalize=normalize)
+                                         regressor)
+        if self.regressor is None:
+            self.regressor = linear_model.LinearRegression(copy_X=True,
+                                                           fit_intercept=intercept,
+                                                           n_jobs=jobs,
+                                                           normalize=normalize)
 
-        self.intercept = self.classifier.intercept_ if hasattr(self.classifier, 'intercept_') else None
-        self.coefficient = self.classifier.coef_ if hasattr(self.classifier, 'coef_') else None
+        self.intercept = self.regressor.intercept_ if hasattr(self.regressor, 'intercept_') else None
+        self.coefficient = self.regressor.coef_ if hasattr(self.regressor, 'coef_') else None
 
         if kwargs is not None:
             if 'timer' in kwargs:
@@ -267,8 +275,8 @@ class MRegressor(_Classifier):
 
     def __repr__(self):
         # gather which attributes exist
-        attr_truth = [hasattr(self.classifier, 'coef_'),
-                      hasattr(self.classifier, 'intercept_')]
+        attr_truth = [hasattr(self.regressor, 'coef_'),
+                      hasattr(self.regressor, 'intercept_')]
 
         if any(attr_truth):
 
@@ -276,10 +284,10 @@ class MRegressor(_Classifier):
 
             # strings to be printed for each attribute
             if attr_truth[0]:
-                print_str_list.append("Coefficients: {}\n".format(len(self.classifier.coef_)))
+                print_str_list.append("Coefficients: {}\n".format(len(self.regressor.coef_)))
 
             if attr_truth[1]:
-                print_str_list.append("Intercept: {}\n".format(self.classifier.intercept_))
+                print_str_list.append("Intercept: {}\n".format(self.regressor.intercept_))
 
             # combine all strings into one print string
             print_str = ''.join(print_str_list)
@@ -344,16 +352,16 @@ class MRegressor(_Classifier):
 
                 # calculate predictions for each pixel in a 2d array
                 out_arr[i * npx_tile:(i + 1) * npx_tile] = \
-                    self.classifier.predict(arr[i * npx_tile:(i + 1) * npx_tile, :])
+                    self.regressor.predict(arr[i * npx_tile:(i + 1) * npx_tile, :])
 
             if npx_last > 0:  # number of total pixels for the last tile
 
                 i = ntiles - 2
                 out_arr[i * npx_last:(i + 1) * npx_last] = \
-                    self.classifier.predict(arr[i * npx_last:(i + 1) * npx_last, :])
+                    self.regressor.predict(arr[i * npx_tile:(i * npx_tile + npx_last), :])
 
         else:
-            out_arr = self.classifier.predict(arr)
+            out_arr = self.regressor.predict(arr)
 
         if len(self.adjustment) > 0:
 
@@ -373,7 +381,7 @@ class MRegressor(_Classifier):
 
         if nodatavalue is not None:
             for ii in range(arr.shape[0]):
-                output[np.unique(np.where(arr[ii, :, :] == nodatavalue)[1])] = nodatavalue
+                output[np.unique(np.where(arr[ii, :, :] == nodatavalue)[0])] = nodatavalue
 
         return output
 
@@ -478,14 +486,14 @@ class MRegressor(_Classifier):
         self.adjustment['lower_limit'] = data_limits[1]
 
 
-class RFRegressor(_Classifier):
+class RFRegressor(_Regressor):
     """Random Forest Regressor class for scikit-learn Random Forest regressor"""
 
     time_it = False
 
     def __init__(self,
                  data=None,
-                 classifier=None,
+                 regressor=None,
                  trees=10,
                  samp_split=2,
                  samp_leaf=1,
@@ -496,7 +504,7 @@ class RFRegressor(_Classifier):
                  n_jobs=1,
                  **kwargs):
         """
-        Initialize RF classifier using class parameters
+        Initialize RF regressor using class parameters
         :param trees: Number of trees
         :param samp_split: Minimum number of samples for split
         :param oob_score: (bool) calculate out of bag score
@@ -506,17 +514,17 @@ class RFRegressor(_Classifier):
         """
 
         super(RFRegressor, self).__init__(data,
-                                          classifier)
+                                          regressor)
 
-        if self.classifier is None:
-            self.classifier = RandomForestRegressor(n_estimators=trees,
-                                                    max_depth=max_depth,
-                                                    min_samples_split=samp_split,
-                                                    min_samples_leaf=samp_leaf,
-                                                    max_features=max_feat,
-                                                    criterion=criterion,
-                                                    oob_score=oob_score,
-                                                    n_jobs=n_jobs)
+        if self.regressor is None:
+            self.regressor = RandomForestRegressor(n_estimators=trees,
+                                                   max_depth=max_depth,
+                                                   min_samples_split=samp_split,
+                                                   min_samples_leaf=samp_leaf,
+                                                   max_features=max_feat,
+                                                   criterion=criterion,
+                                                   oob_score=oob_score,
+                                                   n_jobs=n_jobs)
         self.trees = trees
         self.max_depth = max_depth
         self.samp_split = samp_split
@@ -532,10 +540,10 @@ class RFRegressor(_Classifier):
 
     def __repr__(self):
         # gather which attributes exist
-        attr_truth = [hasattr(self.classifier, 'estimators_'),
-                      hasattr(self.classifier, 'n_features_'),
-                      hasattr(self.classifier, 'n_outputs_'),
-                      hasattr(self.classifier, 'oob_score_')]
+        attr_truth = [hasattr(self.regressor, 'estimators_'),
+                      hasattr(self.regressor, 'n_features_'),
+                      hasattr(self.regressor, 'n_outputs_'),
+                      hasattr(self.regressor, 'oob_score_')]
 
         # if any exist print them
         if any(attr_truth):
@@ -544,16 +552,16 @@ class RFRegressor(_Classifier):
 
             # strings to be printed for each attribute
             if attr_truth[0]:
-                print_str_list.append("Estimators: {}\n".format(len(self.classifier.estimators_)))
+                print_str_list.append("Estimators: {}\n".format(len(self.regressor.estimators_)))
 
             if attr_truth[1]:
-                print_str_list.append("Features: {}\n".format(self.classifier.n_features_))
+                print_str_list.append("Features: {}\n".format(self.regressor.n_features_))
 
             if attr_truth[2]:
-                print_str_list.append("Output: {}\n".format(self.classifier.n_outputs_))
+                print_str_list.append("Output: {}\n".format(self.regressor.n_outputs_))
 
             if attr_truth[3]:
-                print_str_list.append("OOB Score: {:{w}.{p}f} %".format(self.classifier.oob_score_ * 100.0,
+                print_str_list.append("OOB Score: {:{w}.{p}f} %".format(self.regressor.oob_score_ * 100.0,
                                                                         w=3, p=2))
 
             # combine all strings into one print string
@@ -565,12 +573,96 @@ class RFRegressor(_Classifier):
             # if empty return empty
             return "<Random Forest Regressor: __empty__>"
 
+    @staticmethod
+    def regress_tile(arr,
+                     tile_start,
+                     tile_end,
+                     regressor,
+                     feature_index,
+                     npx_tile=1024*1024,
+                     nodatavalue=None,
+                     output_type='median',
+                     intvl=95.0):
+
+        """
+        Method to preocess each tile of the image internally
+        :param tile_start: pixel location of tile start
+        :param tile_end: pixel loation of tile end
+        :param arr: input array to process
+        :param regressor: RFRegressor
+        :param feature_index: List of list of feature indices corresponding to input array
+                              i.e. index of bands to be used for regression
+        :param npx_tile: numper to pixels in each tile
+        :param nodatavalue: No data value
+        :param output_type: Type of output to produce,
+                       choices: ['sd', 'var', 'pred', 'full', 'conf']
+                       where 'sd' is for standard deviation,
+                       'var' is for variance
+                       'median' is for median of tree outputs
+                       'mean' is for mean of tree coutputs
+                       'conf' stands for confidence interval
+        :param intvl: Prediction interval width (default: 95 percentile)
+        :return: numpy 1-D array
+        """
+        temp_arr = arr[tile_start:tile_end, feature_index]
+
+        out_tile = np.empty([tile_end - tile_start + 1]) * 0.0
+
+        if nodatavalue is not None:
+            out_tile += nodatavalue
+
+        tile_arr = np.array([list(range(0, npx_tile)) for _ in range(0, regressor.trees)], dtype=float)
+
+        # calculate tree predictions for each pixel in a 2d array
+        for jj, tree_ in enumerate(regressor.regressor.estimators_):
+            tile_arr[jj, :] = tree_.predict(temp_arr)
+
+        # calculate standard dev or variance or prediction for each tree
+        if output_type == 'sd':
+            temp_tile = np.std(tile_arr, axis=0)
+        elif output_type == 'var':
+            temp_tile = np.var(tile_arr, axis=0)
+        elif output_type == 'median':
+            temp_tile = np.median(tile_arr, axis=0)
+        elif output_type == 'mean':
+            temp_tile = np.mean(tile_arr, axis=0)
+        elif output_type == 'conf':
+            temp_tile = np.apply_along_axis(Sublist.pctl_interval, 0, tile_arr, intvl)
+        elif output_type == 'se':
+            temp_tile = 2.0 * (np.std(tile_arr, axis=0) / np.sqrt(regressor.trees))
+        elif output_type == 'full':
+            return tile_arr
+        else:
+            raise RuntimeError("Unknown output type or no output type specified")
+
+        if len(regressor.adjustment) > 0:
+
+            if 'gain' in regressor.adjustment:
+                temp_tile = temp_tile * regressor.adjustment['gain']
+
+            if 'bias' in regressor.adjustment:
+                temp_tile = temp_tile + regressor.adjustment['bias']
+
+            if 'upper_limit' in regressor.adjustment:
+                temp_tile[temp_tile > regressor.adjustment['upper_limit']] = regressor.adjustment['upper_limit']
+
+            if 'lower_limit' in regressor.adjustment:
+                temp_tile[temp_tile < regressor.adjustment['lower_limit']] = regressor.adjustment['lower_limit']
+
+        if nodatavalue is not None:
+            temp_tile[np.unique(np.where(temp_arr == nodatavalue)[0])] = nodatavalue
+            out_tile[np.where(out_tile == nodatavalue)] = temp_tile[np.where(out_tile == nodatavalue)]
+        else:
+            return temp_tile
+
+        return out_tile
+
     @Timer.timing(time_it)
     def predict(self,
                 arr,
                 ntile_max=9,
                 tile_size=128,
-                output='pred',
+                output_type='pred',
                 intvl=95.0,
                 **kwargs):
         """
@@ -585,11 +677,12 @@ class RFRegressor(_Classifier):
                           You can choose any (small) number that suits the available memory.
         :param tile_size: Size of each square tile (default = 128)
 
-        :param output: which output to produce,
+        :param output_type: which output to produce,
                        choices: ['sd', 'var', 'pred', 'full', 'conf']
                        where 'sd' is for standard deviation,
                        'var' is for variance
-                       'pred' is for prediction or mean of tree outputs
+                       'median' is for median of tree outputs
+                       'mean' is for mean of tree coutputs
                        'full' is for the full spectrum of the leaf nodes' prediction
                        'conf' stands for confidence interval
 
@@ -613,12 +706,10 @@ class RFRegressor(_Classifier):
                     nodatavalue = value
 
         # define output array
-        out_arr = Opt.__copy__(arr[:, 0]) * 0.0
-        arr_shp = out_arr.shape
-
-        full_arr = None
-        if output == 'full':
-            full_arr = np.empty([self.trees, arr_shp[0]])
+        if output_type == 'full':
+            out_arr = np.empty([self.trees, arr.shape[0]])
+        else:
+            out_arr = Opt.__copy__(arr[:, 0]) * 0.0
 
         # input image size
         npx_inp = long(arr.shape[0])  # number of pixels in input image
@@ -633,121 +724,74 @@ class RFRegressor(_Classifier):
         # are less than the specified number
         if ntiles > ntile_max:
 
-            # define tile array
-            tile_arr = np.array([list(range(0, npx_tile)) for _ in range(0, self.trees)], dtype=float)
-
             for i in range(0, ntiles - 1):
 
-                print('Processing tile {} of {}'.format(str(i+1), ntiles))
+                Opt.cprint('Processing tile {} of {}'.format(str(i+1), ntiles))
 
-                # calculate tree predictions for each pixel in a 2d array
-                for j, tree in enumerate(self.classifier.estimators_):
-                    temp = tree.predict(arr[i * npx_tile:(i + 1) * npx_tile, :])
-                    tile_arr[j, :] = temp
-
-                # calculate standard dev or variance or prediction for each tree
-                if output == 'sd':
-                    out_arr[i * npx_tile:(i + 1) * npx_tile] = np.std(tile_arr, axis=0)
-                elif output == 'var':
-                    out_arr[i * npx_tile:(i + 1) * npx_tile] = np.var(tile_arr, axis=0)
-                elif output == 'pred':
-                    out_arr[i * npx_tile:(i + 1) * npx_tile] = np.median(tile_arr, axis=0)
-
-                elif output == 'full':
-                    full_arr[:, i * npx_tile:(i + 1) * npx_tile] = tile_arr
-
-                elif output == 'conf':
-                    out_arr[i * npx_tile:(i + 1) * npx_tile] = \
-                        np.apply_along_axis(Sublist.pctl_interval, 0, tile_arr, intvl)
-                elif output == 'se':
-                    out_arr[i * npx_tile:(i + 1) * npx_tile] = 2.0 * (np.std(tile_arr, axis=0)/np.sqrt(self.trees))
-
+                if output_type == 'full':
+                    out_arr[:, i * npx_tile:(i + 1) * npx_tile] = self.regress_tile(arr,
+                                                                                    i * npx_tile,
+                                                                                    (i + 1) * npx_tile,
+                                                                                    self,
+                                                                                    self.feature_index,
+                                                                                    npx_tile=npx_tile,
+                                                                                    nodatavalue=nodatavalue,
+                                                                                    output_type=output_type,
+                                                                                    intvl=intvl)
                 else:
-                    raise RuntimeError("No output type specified")
+                    out_arr[i * npx_tile:(i + 1) * npx_tile] = self.regress_tile(arr,
+                                                                                 i * npx_tile,
+                                                                                 (i + 1) * npx_tile,
+                                                                                 self,
+                                                                                 self.feature_index,
+                                                                                 npx_tile=npx_tile,
+                                                                                 nodatavalue=nodatavalue,
+                                                                                 output_type=output_type,
+                                                                                 intvl=intvl)
 
             if npx_last > 0:  # number of total pixels for the last tile
 
                 i = ntiles - 2
 
-                tile_arr = np.array([list(range(0, npx_last)) for _ in range(0, self.trees)], dtype=float)
+                Opt.cprint('Processing tile {} of {}'.format(str(i+2), ntiles))
 
-                print('Processing tile {} of {}'.format(str(i+1), ntiles))
-
-                # calculate tree predictions for each pixel in a 2d array
-                for j, tree in enumerate(self.classifier.estimators_):
-                    temp = tree.predict(arr[i * npx_tile:(i * npx_tile + npx_last), :])
-                    tile_arr[j, :] = temp
-
-                # calculate standard dev or variance or prediction for each tree
-                if output == 'sd':
-                    out_arr[i * npx_tile:(i * npx_tile + npx_last)] = np.std(tile_arr, axis=0)
-                elif output == 'var':
-                    out_arr[i * npx_tile:(i * npx_tile + npx_last)] = np.var(tile_arr, axis=0)
-                elif output == 'pred':
-                    out_arr[i * npx_tile:(i * npx_tile + npx_last)] = np.mean(tile_arr, axis=0)
-
-                elif output == 'full':
-                    full_arr[:, i * npx_tile:(i * npx_tile + npx_last)] = tile_arr
-
-                elif output == 'conf':
-                    out_arr[i * npx_tile:(i * npx_tile + npx_last)] = \
-                        np.apply_along_axis(Sublist.pctl_interval, 0, tile_arr, intvl)
-                elif output == 'se':
-                    out_arr[i * npx_tile:(i * npx_tile + npx_last)] = \
-                        2.0 * (np.std(tile_arr, axis=0)/np.sqrt(self.trees))
-
+                if output_type == 'full':
+                    out_arr[:, i * npx_tile:(i * npx_tile + npx_last)] = self.regress_tile(arr,
+                                                                                           i * npx_tile,
+                                                                                           (i + 1) * npx_tile,
+                                                                                           self,
+                                                                                           self.feature_index,
+                                                                                           npx_tile=npx_tile,
+                                                                                           nodatavalue=nodatavalue,
+                                                                                           output_type=output_type,
+                                                                                           intvl=intvl)
                 else:
-                    raise RuntimeError("No output type specified")
-        else:
-
-            # initialize output array
-            tree_pred_arr = np.array([list(range(0, arr.shape[0])) for _ in range(0, self.trees)], dtype=float)
-
-            # calculate tree predictions for each pixel in a 2d array
-            for i, tree in enumerate(self.classifier.estimators_):
-                tree_pred_arr[i, :] = tree.predict(arr)
-
-            # calculate standard dev or variance or prediction for each tree
-            if output == 'sd':
-                out_arr = np.std(tree_pred_arr, axis=0)
-            elif output == 'var':
-                out_arr = np.var(tree_pred_arr, axis=0)
-            elif output == 'pred':
-                out_arr = np.mean(tree_pred_arr, axis=0)
-
-            elif output == 'full':
-                full_arr = tree_pred_arr
-
-            elif output == 'conf':
-                out_arr = \
-                    np.apply_along_axis(Sublist.pctl_interval, 0, tree_pred_arr, intvl)
-            elif output == 'se':
-                out_arr = 2.0 * (np.std(tree_pred_arr, axis=0) / np.sqrt(self.trees))
-
-            else:
-                raise RuntimeError("No output type specified")
-
-        if output == 'full':
-
-            if len(self.adjustment) > 0:
-                print('Applying model adjustments ...')
-
-                if 'gain' in self.adjustment:
-                    full_arr = full_arr * self.adjustment['gain']
-
-                if 'bias' in self.adjustment:
-                    full_arr = full_arr + self.adjustment['bias']
-
-                if 'upper_limit' in self.adjustment:
-                    full_arr[full_arr > self.adjustment['upper_limit']] = self.adjustment['upper_limit']
-
-                if 'lower_limit' in self.adjustment:
-                    full_arr[full_arr < self.adjustment['lower_limit']] = self.adjustment['lower_limit']
-
-            output = full_arr
+                    out_arr[i * npx_tile:(i * npx_tile + npx_last)] = self.regress_tile(arr,
+                                                                                        i * npx_tile,
+                                                                                        (i + 1) * npx_tile,
+                                                                                        self,
+                                                                                        self.feature_index,
+                                                                                        npx_tile=npx_tile,
+                                                                                        nodatavalue=nodatavalue,
+                                                                                        output_type=output_type,
+                                                                                        intvl=intvl)
 
         else:
 
+            out_arr = self.regress_tile(arr,
+                                        0,
+                                        npx_inp - 1,
+                                        self,
+                                        self.feature_index,
+                                        npx_tile=npx_tile,
+                                        nodatavalue=nodatavalue,
+                                        output_type=output_type,
+                                        intvl=intvl)
+
+        if output_type == 'full':
+            if nodatavalue is not None:
+                out_arr[:, np.unique(np.where(arr == nodatavalue)[0])] = nodatavalue
+        else:
             if len(self.adjustment) > 0:
 
                 if 'gain' in self.adjustment:
@@ -762,12 +806,10 @@ class RFRegressor(_Classifier):
                 if 'lower_limit' in self.adjustment:
                     out_arr[out_arr < self.adjustment['lower_limit']] = self.adjustment['lower_limit']
 
-            output = out_arr
+            if nodatavalue is not None:
+                out_arr[np.unique(np.where(arr == nodatavalue)[0])] = nodatavalue
 
-        if nodatavalue is not None:
-            output[np.unique(np.where(arr == nodatavalue)[1])] = nodatavalue
-
-        return output
+        return out_arr
 
     def sample_predictions(self,
                            data,
@@ -775,7 +817,7 @@ class RFRegressor(_Classifier):
                            outfile=None,
                            **kwargs):
         """
-        Get tree predictions from the RF classifier
+        Get tree predictions from the RF regressor
         :param data: Dictionary object from Samples.format_data
         :param picklefile: Random Forest pickle file
         :param outfile: output csv file name
@@ -920,7 +962,7 @@ class RFRegressor(_Classifier):
         """
 
         return [(band, importance) for band, importance in
-                zip(self.data['feature_names'], self.classifier.feature_importances_)]
+                zip(self.data['feature_names'], self.regressor.feature_importances_)]
 
     def get_training_fit(self,
                          regress_limit=None):
@@ -968,3 +1010,268 @@ class RFRegressor(_Classifier):
         self.adjustment['gain'] = (1.0 / self.training_results['slope'])*over_adjust
         self.adjustment['upper_limit'] = data_limits[0]
         self.adjustment['lower_limit'] = data_limits[1]
+
+
+class HRFRegressor(RFRegressor):
+
+    """
+    Hierarchical Random Forest Regressor
+    """
+
+    time_it = False
+
+    def __init__(self,
+                 data=None,
+                 regressor=None,
+                 **kwargs):
+
+        super(RFRegressor, self).__init__(data,
+                                          regressor)
+        if type(regressor).__name__ not in ('list', 'tuple'):
+            regressor = [regressor]
+
+        if type(data).__name__ not in ('list', 'tuple'):
+            data = [data]
+
+        feature_list_ = list(reg.features for reg in regressor)
+        feature_index_ = list(reversed(sorted(range(len(feature_list_)),
+                                              key=lambda x: len(feature_list_[x]))))
+
+        self.regressor = list(regressor[idx] for idx in feature_index_)
+        self.data = list(data[idx] for idx in feature_index_)
+        self.features = list(feature_list_[idx] for idx in feature_index_)
+        self.feature_index = None
+
+    def __repr__(self):
+
+        if self.regressor is None:
+            repr_regressor = ['<empty>']
+        elif type(self.regressor).__name__ in ('list', 'tuple'):
+            repr_regressor = list(regressor.__repr__() for regressor in self.regressor)
+        else:
+            repr_regressor = [self.regressor.__repr__()]
+
+        return "Hierarchical regressor object" + \
+            "\n---\n  Regressors: \n{}".format(list('\n'.join(repr_regressor))) + \
+            "\n---"
+
+    @Timer.timing(time_it)
+    def regress_raster(self,
+                       raster_obj,
+                       outfile=None,
+                       outdir=None,
+                       band_name='prediction',
+                       output_type='median',
+                       out_data_type=gdal.GDT_Float32,
+                       nodatavalue=-32768.0,
+                       **kwargs):
+
+        """Tree variance from the RF regressor
+        :param raster_obj: Initialized Raster object with a 3d array
+        :param outfile: name of output file
+        :param out_data_type: output raster data type
+        :param nodatavalue: No data value for output raster
+        :param band_name: Name of the output raster band
+        :param outdir: output folder
+        :param output_type: Should the output be standard deviation ('sd'),
+                            variance ('var'), or prediction ('pred'),
+                            or 'conf' for confidence interval
+        :returns: Output as raster object
+        """
+        self.feature_index = list(list(raster_obj.bnames.index(feat) for feat in feat_grp)
+                                  for feat_grp in self.features)
+
+        _Regressor.regress_raster(self,
+                                  raster_obj,
+                                  outfile=outfile,
+                                  outdir=outdir,
+                                  band_name=band_name,
+                                  output_type=output_type,
+                                  out_data_type=out_data_type,
+                                  nodatavalue=nodatavalue,
+                                  **kwargs)
+
+    @staticmethod
+    def regress_tile(arr,
+                     tile_start,
+                     tile_end,
+                     regressors,
+                     feature_index,
+                     npx_tile=1024*1024,
+                     nodatavalue=None,
+                     output_type='median',
+                     intvl=95.0):
+
+        """
+        Method to preocess each tile of the image internally
+        :param tile_start: pixel location of tile start
+        :param tile_end: pixel loation of tile end
+        :param arr: input array to process
+        :param regressors: list of _Regressor objects, usually RFRegressor
+        :param feature_index: List of list of feature indices corresponding to input array
+                              i.e. index of bands to be used for regression
+        :param npx_tile: numper to pixels in each tile
+        :param nodatavalue: No data value
+        :param output_type: Type of output to produce,
+                       choices: ['sd', 'var', 'pred', 'full', 'conf']
+                       where 'sd' is for standard deviation,
+                       'var' is for variance
+                       'median' is for median of tree outputs
+                       'mean' is for mean of tree coutputs
+                       'conf' stands for confidence interval
+        :param intvl: Prediction interval width (default: 95 percentile)
+        :return: numpy 1-D array
+        """
+
+        out_tile = np.empty([tile_end - tile_start + 1]) * 0.0
+        if nodatavalue is not None:
+            out_tile += nodatavalue
+
+        if type(regressors).__name__ not in ('list', 'tuple'):
+            regressors = [regressors]
+
+        for ii, regressor in enumerate(regressors):
+
+            Opt.cprint(' . {}'.format(str(ii + 1)))
+
+            temp_arr = arr[tile_start:tile_end, feature_index[ii]]
+            tile_arr = np.array([list(range(0, npx_tile)) for _ in range(0, regressor.trees)], dtype=float)
+
+            # calculate tree predictions for each pixel in a 2d array
+            for jj, tree_ in enumerate(regressor.regressor.estimators_):
+                tile_arr[jj, :] = tree_.predict(temp_arr)
+
+            # calculate standard dev or variance or prediction for each tree
+            if output_type == 'sd':
+                temp_tile = np.std(tile_arr, axis=0)
+            elif output_type == 'var':
+                temp_tile = np.var(tile_arr, axis=0)
+            elif output_type == 'median':
+                temp_tile = np.median(tile_arr, axis=0)
+            elif output_type == 'mean':
+                temp_tile = np.mean(tile_arr, axis=0)
+            elif output_type == 'conf':
+                temp_tile = np.apply_along_axis(Sublist.pctl_interval, 0, tile_arr, intvl)
+            elif output_type == 'se':
+                temp_tile = 2.0 * (np.std(tile_arr, axis=0) / np.sqrt(regressor.trees))
+            else:
+                raise RuntimeError("Unknown output type or no output type specified")
+
+            if len(regressor.adjustment) > 0:
+
+                if 'gain' in regressor.adjustment:
+                    temp_tile = temp_tile * regressor.adjustment['gain']
+
+                if 'bias' in regressor.adjustment:
+                    temp_tile = temp_tile + regressor.adjustment['bias']
+
+                if 'upper_limit' in regressor.adjustment:
+                    temp_tile[temp_tile > regressor.adjustment['upper_limit']] = regressor.adjustment['upper_limit']
+
+                if 'lower_limit' in regressor.adjustment:
+                    temp_tile[temp_tile < regressor.adjustment['lower_limit']] = regressor.adjustment['lower_limit']
+
+            if nodatavalue is not None:
+                temp_tile[np.unique(np.where(temp_arr == nodatavalue)[0])] = nodatavalue
+                out_tile[np.where(out_tile == nodatavalue)] = temp_tile[np.where(out_tile == nodatavalue)]
+            else:
+                return temp_tile
+
+        return out_tile
+
+    def predict(self,
+                arr,
+                ntile_max=5,
+                tile_size=1024,
+                output_type='median',
+                intvl=95.0,
+                **kwargs):
+        """
+        Calculate random forest model prediction, variance, or standard deviation.
+        Variance or standard deviation is calculated across all trees.
+        Tiling is necessary in this step because large numpy arrays can cause
+        memory issues during creation.
+
+        :param arr: input 2d array (axis 0: features (pixels), axis 1: bands)
+        :param ntile_max: Maximum number of tiles up to which the
+                          input image or array is processed without tiling (default = 9).
+                          You can choose any (small) number that suits the available memory.
+        :param tile_size: Size of each square tile (default = 128)
+
+        :param output_type: which output to produce,
+                       choices: ['sd', 'var', 'pred', 'full', 'conf']
+                       where 'sd' is for standard deviation,
+                       'var' is for variance
+                       'median' is for median of tree outputs
+                       'mean' is for mean of tree coutputs
+                       'conf' stands for confidence interval
+
+        :param intvl: Prediction interval width (default: 95 percentile)
+        :return: 1d image array (that will need reshaping if image output)
+        """
+
+        nodatavalue = None
+
+        if kwargs is not None:
+            for key, value in kwargs.items():
+                if key == 'nodatavalue':
+                    nodatavalue = value
+
+        # define output array
+        out_arr = Opt.__copy__(arr[:, 0]) * 0.0
+        if nodatavalue is not None:
+            out_arr += nodatavalue
+
+        # input image size
+        npx_inp = long(arr.shape[0])  # number of pixels in input image
+        nb_inp = long(arr.shape[1])  # number of bands in input image
+
+        # size of tiles
+        npx_tile = long(tile_size * tile_size)  # pixels in each tile
+        npx_last = npx_inp % npx_tile  # pixels in last tile
+        ntiles = long(npx_inp) / long(npx_tile) + 1  # total tiles
+
+        if ntiles > ntile_max:
+
+            for i in range(0, ntiles - 1):
+
+                Opt.cprint('Processing tile {} of {}'.format(str(i + 1), ntiles), newline='')
+
+                out_arr[i * npx_tile:(i + 1) * npx_tile] = self.regress_tile(arr,
+                                                                             i * npx_tile,
+                                                                             (i + 1) * npx_tile,
+                                                                             self.regressor,
+                                                                             self.feature_index,
+                                                                             npx_tile=npx_tile,
+                                                                             nodatavalue=nodatavalue,
+                                                                             output_type=output_type,
+                                                                             intvl=intvl)
+
+            if npx_last > 0:
+
+                i = ntiles - 2
+                Opt.cprint('Processing tile {} of {}'.format(str(i + 2), ntiles), newline='')
+
+                out_arr[i * npx_tile:(i * npx_tile + npx_last)] = self.regress_tile(arr,
+                                                                                    i * npx_tile,
+                                                                                    i * npx_tile + npx_last,
+                                                                                    self.regressor,
+                                                                                    self.feature_index,
+                                                                                    npx_tile=npx_last,
+                                                                                    nodatavalue=nodatavalue,
+                                                                                    output_type=output_type,
+                                                                                    intvl=intvl)
+        else:
+            Opt.cprint('Processing image as one tile', newline='')
+
+            out_arr = self.regress_tile(arr,
+                                        0,
+                                        npx_inp - 1,
+                                        self.regressor,
+                                        self.feature_index,
+                                        npx_tile=npx_last,
+                                        nodatavalue=nodatavalue,
+                                        output_type=output_type,
+                                        intvl=intvl)
+
+        return out_arr
