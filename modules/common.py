@@ -1068,8 +1068,9 @@ class Opt:
         Opt.cprint('')
 
     @staticmethod
-    def cprint(text):
-        sys.stdout.write(str(text) + '\n')
+    def cprint(text,
+               newline='\n'):
+        sys.stdout.write(str(text) + newline)
         sys.stdout.flush()
 
     @staticmethod
