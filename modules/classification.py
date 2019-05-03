@@ -615,7 +615,7 @@ class RFRegressor(_Regressor):
 
         temp_arr = arr[tile_start:tile_end, feature_index]
 
-        out_tile = np.empty([tile_end - tile_start + 1]) * 0.0
+        out_tile = np.empty([tile_end - tile_start]) * 0.0
 
         tile_arr = np.array([list(range(0, npx_tile)) for _ in range(0, regressor.trees)], dtype=float)
 
@@ -1137,7 +1137,7 @@ class HRFRegressor(RFRegressor):
                        where 'sd' is for standard deviation,
                        'var' is for variance
                        'median' is for median of tree outputs
-                       'mean' is for mean of tree coutputs
+                       'mean' is for mean of tree outputs
                        'conf' stands for confidence interval
         :param intvl: Prediction interval width (default: 95 percentile)
         :param min_variance: Minimum variance after which to cutoff
@@ -1146,12 +1146,14 @@ class HRFRegressor(RFRegressor):
         if min_variance is None:
             min_variance = 0.05 * np.min(arr.astype(np.float32))
 
-        out_tile = np.empty([tile_end - tile_start + 1]) * 0.0
+        out_tile = np.empty([tile_end - tile_start]) * 0.0
         if nodatavalue is not None:
             out_tile += nodatavalue
 
         for ii, regressor in enumerate(regressors):
             Opt.cprint(' . {}'.format(str(ii + 1)))
+
+            temp_tile = np.empty([tile_end - tile_start]) * 0.0
 
             temp_arr = arr[tile_start:tile_end, feature_index[ii]]
             tile_arr = np.array([list(range(0, npx_tile)) for _ in range(0, regressor.trees)], dtype=float)
@@ -1163,9 +1165,9 @@ class HRFRegressor(RFRegressor):
                     tile_arr[jj, :] = tree_.predict(temp_arr)
 
                 if output_type == 'median':
-                    out_tile = np.median(tile_arr, axis=0)
+                    temp_tile = np.median(tile_arr, axis=0)
                 elif output_type == 'mean':
-                    out_tile = np.mean(tile_arr, axis=0)
+                    temp_tile = np.mean(tile_arr, axis=0)
                 elif output_type == 'full':
                     return tile_arr
 
@@ -1178,37 +1180,38 @@ class HRFRegressor(RFRegressor):
 
                     var_tree[var_tree < min_variance] = min_variance
                     mean_tree = tree_.predict(temp_arr)
-                    out_tile += var_tree + mean_tree ** 2
+                    temp_tile += var_tree + mean_tree ** 2
 
                 predictions = np.mean(tile_arr, axis=0)
 
-                out_tile /= len(regressor.regressor.estimators_)
-                out_tile -= predictions ** 2.0
-                out_tile[out_tile < 0.0] = 0.0
+                temp_tile /= len(regressor.regressor.estimators_)
+                temp_tile -= predictions ** 2.0
+                temp_tile[temp_tile < 0.0] = 0.0
 
                 if output_type == 'var':
-                    return out_tile
+                    return temp_tile
                 elif output_type == 'sd':
-                    return out_tile ** 0.5
+                    return temp_tile ** 0.5
             else:
                 raise RuntimeError("Unknown output type or no output type specified")
 
             if len(regressor.adjustment) > 0:
 
                 if 'gain' in regressor.adjustment:
-                    out_tile = out_tile * regressor.adjustment['gain']
+                    temp_tile = temp_tile * regressor.adjustment['gain']
 
                 if 'bias' in regressor.adjustment:
-                    out_tile = out_tile + regressor.adjustment['bias']
+                    temp_tile = temp_tile + regressor.adjustment['bias']
 
                 if 'upper_limit' in regressor.adjustment:
-                    out_tile[out_tile > regressor.adjustment['upper_limit']] = regressor.adjustment['upper_limit']
+                    temp_tile[temp_tile > regressor.adjustment['upper_limit']] = regressor.adjustment['upper_limit']
 
                 if 'lower_limit' in regressor.adjustment:
-                    out_tile[out_tile < regressor.adjustment['lower_limit']] = regressor.adjustment['lower_limit']
+                    temp_tile[temp_tile < regressor.adjustment['lower_limit']] = regressor.adjustment['lower_limit']
 
             if nodatavalue is not None:
-                out_tile[np.unique(np.where(temp_arr == nodatavalue)[0])] = nodatavalue
+                temp_tile[np.unique(np.where(temp_arr == nodatavalue)[0])] = nodatavalue
+                out_tile[np.where(out_tile == nodatavalue)] = temp_tile[np.where(out_tile == nodatavalue)]
 
         return out_tile
 
