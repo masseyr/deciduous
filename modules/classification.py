@@ -610,6 +610,9 @@ class RFRegressor(_Regressor):
         :param min_variance: Minimum variance after which to cutoff
         :return: numpy 1-D array
         """
+        if min_variance is None:
+            min_variance = 0.05 * np.min(arr.astype(np.float32))
+
         temp_arr = arr[tile_start:tile_end, feature_index]
 
         out_tile = np.empty([tile_end - tile_start + 1]) * 0.0
