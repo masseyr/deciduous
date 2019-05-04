@@ -465,9 +465,9 @@ class MRegressor(_Regressor):
                              over_adjust=1.0):
         """
         get the model adjustment parameters based on training fit
-        :param clip:
-        :param data_limits:
-        :param over_adjust
+        :param clip: ratio of the data to be clipped from either ends to fit a constraining regression
+        :param data_limits: minimum and maximum value of the output
+        :param over_adjust: factor to multiply the final output with
 
         :return: None
         """
