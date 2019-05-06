@@ -210,39 +210,51 @@ class _Regressor(object):
         Calculate linear regression attributes
         :param x: Vector of independent variables
         :param y: Vector of dependent variables
-        :param xlim: 2 element list [lower limit, upper limit] of starting and ending values for x vector
-        :param ylim: 2 element list [lower limit, upper limit] of starting and ending values for y vector
+        :param xlim: 2 element list or tuple [lower limit, upper limit] of starting and ending values for x vector
+        :param ylim: 2 element list or tuple [lower limit, upper limit] of starting and ending values for y vector
         """
 
-        if xlim is not None:
-            value_arr = list(xlim[0] <= elem <= xlim[1] for elem in x)
-            if not any(value_arr):
-                raise ValueError("Minimum or maximum argument for regression outside data limits")
+        xindex = list()
+        yindex = list()
 
-            x_index_list = Sublist(x).range(*xlim,
-                                            index=True)
-            x = list(x[i] for i in x_index_list)
-            y = list(y[i] for i in x_index_list)
+        if xlim is not None:
+
+            for ii, elem in enumerate(x):
+                if xlim[0] <= elem <= xlim[1]:
+                    xindex.append(ii)
+
+            if not any(xindex):
+                raise ValueError("Minimum or maximum argument for x outside data limits")
 
         if ylim is not None:
-            value_arr = list(ylim[0] <= elem <= ylim[1] for elem in y)
-            if not any(value_arr):
-                raise ValueError("Minimum or maximum argument for regression outside data limits")
 
-            y_index_list = Sublist(y).range(*ylim,
-                                            index=True)
-            x = list(x[i] for i in y_index_list)
-            y = list(y[i] for i in y_index_list)
+            for ii, elem in enumerate(y):
+                if ylim[0] <= elem <= ylim[1]:
+                    yindex.append(ii)
 
-        slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
+            if not any(yindex):
+                raise ValueError("Minimum or maximum argument for y outside data limits")
+
+        samp_index = sorted(list(set(xindex + yindex)))
+
+        if len(samp_index) == 0:
+            samp_index = range(len(x))
+
+        x_ = list(x[ii] for ii in samp_index)
+        y_ = list(y[ii] for ii in samp_index)
+
+        slope, intercept, r_value, p_value, std_err = stats.linregress(x_, y_)
         rsq = r_value ** 2
-        return {
+
+        out_dict = {
             'rsq': rsq,
             'slope': slope,
             'intercept': intercept,
             'pval': p_value,
             'stderr': std_err
         }
+
+        return out_dict
 
 
 class MRegressor(_Regressor):
@@ -466,17 +478,16 @@ class MRegressor(_Regressor):
         """
         get the model adjustment parameters based on training fit
         :param clip: ratio of the data to be clipped from either ends to fit a constraining regression
-        :param data_limits: minimum and maximum value of the output
+        :param data_limits: minimum and maximum value of the output, tuple
         :param over_adjust: factor to multiply the final output with
 
         :return: None
         """
-
         if data_limits is None:
-            data_limits = [max(self.data['labels']), min(self.data['labels'])]
+            data_limits = [min(self.data['labels']), max(self.data['labels'])]
 
-        regress_limit = [clip * data_limits[0],
-                         (1.0 - clip) * data_limits[0]]
+        regress_limit = [data_limits[0] + clip * (data_limits[1]-data_limits[0]),
+                         data_limits[1] - clip * (data_limits[1]-data_limits[0])]
 
         self.get_training_fit(regress_limit=regress_limit)
 
@@ -484,8 +495,9 @@ class MRegressor(_Regressor):
             self.adjustment['bias'] = -1.0 * (self.training_results['intercept'] / self.training_results['slope'])
 
         self.adjustment['gain'] = (1.0 / self.training_results['slope']) * over_adjust
-        self.adjustment['upper_limit'] = data_limits[0]
-        self.adjustment['lower_limit'] = data_limits[1]
+
+        self.adjustment['lower_limit'] = data_limits[0]
+        self.adjustment['upper_limit'] = data_limits[1]
 
 
 class RFRegressor(_Regressor):
@@ -590,21 +602,21 @@ class RFRegressor(_Regressor):
                      min_variance=0.01):
 
         """
-        Method to preocess each tile of the image internally
+        Method to preprocess each tile of the image internally
         :param tile_start: pixel location of tile start
-        :param tile_end: pixel loation of tile end
+        :param tile_end: pixel location of tile end
         :param arr: input array to process
         :param regressor: RFRegressor
         :param feature_index: List of list of feature indices corresponding to input array
                               i.e. index of bands to be used for regression
-        :param npx_tile: numper to pixels in each tile
+        :param npx_tile: number of pixels in each tile
         :param nodatavalue: No data value
         :param output_type: Type of output to produce,
                        choices: ['sd', 'var', 'pred', 'full', 'conf']
                        where 'sd' is for standard deviation,
                        'var' is for variance
                        'median' is for median of tree outputs
-                       'mean' is for mean of tree coutputs
+                       'mean' is for mean of tree outputs
                        'conf' stands for confidence interval
         :param intvl: Prediction interval width (default: 95 percentile)
         :param min_variance: Minimum variance after which to cutoff
@@ -649,10 +661,8 @@ class RFRegressor(_Regressor):
             out_tile -= predictions ** 2.0
             out_tile[out_tile < 0.0] = 0.0
 
-            if output_type == 'var':
-                return out_tile
-            elif output_type == 'sd':
-                return out_tile ** 0.5
+            if output_type == 'sd':
+                out_tile = out_tile ** 0.5
         else:
             raise RuntimeError("Unknown output type or no output type specified")
 
@@ -679,8 +689,8 @@ class RFRegressor(_Regressor):
     def predict(self,
                 arr,
                 ntile_max=5,
-                tile_size=1024,
-                output_type='pred',
+                tile_size=128,
+                output_type='median',
                 intvl=95.0,
                 **kwargs):
         """
@@ -776,20 +786,20 @@ class RFRegressor(_Regressor):
                 if output_type == 'full':
                     out_arr[:, i * npx_tile:(i * npx_tile + npx_last)] = self.regress_tile(arr,
                                                                                            i * npx_tile,
-                                                                                           (i + 1) * npx_tile,
+                                                                                           i * npx_tile + npx_last,
                                                                                            self,
                                                                                            self.feature_index,
-                                                                                           npx_tile=npx_tile,
+                                                                                           npx_tile=npx_last,
                                                                                            nodatavalue=nodatavalue,
                                                                                            output_type=output_type,
                                                                                            intvl=intvl)
                 else:
                     out_arr[i * npx_tile:(i * npx_tile + npx_last)] = self.regress_tile(arr,
                                                                                         i * npx_tile,
-                                                                                        (i + 1) * npx_tile,
+                                                                                        i * npx_tile + npx_last,
                                                                                         self,
                                                                                         self.feature_index,
-                                                                                        npx_tile=npx_tile,
+                                                                                        npx_tile=npx_last,
                                                                                         nodatavalue=nodatavalue,
                                                                                         output_type=output_type,
                                                                                         intvl=intvl)
@@ -798,34 +808,13 @@ class RFRegressor(_Regressor):
 
             out_arr = self.regress_tile(arr,
                                         0,
-                                        npx_inp - 1,
+                                        npx_inp,
                                         self,
                                         self.feature_index,
-                                        npx_tile=npx_tile,
+                                        npx_tile=npx_inp,
                                         nodatavalue=nodatavalue,
                                         output_type=output_type,
                                         intvl=intvl)
-
-        if output_type == 'full':
-            if nodatavalue is not None:
-                out_arr[:, np.unique(np.where(arr == nodatavalue)[0])] = nodatavalue
-        else:
-            if len(self.adjustment) > 0:
-
-                if 'gain' in self.adjustment:
-                    out_arr = out_arr * self.adjustment['gain']
-
-                if 'bias' in self.adjustment:
-                    out_arr = out_arr + self.adjustment['bias']
-
-                if 'upper_limit' in self.adjustment:
-                    out_arr[out_arr > self.adjustment['upper_limit']] = self.adjustment['upper_limit']
-
-                if 'lower_limit' in self.adjustment:
-                    out_arr[out_arr < self.adjustment['lower_limit']] = self.adjustment['lower_limit']
-
-            if nodatavalue is not None:
-                out_arr[np.unique(np.where(arr == nodatavalue)[0])] = nodatavalue
 
         return out_arr
 
@@ -883,26 +872,15 @@ class RFRegressor(_Regressor):
                                     output='sd')
 
         # calculate sd of tree predictions
-        se_y = None
-        if 'se_y' in kwargs:
+        mean = None
+        if 'mean' in kwargs:
             if kwargs['se_y']:
-                se_y = self.predict(np.array(data['features']),
-                                    output='se')
+                mean = self.predict(np.array(data['features']),
+                                    output='mean')
 
-        conf_y = None
-        if 'conf_y' in kwargs:
-            if kwargs['conf_y']:
-                if 'intvl' in kwargs:
-                    intvl = kwargs['intvl']
-                else:
-                    intvl = 95.0
-                conf_y = self.predict(np.array(data['features']),
-                                      intvl=intvl,
-                                      output='conf')
-
-        # calculate mean of tree predictions
+        # calculate median tree predictions
         pred_y = self.predict(np.array(data['features']),
-                              output='pred')
+                              output='median')
 
         # rms error of the predicted versus actual
         rmse = sqrt(mean_squared_error(data['labels'], pred_y))
@@ -942,11 +920,8 @@ class RFRegressor(_Regressor):
             if sd_y is not None:
                 out_list.append('sd_y,' + ', '.join([str(elem) for elem in sd_y]))
 
-            if conf_y is not None:
-                out_list.append('conf_y,' + ', '.join([str(elem) for elem in conf_y]))
-
-            if se_y is not None:
-                out_list.append('se_y,' + ', '.join([str(elem) for elem in se_y]))
+            if mean is not None:
+                out_list.append('mean,' + ', '.join([str(elem) for elem in mean]))
 
             # write the list to file
             Handler(filename=outfile).write_list_to_file(out_list)
@@ -968,10 +943,8 @@ class RFRegressor(_Regressor):
             out_dict['var_y'] = var_y
         if sd_y is not None:
             out_dict['sd_y'] = sd_y
-        if conf_y is not None:
-            out_dict['conf_y'] = conf_y
-        if se_y is not None:
-            out_dict['se_y'] = se_y
+        if mean is not None:
+            out_dict['mean'] = mean
 
         return out_dict
 
@@ -1009,26 +982,27 @@ class RFRegressor(_Regressor):
                              over_adjust=1.0):
         """
         get the model adjustment parameters based on training fit
-        :param clip: Ratio of samples not to be used at each tailend
-        :param data_limits: Limits of output data
-        :param over_adjust: Amount of over adjustment needed to slope
+        :param clip: Ratio of samples not to be used at each tail end
+        :param data_limits: tuple of (min, max) limits of output data
+        :param over_adjust: Amount of over adjustment needed to adjust slope of the output data
         :return: None
         """
 
         if data_limits is None:
-            data_limits = [max(self.data['labels']), min(self.data['labels'])]
+            data_limits = [min(self.data['labels']), max(self.data['labels'])]
 
-        regress_limit = [clip * data_limits[0],
-                         (1.0-clip) * data_limits[0]]
+        regress_limit = [data_limits[0] + clip * (data_limits[1]-data_limits[0]),
+                         data_limits[1] - clip * (data_limits[1]-data_limits[0])]
 
         self.get_training_fit(regress_limit=regress_limit)
 
         if self.training_results['intercept'] > regress_limit[0]:
             self.adjustment['bias'] = -1.0 * (self.training_results['intercept'] / self.training_results['slope'])
 
-        self.adjustment['gain'] = (1.0 / self.training_results['slope'])*over_adjust
-        self.adjustment['upper_limit'] = data_limits[0]
-        self.adjustment['lower_limit'] = data_limits[1]
+        self.adjustment['gain'] = (1.0 / self.training_results['slope']) * over_adjust
+
+        self.adjustment['lower_limit'] = data_limits[0]
+        self.adjustment['upper_limit'] = data_limits[1]
 
 
 class HRFRegressor(RFRegressor):
