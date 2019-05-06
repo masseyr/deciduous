@@ -382,7 +382,8 @@ class Sublist(list):
         return self.percentile(self, pctl=50)
 
     @staticmethod
-    def percentile(arr, pctl=95.0):
+    def percentile(arr,
+                   pctl=95.0):
         """
         Method to output percentile in an array
         :param arr: input numpy array or iterable
@@ -390,13 +391,7 @@ class Sublist(list):
         :return:
         """
 
-        pctl_calc = np.percentile(arr, pctl)
-        diff = np.abs(np.array(arr) - pctl_calc)
-        closest_vals = np.array(arr)[diff == min(diff)]
-        if len(closest_vals) > 1:
-            return min(closest_vals)
-        else:
-            return closest_vals.item()
+        return np.percentile(arr, pctl, interpolation='nearest')
 
     @staticmethod
     def pctl_interval(arr, intvl=95.0):
@@ -406,11 +401,19 @@ class Sublist(list):
         :param intvl: Interval to calculate (default: 95th percentile)
         :return: scalar
         """
-
         lower = Sublist.percentile(arr, (100.0 - intvl)/2.0)
         upper = Sublist.percentile(arr, 100.0 - (100.0 - intvl)/2.0)
 
         return np.abs((upper - lower)/2.0)
+
+    @staticmethod
+    def std_dev(arr):
+        """
+        Method to calculate standard deviation of an array
+        :param arr: input array
+        :return: standard deviation
+        """
+        return np.std(arr)
 
 
 class Handler(object):
