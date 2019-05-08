@@ -11,7 +11,8 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
 
 
-__all__ = ['RFRegressor',
+__all__ = ['HRFRegressor',
+           'RFRegressor',
            'MRegressor']
 
 
@@ -122,6 +123,11 @@ class _Regressor(object):
                             or 'conf' for confidence interval
         :returns: Output as raster object
         """
+        if 'tile_size' in kwargs:
+            tile_size = kwargs['tile_size']
+        else:
+            tile_size = 128
+
         if 'z_val' in kwargs:
             z_val = kwargs['z_val']
         else:
@@ -171,6 +177,7 @@ class _Regressor(object):
                 pixel_vec[np.where(pixel_vec != nodatavalue)] * multiplier[np.where(pixel_vec != nodatavalue)]
             return pixel_vec
 
+        Opt.cprint('Applying multipliers...')
         temp_arr = np.apply_along_axis(_with_data,
                                        0,
                                        raster_obj.array.astype(gdal_array.GDALTypeCodeToNumericTypeCode(out_data_type)))
@@ -179,7 +186,9 @@ class _Regressor(object):
         temp_arr = temp_arr.swapaxes(0, 1)
 
         # apply the variance calculating function on the array
+        Opt.cprint("Tiling...")
         out_arr = regressor.predict(temp_arr,
+                                    tile_size=tile_size,
                                     output_type=output_type,
                                     z_val=z_val,
                                     nodatavalue=nodatavalue,
@@ -314,7 +323,7 @@ class MRegressor(_Regressor):
     def predict(self,
                 arr,
                 ntile_max=5,
-                tile_size=1024,
+                tile_size=128,
                 **kwargs):
         """
         Calculate multiple regression model prediction, variance, or standard deviation.
@@ -595,7 +604,7 @@ class RFRegressor(_Regressor):
                      tile_end,
                      regressor,
                      feature_index,
-                     npx_tile=1024*1024,
+                     npx_tile=128*128,
                      nodatavalue=None,
                      output_type='median',
                      intvl=95.0,
@@ -629,7 +638,7 @@ class RFRegressor(_Regressor):
 
         out_tile = np.empty([tile_end - tile_start]) * 0.0
 
-        tile_arr = np.array([list(range(0, npx_tile)) for _ in range(0, regressor.trees)], dtype=float)
+        tile_arr = np.zeros([regressor.trees, (tile_end - tile_start)], dtype=float)
 
         if output_type in ('mean', 'median', 'full'):
 
@@ -1020,19 +1029,25 @@ class HRFRegressor(RFRegressor):
 
         super(RFRegressor, self).__init__(data,
                                           regressor)
-        if type(regressor).__name__ not in ('list', 'tuple'):
-            regressor = [regressor]
 
-        if type(data).__name__ not in ('list', 'tuple'):
-            data = [data]
+        if regressor is not None:
+            if type(regressor).__name__ not in ('list', 'tuple'):
+                regressor = [regressor]
 
         feature_list_ = list(reg.features for reg in regressor)
         feature_index_ = list(reversed(sorted(range(len(feature_list_)),
                                               key=lambda x: len(feature_list_[x]))))
 
-        self.regressor = list(regressor[idx] for idx in feature_index_)
-        self.data = list(data[idx] for idx in feature_index_)
         self.features = list(feature_list_[idx] for idx in feature_index_)
+        self.regressor = list(regressor[idx] for idx in feature_index_)
+
+        if data is not None:
+            if type(data).__name__ not in ('list', 'tuple'):
+                data = [data]
+            self.data = list(data[idx] for idx in feature_index_)
+        else:
+            self.data = data
+
         self.feature_index = None
 
     def __repr__(self):
@@ -1071,18 +1086,19 @@ class HRFRegressor(RFRegressor):
                             or 'conf' for confidence interval
         :returns: Output as raster object
         """
+
         self.feature_index = list(list(raster_obj.bnames.index(feat) for feat in feat_grp)
                                   for feat_grp in self.features)
 
-        _Regressor.regress_raster(self,
-                                  raster_obj,
-                                  outfile=outfile,
-                                  outdir=outdir,
-                                  band_name=band_name,
-                                  output_type=output_type,
-                                  out_data_type=out_data_type,
-                                  nodatavalue=nodatavalue,
-                                  **kwargs)
+        return _Regressor.regress_raster(self,
+                                         raster_obj,
+                                         outfile=outfile,
+                                         outdir=outdir,
+                                         band_name=band_name,
+                                         output_type=output_type,
+                                         out_data_type=out_data_type,
+                                         nodatavalue=nodatavalue,
+                                         **kwargs)
 
     @staticmethod
     def regress_tile(arr,
@@ -1090,7 +1106,7 @@ class HRFRegressor(RFRegressor):
                      tile_end,
                      regressors,
                      feature_index,
-                     npx_tile=1024*1024,
+                     npx_tile=256*256,
                      nodatavalue=None,
                      output_type='median',
                      intvl=95.0,
@@ -1124,13 +1140,34 @@ class HRFRegressor(RFRegressor):
         if nodatavalue is not None:
             out_tile += nodatavalue
 
+        tile_index = list()
+
+        for ii, _ in enumerate(regressors):
+            if len(tile_index) == 0:
+                tile_index.append(np.where(np.apply_along_axis(lambda x:
+                                                               np.any(x[feature_index[ii]] != nodatavalue),
+                                                               0,
+                                                               arr[tile_start:tile_end, :]))[0])
+            else:
+                elems = np.where(np.apply_along_axis(lambda x:
+                                                     np.any(x[feature_index[ii]] != nodatavalue),
+                                                     0,
+                                                     arr[tile_start:tile_end, :]))[0]
+                for index_list in tile_index:
+                    intersecting_index = np.intersect1d(elems, index_list,
+                                                        return_indices=True)
+
+                    elems = elems[~intersecting_index[1]]
+
+                tile_index.append(elems)
+
         for ii, regressor in enumerate(regressors):
-            Opt.cprint(' . {}'.format(str(ii + 1)))
+            Opt.cprint(' . {}'.format(str(ii + 1)), newline='')
 
-            temp_tile = np.empty([tile_end - tile_start]) * 0.0
+            temp_tile = np.empty([tile_index[ii].shape[0]]) * 0.0
 
-            temp_arr = arr[tile_start:tile_end, feature_index[ii]]
-            tile_arr = np.array([list(range(0, npx_tile)) for _ in range(0, regressor.trees)], dtype=float)
+            temp_arr = arr[tile_index[ii][:, np.newaxis], feature_index[ii]]
+            tile_arr = np.zeros([regressor.trees, tile_index[ii].shape[0]], dtype=float)
 
             if output_type in ('mean', 'median', 'full'):
 
@@ -1162,10 +1199,8 @@ class HRFRegressor(RFRegressor):
                 temp_tile -= predictions ** 2.0
                 temp_tile[temp_tile < 0.0] = 0.0
 
-                if output_type == 'var':
-                    return temp_tile
-                elif output_type == 'sd':
-                    return temp_tile ** 0.5
+                if output_type == 'sd':
+                    out_tile = out_tile ** 0.5
             else:
                 raise RuntimeError("Unknown output type or no output type specified")
 
@@ -1185,14 +1220,14 @@ class HRFRegressor(RFRegressor):
 
             if nodatavalue is not None:
                 temp_tile[np.unique(np.where(temp_arr == nodatavalue)[0])] = nodatavalue
-                out_tile[np.where(out_tile == nodatavalue)] = temp_tile[np.where(out_tile == nodatavalue)]
+                out_tile[tile_index[ii]] = temp_tile
 
         return out_tile
 
     def predict(self,
                 arr,
                 ntile_max=5,
-                tile_size=1024,
+                tile_size=256,
                 output_type='median',
                 intvl=95.0,
                 **kwargs):
@@ -1245,7 +1280,7 @@ class HRFRegressor(RFRegressor):
 
             for i in range(0, ntiles - 1):
 
-                Opt.cprint('Processing tile {} of {}'.format(str(i + 1), ntiles), newline='')
+                Opt.cprint('\nProcessing tile {} of {}'.format(str(i + 1), ntiles), newline='')
 
                 out_arr[i * npx_tile:(i + 1) * npx_tile] = self.regress_tile(arr,
                                                                              i * npx_tile,
@@ -1260,7 +1295,7 @@ class HRFRegressor(RFRegressor):
             if npx_last > 0:
 
                 i = ntiles - 2
-                Opt.cprint('Processing tile {} of {}'.format(str(i + 2), ntiles), newline='')
+                Opt.cprint('\nProcessing tile {} of {}'.format(str(i + 2), ntiles), newline='')
 
                 out_arr[i * npx_tile:(i * npx_tile + npx_last)] = self.regress_tile(arr,
                                                                                     i * npx_tile,
