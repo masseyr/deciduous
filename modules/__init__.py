@@ -1,5 +1,5 @@
 from common import Sublist, Handler, FTPHandler, Opt
-from classification import RFRegressor, MRegressor
+from classification import RFRegressor, MRegressor, HRFRegressor
 from samples import Samples
 from raster import Raster
 from resources import *
