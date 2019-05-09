@@ -1209,14 +1209,16 @@ class HRFRegressor(RFRegressor):
                 if 'gain' in regressor.adjustment:
                     temp_tile = temp_tile * regressor.adjustment['gain']
 
-                if 'bias' in regressor.adjustment:
-                    temp_tile = temp_tile + regressor.adjustment['bias']
+                if output_type not in ('sd', 'var'):
 
-                if 'upper_limit' in regressor.adjustment:
-                    temp_tile[temp_tile > regressor.adjustment['upper_limit']] = regressor.adjustment['upper_limit']
+                    if 'bias' in regressor.adjustment:
+                        temp_tile = temp_tile + regressor.adjustment['bias']
 
-                if 'lower_limit' in regressor.adjustment:
-                    temp_tile[temp_tile < regressor.adjustment['lower_limit']] = regressor.adjustment['lower_limit']
+                    if 'upper_limit' in regressor.adjustment:
+                        temp_tile[temp_tile > regressor.adjustment['upper_limit']] = regressor.adjustment['upper_limit']
+
+                    if 'lower_limit' in regressor.adjustment:
+                        temp_tile[temp_tile < regressor.adjustment['lower_limit']] = regressor.adjustment['lower_limit']
 
             if nodatavalue is not None:
                 temp_tile[np.unique(np.where(temp_arr == nodatavalue)[0])] = nodatavalue
