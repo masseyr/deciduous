@@ -1144,20 +1144,17 @@ class HRFRegressor(RFRegressor):
 
         for ii, _ in enumerate(regressors):
             if len(tile_index) == 0:
-                tile_index.append(np.where(np.apply_along_axis(lambda x:
-                                                               np.any(x[feature_index[ii]] != nodatavalue),
+                tile_index.append(np.where(np.apply_along_axis(lambda x: np.all(x[feature_index[ii]] != nodatavalue),
                                                                0,
                                                                arr[tile_start:tile_end, :]))[0])
             else:
-                elems = np.where(np.apply_along_axis(lambda x:
-                                                     np.any(x[feature_index[ii]] != nodatavalue),
+                elems = np.where(np.apply_along_axis(lambda x: np.all(x[feature_index[ii]] != nodatavalue),
                                                      0,
                                                      arr[tile_start:tile_end, :]))[0]
                 for index_list in tile_index:
-                    intersecting_index = np.intersect1d(elems, index_list,
-                                                        return_indices=True)
+                    intersecting_index = np.where(np.in1d(elems, index_list))[0]
 
-                    elems = elems[~intersecting_index[1]]
+                    elems = elems[~intersecting_index]
 
                 tile_index.append(elems)
 
