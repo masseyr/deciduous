@@ -323,7 +323,7 @@ class MRegressor(_Regressor):
     def predict(self,
                 arr,
                 ntile_max=5,
-                tile_size=128,
+                tile_size=1024,
                 **kwargs):
         """
         Calculate multiple regression model prediction, variance, or standard deviation.
@@ -361,7 +361,7 @@ class MRegressor(_Regressor):
         nb_inp = long(arr.shape[1])  # number of bands in input image
 
         # size of tiles
-        npx_tile = long(tile_size * tile_size)  # pixels in each tile
+        npx_tile = long(tile_size)  # pixels in each tile
         npx_last = npx_inp % npx_tile  # pixels in last tile
         ntiles = long(npx_inp) / long(npx_tile) + 1  # total tiles
 
@@ -698,7 +698,7 @@ class RFRegressor(_Regressor):
     def predict(self,
                 arr,
                 ntile_max=5,
-                tile_size=128,
+                tile_size=1024,
                 output_type='median',
                 intvl=95.0,
                 **kwargs):
@@ -753,7 +753,7 @@ class RFRegressor(_Regressor):
         nb_inp = long(arr.shape[1])  # number of bands in input image
 
         # size of tiles
-        npx_tile = long(tile_size * tile_size)  # pixels in each tile
+        npx_tile = long(tile_size)  # pixels in each tile
         npx_last = npx_inp % npx_tile  # pixels in last tile
         ntiles = long(npx_inp) / long(npx_tile) + 1  # total tiles
 
@@ -1163,70 +1163,74 @@ class HRFRegressor(RFRegressor):
 
             temp_tile = np.empty([tile_index[ii].shape[0]]) * 0.0
 
-            temp_arr = arr[tile_index[ii][:, np.newaxis], feature_index[ii]]
-            tile_arr = np.zeros([regressor.trees, tile_index[ii].shape[0]], dtype=float)
+            if temp_tile.shape[0] > 0:
 
-            if output_type in ('mean', 'median', 'full'):
+                temp_arr = arr[tile_index[ii][:, np.newaxis], feature_index[ii]]
+                tile_arr = np.zeros([regressor.trees, tile_index[ii].shape[0]], dtype=float)
 
-                # calculate tree predictions for each pixel in a 2d array
-                for jj, tree_ in enumerate(regressor.regressor.estimators_):
-                    tile_arr[jj, :] = tree_.predict(temp_arr)
+                if output_type in ('mean', 'median', 'full'):
 
-                if output_type == 'median':
-                    temp_tile = np.median(tile_arr, axis=0)
-                elif output_type == 'mean':
-                    temp_tile = np.mean(tile_arr, axis=0)
-                elif output_type == 'full':
-                    return tile_arr
+                    # calculate tree predictions for each pixel in a 2d array
+                    for jj, tree_ in enumerate(regressor.regressor.estimators_):
+                        tile_arr[jj, :] = tree_.predict(temp_arr)
 
-            elif output_type in ('sd', 'var'):
+                    if output_type == 'median':
+                        temp_tile = np.median(tile_arr, axis=0)
+                    elif output_type == 'mean':
+                        temp_tile = np.mean(tile_arr, axis=0)
+                    elif output_type == 'full':
+                        return tile_arr
 
-                for jj, tree_ in enumerate(regressor.regressor.estimators_):
-                    tile_arr[jj, :] = tree_.predict(temp_arr)
+                elif output_type in ('sd', 'var'):
 
-                    var_tree = tree_.tree_.impurity[tree_.apply(temp_arr)]
+                    for jj, tree_ in enumerate(regressor.regressor.estimators_):
+                        tile_arr[jj, :] = tree_.predict(temp_arr)
 
-                    var_tree[var_tree < min_variance] = min_variance
-                    mean_tree = tree_.predict(temp_arr)
-                    temp_tile += var_tree + mean_tree ** 2
+                        var_tree = tree_.tree_.impurity[tree_.apply(temp_arr)]
 
-                predictions = np.mean(tile_arr, axis=0)
+                        var_tree[var_tree < min_variance] = min_variance
+                        mean_tree = tree_.predict(temp_arr)
+                        temp_tile += var_tree + mean_tree ** 2
 
-                temp_tile /= len(regressor.regressor.estimators_)
-                temp_tile -= predictions ** 2.0
-                temp_tile[temp_tile < 0.0] = 0.0
+                    predictions = np.mean(tile_arr, axis=0)
 
-                if output_type == 'sd':
-                    out_tile = out_tile ** 0.5
-            else:
-                raise RuntimeError("Unknown output type or no output type specified")
+                    temp_tile /= len(regressor.regressor.estimators_)
+                    temp_tile -= predictions ** 2.0
+                    temp_tile[temp_tile < 0.0] = 0.0
 
-            if len(regressor.adjustment) > 0:
+                    if output_type == 'sd':
+                        out_tile = out_tile ** 0.5
+                else:
+                    raise RuntimeError("Unknown output type or no output type specified")
 
-                if 'gain' in regressor.adjustment:
-                    temp_tile = temp_tile * regressor.adjustment['gain']
+                if len(regressor.adjustment) > 0:
 
-                if output_type not in ('sd', 'var'):
+                    if 'gain' in regressor.adjustment:
+                        temp_tile = temp_tile * regressor.adjustment['gain']
 
-                    if 'bias' in regressor.adjustment:
-                        temp_tile = temp_tile + regressor.adjustment['bias']
+                    if output_type not in ('sd', 'var'):
 
-                    if 'upper_limit' in regressor.adjustment:
-                        temp_tile[temp_tile > regressor.adjustment['upper_limit']] = regressor.adjustment['upper_limit']
+                        if 'bias' in regressor.adjustment:
+                            temp_tile = temp_tile + regressor.adjustment['bias']
 
-                    if 'lower_limit' in regressor.adjustment:
-                        temp_tile[temp_tile < regressor.adjustment['lower_limit']] = regressor.adjustment['lower_limit']
+                        if 'upper_limit' in regressor.adjustment:
+                            temp_tile[temp_tile > regressor.adjustment['upper_limit']] = \
+                                regressor.adjustment['upper_limit']
 
-            if nodatavalue is not None:
-                temp_tile[np.unique(np.where(temp_arr == nodatavalue)[0])] = nodatavalue
-                out_tile[tile_index[ii]] = temp_tile
+                        if 'lower_limit' in regressor.adjustment:
+                            temp_tile[temp_tile < regressor.adjustment['lower_limit']] = \
+                                regressor.adjustment['lower_limit']
+
+                if nodatavalue is not None:
+                    temp_tile[np.unique(np.where(temp_arr == nodatavalue)[0])] = nodatavalue
+                    out_tile[tile_index[ii]] = temp_tile
 
         return out_tile
 
     def predict(self,
                 arr,
                 ntile_max=5,
-                tile_size=256,
+                tile_size=1024,
                 output_type='median',
                 intvl=95.0,
                 **kwargs):
@@ -1271,7 +1275,7 @@ class HRFRegressor(RFRegressor):
         nb_inp = long(arr.shape[1])  # number of bands in input image
 
         # size of tiles
-        npx_tile = long(tile_size * tile_size)  # pixels in each tile
+        npx_tile = long(tile_size)  # pixels in each tile
         npx_last = npx_inp % npx_tile  # pixels in last tile
         ntiles = long(npx_inp) / long(npx_tile) + 1  # total tiles
 
