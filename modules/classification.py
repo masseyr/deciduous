@@ -186,13 +186,15 @@ class _Regressor(object):
         temp_arr = temp_arr.swapaxes(0, 1)
 
         # apply the variance calculating function on the array
-        Opt.cprint("Tiling...")
+        Opt.cprint("Processing tiles...\n")
         out_arr = regressor.predict(temp_arr,
                                     tile_size=tile_size,
                                     output_type=output_type,
                                     z_val=z_val,
                                     nodatavalue=nodatavalue,
                                     out_nodatavalue=out_nodatavalue)
+
+        Opt.cprint("\n\nTile processing completed")
 
         # output raster and metadata
         if out_data_type != gdal_array.NumericTypeCodeToGDALTypeCode(out_arr.dtype):
@@ -1154,7 +1156,11 @@ class HRFRegressor(RFRegressor):
                 for index_list in tile_index:
                     intersecting_index = np.where(np.in1d(elems, index_list))[0]
 
-                    elems = elems[~intersecting_index]
+                    mask = np.zeros(elems.shape,
+                                    dtype=bool) + True
+                    mask[intersecting_index] = False
+
+                    elems = elems[np.where(mask)[0]]
 
                 tile_index.append(elems)
 
