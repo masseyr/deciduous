@@ -1205,7 +1205,7 @@ class HRFRegressor(RFRegressor):
                     temp_tile[temp_tile < 0.0] = 0.0
 
                     if output_type == 'sd':
-                        out_tile = out_tile ** 0.5
+                        temp_tile = temp_tile ** 0.5
                 else:
                     raise RuntimeError("Unknown output type or no output type specified")
 
