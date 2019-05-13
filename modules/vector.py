@@ -4,47 +4,7 @@ import sys
 import os
 from common import *
 
-__all__ = ['OGR_TYPE_DEF',
-           'OGR_FIELD_DEF',
-           'OGR_GEOM_DEF',
-           'Vector']
-
-
-OGR_FIELD_DEF = {
-    'int': ogr.OFTInteger,
-    'long': ogr.OFTInteger,
-    'float': ogr.OFTReal,
-    'double': ogr.OFTReal,
-    'str': ogr.OFTString,
-    'bool': ogr.OFTInteger,
-    'nonetype': ogr.OFSTNone,
-    'none': ogr.OFSTNone
-}
-
-
-OGR_TYPE_DEF = {
-            'point': 1,
-            'line': 2,
-            'linestring': 2,
-            'polygon': 3,
-            'multipoint': 4,
-            'multilinestring': 5,
-            'multipolygon': 6,
-            'geometry': 0,
-            'no geometry': 100
-}
-
-
-OGR_GEOM_DEF = {
-                1: 'point',
-                2: 'line',
-                3: 'polygon',
-                4: 'multipoint',
-                5: 'multilinestring',
-                6: 'multipolygon',
-                0: 'geometry',
-                100: 'no geometry',
-}
+__all__ = ['Vector']
 
 
 class Vector(object):
