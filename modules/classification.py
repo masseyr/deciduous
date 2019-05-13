@@ -133,10 +133,10 @@ class _Regressor(object):
         else:
             z_val = 1.96
 
-        if 'band_multiplier' in kwargs:
-            band_multiplier = kwargs['band_multiplier']
+        if 'band_multipliers' in kwargs:
+            band_multipliers = kwargs['band_multipliers']
         else:
-            band_multiplier = zip(list((elem, 1.0) for elem in raster_obj.bnames))
+            band_multipliers = zip(list((elem, 1.0) for elem in raster_obj.bnames))
 
         if 'out_nodatavalue' in kwargs:
             out_nodatavalue = kwargs['out_nodatavalue']
@@ -169,7 +169,7 @@ class _Regressor(object):
         # reshape into a long 2d array (nband, nrow * ncol) for classification,
         new_shape = [nbands, nrows * ncols]
 
-        multiplier = np.array([band_multiplier[elem] if elem in band_multiplier else 1.0
+        multiplier = np.array([band_multipliers[elem] if elem in band_multipliers else 1.0
                                for elem in raster_obj.bnames])
 
         def _with_data(pixel_vec):
@@ -178,6 +178,7 @@ class _Regressor(object):
             return pixel_vec
 
         Opt.cprint('Applying multipliers...')
+
         temp_arr = np.apply_along_axis(_with_data,
                                        0,
                                        raster_obj.array.astype(gdal_array.GDALTypeCodeToNumericTypeCode(out_data_type)))
@@ -1062,8 +1063,8 @@ class HRFRegressor(RFRegressor):
             repr_regressor = [self.regressor.__repr__()]
 
         return "Hierarchical regressor object" + \
-            "\n---\n  Regressors: \n{}".format(list('\n'.join(repr_regressor))) + \
-            "\n---"
+            "\n---\nRegressors: \n---\n{}".format('\n'.join(repr_regressor)) + \
+            "\n---\n\n"
 
     @Timer.timing(time_it)
     def regress_raster(self,
@@ -1108,7 +1109,7 @@ class HRFRegressor(RFRegressor):
                      tile_end,
                      regressors,
                      feature_index,
-                     npx_tile=256*256,
+                     npx_tile=1024,
                      nodatavalue=None,
                      output_type='median',
                      intvl=95.0,
@@ -1145,24 +1146,24 @@ class HRFRegressor(RFRegressor):
         tile_index = list()
 
         for ii, _ in enumerate(regressors):
-            if len(tile_index) == 0:
-                tile_index.append(np.where(np.apply_along_axis(lambda x: np.all(x[feature_index[ii]] != nodatavalue),
-                                                               0,
-                                                               arr[tile_start:tile_end, :]))[0])
-            else:
-                elems = np.where(np.apply_along_axis(lambda x: np.all(x[feature_index[ii]] != nodatavalue),
-                                                     0,
+            reg_index = np.where(np.apply_along_axis(lambda x: np.all(x[feature_index[ii]] != nodatavalue),
+                                                     1,
                                                      arr[tile_start:tile_end, :]))[0]
-                for index_list in tile_index:
-                    intersecting_index = np.where(np.in1d(elems, index_list))[0]
 
-                    mask = np.zeros(elems.shape,
+            if len(tile_index) == 0:
+                tile_index.append(reg_index)
+            else:
+
+                for index_list in tile_index:
+                    intersecting_index = np.where(np.in1d(reg_index, index_list))[0]
+
+                    mask = np.zeros(reg_index.shape,
                                     dtype=bool) + True
                     mask[intersecting_index] = False
 
-                    elems = elems[np.where(mask)[0]]
+                    reg_index = reg_index[np.where(mask)[0]]
 
-                tile_index.append(elems)
+                tile_index.append(reg_index)
 
         for ii, regressor in enumerate(regressors):
             Opt.cprint(' . {}'.format(str(ii + 1)), newline='')
@@ -1171,7 +1172,7 @@ class HRFRegressor(RFRegressor):
 
             if temp_tile.shape[0] > 0:
 
-                temp_arr = arr[tile_index[ii][:, np.newaxis], feature_index[ii]]
+                temp_arr = arr[tile_index[ii][:, np.newaxis] + tile_start, feature_index[ii]]
                 tile_arr = np.zeros([regressor.trees, tile_index[ii].shape[0]], dtype=float)
 
                 if output_type in ('mean', 'median', 'full'):
@@ -1227,9 +1228,7 @@ class HRFRegressor(RFRegressor):
                             temp_tile[temp_tile < regressor.adjustment['lower_limit']] = \
                                 regressor.adjustment['lower_limit']
 
-                if nodatavalue is not None:
-                    temp_tile[np.unique(np.where(temp_arr == nodatavalue)[0])] = nodatavalue
-                    out_tile[tile_index[ii]] = temp_tile
+                out_tile[tile_index[ii]] = temp_tile
 
         return out_tile
 
