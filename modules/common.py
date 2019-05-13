@@ -1,4 +1,5 @@
 from decimal import *
+from osgeo import ogr, gdal
 from itertools import takewhile, repeat
 import numpy as np
 import datetime
@@ -6,8 +7,6 @@ import fnmatch
 import random
 import psutil
 import ftplib
-import time
-import csv
 import copy
 import gzip
 import sys
@@ -17,7 +16,66 @@ import os
 __all__ = ['Sublist',
            'Handler',
            'FTPHandler',
-           'Opt']
+           'Opt',
+           'OGR_FIELD_DEF',
+           'OGR_FIELD_DEF_INV',
+           'OGR_GEOM_DEF',
+           'OGR_TYPE_DEF',
+           'GDAL_FIELD_DEF',
+           'GDAL_FIELD_DEF_INV']
+
+
+OGR_FIELD_DEF = {
+    'int': ogr.OFTInteger,
+    'long': ogr.OFTInteger,
+    'float': ogr.OFTReal,
+    'double': ogr.OFTReal,
+    'str': ogr.OFTString,
+    'bool': ogr.OFTInteger,
+    'nonetype': ogr.OFSTNone,
+    'none': ogr.OFSTNone
+}
+
+GDAL_FIELD_DEF = {
+    'byte': gdal.GDT_Byte,
+    'int': gdal.GDT_Int16,
+    'long': gdal.GDT_Int32,
+    'float': gdal.GDT_Float32,
+    'double': gdal.GDT_Float64,
+    'uint': gdal.GDT_UInt16,
+    'ulong': gdal.GDT_UInt32,
+}
+
+
+OGR_FIELD_DEF_INV = dict(list((v, k) for k, v in OGR_FIELD_DEF.items()))
+
+
+GDAL_FIELD_DEF_INV = dict(list((v, k) for k, v in GDAL_FIELD_DEF.items()))
+
+
+OGR_TYPE_DEF = {
+            'point': 1,
+            'line': 2,
+            'linestring': 2,
+            'polygon': 3,
+            'multipoint': 4,
+            'multilinestring': 5,
+            'multipolygon': 6,
+            'geometry': 0,
+            'no geometry': 100
+}
+
+
+OGR_GEOM_DEF = {
+                1: 'point',
+                2: 'line',
+                3: 'polygon',
+                4: 'multipoint',
+                5: 'multilinestring',
+                6: 'multipolygon',
+                0: 'geometry',
+                100: 'no geometry',
+}
 
 
 class Sublist(list):
@@ -101,6 +159,15 @@ class Sublist(list):
             return temp[0]
         else:
             return temp
+
+    def __add__(self,
+                other):
+        """
+        Adding another list
+        :param other: other list
+        :return: list
+        """
+        return Sublist(list(self) + list(other))
 
     def __getitem__(self,
                     item):
@@ -276,7 +343,7 @@ class Sublist(list):
         :param pattern: shorter list
         :return: list of locations of elements in mylist ordered as in pattern
         """
-        return Sublist(self.index(x) for x in pattern if x in self)
+        return Sublist(self.index(x) if x in self else -1 for x in pattern)
 
     def count_in_range(self,
                        llim,
