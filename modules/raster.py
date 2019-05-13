@@ -43,14 +43,17 @@ class Raster:
 
     def __repr__(self):
         if self.shape is not None:
-            return "<raster {ras} of size {bands}x{rows}x{cols}>".format(ras=Handler(self.name).basename,
+            return "<raster {ras} of size {bands}x{rows}x{cols} ".format(ras=Handler(self.name).basename,
                                                                          bands=self.shape[0],
                                                                          rows=self.shape[1],
-                                                                         cols=self.shape[2])
+                                                                         cols=self.shape[2]) + \
+                "datatype {dt} 'no-data' value {nd}>".format(dt=str(GDAL_FIELD_DEF_INV[self.dtype]),
+                                                             nd=str(self.nodatavalue))
         else:
             return "<raster with path {ras}>".format(ras=self.name,)
 
-    def write_to_file(self, outfile=None):
+    def write_to_file(self,
+                      outfile=None):
         """
         Write raster to file, given all the properties
         :param self - Raster object
