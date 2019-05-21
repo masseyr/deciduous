@@ -867,29 +867,36 @@ class Handler(object):
                                   np_array,
                                   colnames=None,
                                   rownames=None,
-                                  delim=", "):
+                                  delim=","):
         """
         Write numpy array to file
         :param np_array: Numpy 2d array to be written to file
         :param colnames: list of column name strings
-        :param rownames: list of row name strings
+        :param rownames: list of row name strings (should have the same length as np_array axis 0
         :param delim: Delimiter (default: ", ")
         """
-        # format numpy 2d array as list of strings, each string is a line to be written
-        lines = list()
-        for i in range(0, np_array.shape[0]):
-            lines.append(delim.join(["{:{w}.{p}f}".format(np_array[i, j], w=4, p=9)
-                                     for j in range(0, np_array.shape[1])]))
+        if colnames is not None:
+            header = delim.join(colnames)
+        else:
+            header = None
 
-        # if column names are available from numpy array, this overrides input colnames
-        if np_array.dtype.names is not None:
-            colnames = list(np_array.dtype.names)
+        if len(np_array.shape) == 1:
+            np_array = np_array[:, np.newaxis]
 
-        # write to file
-        self.write_list_to_file(lines,
-                                rownames=rownames,
-                                colnames=colnames,
-                                delim=delim)
+        if rownames is not None:
+            np_array = np.hstack(np.array(rownames)[:, np.newaxis], np_array)
+            if header is not None:
+                header = delim + header
+
+        np_list = np_array.tolist()
+        np_list = list(delim.join(list(str(elem) for elem in row_list))
+                       for row_list in np_list)
+        if header is not None:
+            np_list = [header] + np_list
+
+        with open(self.filename, 'w') as fileptr:
+            for line in np_list:
+                fileptr.write('{}\n'.format(str(line)))
 
     def read_from_csv(self,
                       return_dicts=False,
