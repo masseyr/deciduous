@@ -834,6 +834,7 @@ class RFRegressor(_Regressor):
                            data,
                            picklefile=None,
                            outfile=None,
+                           output='median',
                            **kwargs):
         """
         Get tree predictions from the RF regressor
@@ -892,7 +893,7 @@ class RFRegressor(_Regressor):
 
         # calculate median tree predictions
         pred_y = self.predict(np.array(data['features']),
-                              output='median')
+                              output=output)
 
         # rms error of the predicted versus actual
         rmse = sqrt(mean_squared_error(data['labels'], pred_y))
@@ -969,7 +970,8 @@ class RFRegressor(_Regressor):
                 zip(self.data['feature_names'], self.regressor.feature_importances_)]
 
     def get_training_fit(self,
-                         regress_limit=None):
+                         regress_limit=None,
+                         output='median'):
 
         """
         Find out how well the training samples fit the model
@@ -979,7 +981,8 @@ class RFRegressor(_Regressor):
         if self.fit:
             # predict using held out samples and print to file
             pred = self.sample_predictions(self.data,
-                                           regress_limit=regress_limit)
+                                           regress_limit=regress_limit,
+                                           output=output)
 
             self.training_results['rsq'] = pred['rsq'] * 100.0
             self.training_results['slope'] = pred['slope']
@@ -991,6 +994,7 @@ class RFRegressor(_Regressor):
     def get_adjustment_param(self,
                              clip=0.025,
                              data_limits=None,
+                             output='median',
                              over_adjust=1.0):
         """
         get the model adjustment parameters based on training fit
@@ -1006,7 +1010,8 @@ class RFRegressor(_Regressor):
         regress_limit = [data_limits[0] + clip * (data_limits[1]-data_limits[0]),
                          data_limits[1] - clip * (data_limits[1]-data_limits[0])]
 
-        self.get_training_fit(regress_limit=regress_limit)
+        self.get_training_fit(regress_limit=regress_limit,
+                              output=output)
 
         if self.training_results['intercept'] > regress_limit[0]:
             self.adjustment['bias'] = -1.0 * (self.training_results['intercept'] / self.training_results['slope'])
