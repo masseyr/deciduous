@@ -867,32 +867,32 @@ class RFRegressor(_Regressor):
         var_y = None
         if 'var_y' in kwargs:
             if kwargs['var_y']:
-                var_y = self.predict(np.array(data['features']),
+                var_y = self.predict(data['features'],
                                      output='var')
 
         # calculate mean of tree predictions
         all_y = None
         if 'all_y' in kwargs:
             if kwargs['all_y']:
-                all_y = self.predict(np.array(data['features']),
+                all_y = self.predict(data['features'],
                                      output='full')
 
         # calculate sd of tree predictions
         sd_y = None
         if 'sd_y' in kwargs:
             if kwargs['sd_y']:
-                sd_y = self.predict(np.array(data['features']),
+                sd_y = self.predict(data['features'],
                                     output='sd')
 
         # calculate sd of tree predictions
         mean = None
         if 'mean' in kwargs:
             if kwargs['se_y']:
-                mean = self.predict(np.array(data['features']),
+                mean = self.predict(data['features'],
                                     output='mean')
 
         # calculate median tree predictions
-        pred_y = self.predict(np.array(data['features']),
+        pred_y = self.predict(data['features'],
                               output=output)
 
         # rms error of the predicted versus actual
