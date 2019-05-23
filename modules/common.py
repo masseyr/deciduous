@@ -224,22 +224,19 @@ class Sublist(list):
         :param elem: Index or list of indices
         :return: Sublist
         """
-        if isinstance(elem, list):
-            return Sublist(val for j, val in enumerate(self) for loc in elem if j != loc)
-        else:
-            return Sublist(val for j, val in enumerate(self) if j != elem)
+        mask = np.zeros(len(self), dtype=bool) + True
+        mask[set(list(elem))] = False
+        return (np.array(self)[np.where(mask)]).tolist()
 
     def remove(self,
                elem):
         """
-        Method to remove list item or sublist
+        Method to remove list item or sublist in a 1d int or float list
         :param elem: item or list
         :return: list
         """
-        if isinstance(elem, list):
-            return Sublist(val for val in self if val not in elem)
-        else:
-            return Sublist(val for val in self if val != elem)
+        elem_ = set(list(elem))
+        return (np.array(self)[~np.in1d(np.array(self), np.array(elem_))]).tolist()
 
     @staticmethod
     def list_size(query_list):
@@ -931,7 +928,6 @@ class Handler(object):
         sys.stdout.write('Reading file : ')
 
         counter = 0
-        index = 0
         perc_ = 0
         with open(self.filename, 'r') as f:
             if line_limit:
@@ -996,7 +992,7 @@ class Handler(object):
                     sys.stdout.write('100!\n')
 
         # convert col names to list of strings
-        names = lines[0]
+        names = list(elem.strip() for elem in lines[0])
 
         if len(lines) > 0:
             # convert to list
