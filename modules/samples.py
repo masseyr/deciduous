@@ -1,10 +1,10 @@
 import numpy as np
 from common import *
-import random
+import warnings
 from timer import Timer
 from resources import bname_dict
 from scipy.stats.stats import pearsonr
-import warnings
+import time
 
 __all__ = ['Samples']
 
@@ -42,9 +42,19 @@ class Samples:
         """
         self.csv_file = csv_file
         self.label_colname = label_colname
-        self.x = x
+
+        if type(x).__name__ in ('ndarray', 'NoneType'):
+            self.x = x
+        else:
+            self.x = np.array(list(x))
+
         self.x_name = x_name
-        self.y = y
+
+        if type(y).__name__ in ('ndarray', 'NoneType'):
+            self.y = y
+        else:
+            self.y = np.array(list(y))
+
         self.y_name = y_name
 
         self.weights = weights
@@ -61,7 +71,7 @@ class Samples:
 
         # either of label name or csv file is provided without the other
         if (csv_file is None) and (label_colname is None):
-            pass  # warnings.warn("Samples initiated without data file or label")
+            pass  # warnings.warn("Samples class initiated without data file or label")
 
         # label name or csv file are provided
         elif (label_colname is not None) and (csv_file is not None):
@@ -76,8 +86,8 @@ class Samples:
 
             # read from data dictionary
             self.x_name = Sublist(elem.strip() for elem in temp['name'][:loc] + temp['name'][(loc + 1):])
-            self.x = Sublist(feat[:loc] + feat[(loc + 1):] for feat in temp['feature'])
-            self.y = Sublist(feat[loc] for feat in temp['feature'])
+            self.x = np.array(list(feat[:loc] + feat[(loc + 1):] for feat in temp['feature']))
+            self.y = np.array(list(feat[loc] for feat in temp['feature']))
             self.y_name = temp['name'][loc].strip()
 
             # if band name dictionary is provided
@@ -89,8 +99,8 @@ class Samples:
             temp = Handler(filename=csv_file).read_from_csv()
 
             # read from data dictionary
-            self.x_name = Sublist(elem.strip() for elem in temp['name'])
-            self.x = Sublist(feat for feat in temp['feature'])
+            self.x_name = Sublist(temp['name'])
+            self.x = np.array(list(feat for feat in temp['feature']))
 
         else:
             ValueError("No data found for label.")
@@ -107,8 +117,8 @@ class Samples:
                     else:
                         raise ValueError("Weight column name mismatch.\nAvailable names: " + ', '.join(temp['name']))
 
-                    self.weights = Sublist(feat[loc] for feat in self.x)
-                    self.x = Sublist(self.x).remove_by_loc(loc)
+                    self.weights = self.x[:, loc]
+                    self.x = np.delete(self.x, loc, 1)
 
                 else:
                     raise ValueError("No csv_file specified for weights")
@@ -118,7 +128,12 @@ class Samples:
 
             # columns containing data
             if 'columns' in kwargs:
-                self.columns = kwargs['columns']
+                if type(kwargs['columns']).__name__ == 'list':
+                    self.columns = np.array(kwargs['columns'])
+                elif type(kwargs['columns']).__name__ in ('ndarray', 'NoneType'):
+                    self.columns = kwargs['columns']
+                else:
+                    self.columns = np.array(list(kwargs['columns']))
             else:
                 self.columns = None
 
@@ -135,29 +150,25 @@ class Samples:
         if self.x is not None:
 
             if self.columns is None:
-                self.columns = Sublist(range(0, len(self.x[0])))
+                self.columns = np.arange(0, self.x.shape[1])
 
-            self.nsamp = len(self.x)
-            self.nvar = len(self.x[0])
+            self.nsamp = self.x.shape[0]
+            self.nvar = self.x.shape[1]
+
+            self.nfeat = self.x.shape[1]
+
+            self.xmin = self.x.min(0)
+            self.xmax = self.x.max(0)
+
+            self.index = np.arange(0, self.x.shape[0])
+
         else:
             self.nsamp = 0
             self.nvar = 0
 
-        self.index = Sublist(range(0, self.nsamp))
-
-        if self.x is not None:
-            self.nfeat = len(self.x[0])
-
-            self.xmin = list()
-            self.xmax = list()
-
-            for i in range(0, self.nfeat):
-                self.xmin.append(min(list(x_elem[i] for x_elem in self.x)))
-                self.xmax.append(max(list(x_elem[i] for x_elem in self.x)))
-
         if self.y is not None:
-            self.ymin = min(self.y)
-            self.ymax = max(self.y)
+            self.ymin = self.y.min()
+            self.ymax = self.y.max()
 
     def __repr__(self):
         """
@@ -180,19 +191,15 @@ class Samples:
         :return: dictionary of features and labels
         """
         if self.columns is not None:
-            out_x = list()
-            for tsamp in self.x:
-                tsamp = Sublist(tsamp)[self.columns]
-                out_x.append(tsamp)
-
-            out_x_name = self.x_name[self.columns]
+            out_x = self.x[:, self.columns]
+            out_x_name = Sublist(self.x_name[i] for i in self.columns.tolist())
         else:
             out_x = self.x
             out_x_name = self.x_name
 
         return {
-            'features': Opt.__copy__(out_x),
-            'labels': Opt.__copy__(self.y),
+            'features': out_x.copy(),
+            'labels': self.y.copy(),
             'label_name': Opt.__copy__(self.y_name),
             'feature_names': Opt.__copy__(out_x_name),
         }
@@ -211,7 +218,7 @@ class Samples:
         :return: Dictionary
         """
         # get data from samples
-        data_mat = np.matrix(self.x)
+        data_mat = self.x
         nsamp, nvar = data_mat.shape
         print(nsamp, nvar)
 
@@ -245,12 +252,17 @@ class Samples:
                    samp):
         """
         Merge two sample sets together
+        column and label names and orders should be the same in the two datasets
         :param self, samp:
         """
-        for item in samp.x:
-            self.x.append(item)
-        for item in samp.y:
-            self.y.append(item)
+        self.x = np.vstack((self.x, samp.x))
+        self.y = np.hstack((self.y, samp.y))
+        self.nsamp = self.x.shape[0]
+        self.index = np.arange(0, self.nsamp)
+        self.xmin = self.x.min(0)
+        self.xmax = self.x.max(0)
+        self.ymin = self.y.min()
+        self.ymax = self.y.max()
 
     @Timer.timing(True)
     def delete_column(self,
@@ -268,15 +280,11 @@ class Samples:
         elif column_id is None and column_name is not None:
             column_id = Sublist(self.x_name) == column_name
 
-        temp = self.x
+        self.x = np.delete(self.x, column_id, 1)
 
-        self.x = list([val for j, val in enumerate(temp[i]) if j != column_id]
-                      for i in range(0, self.nsamp))
-
-        self.x_name = Sublist(self.x_name).remove(column_id)
-
-        self.columns = list(range(0, len(self.x_name)))
-        self.nvar = len(self.columns)
+        self.x_name = self.x_name.remove(column_id)
+        self.columns = np.arange(0, self.x.shape[1])
+        self.nvar = self.x.shape[1]
 
     def extract_column(self,
                        column_id=None,
@@ -294,17 +302,16 @@ class Samples:
         elif column_id is None and column_name is not None:
             column_id = Sublist(self.x_name) == column_name
 
-        temp = [samp[column_id] for samp in self.x]
-        temp_name = self.x_name[column_id]
-
-        return {'name': temp_name, 'value': temp}
+        return {'name': self.x_name[column_id], 'value': self.x[:, column_id]}
 
     def add_column(self,
                    column_name=None,
                    column_data=None,
                    column_order=None):
         """
-        Function to add a column to the samples matrix
+        Function to add a column to the samples matrix.
+        Column_order keyword is used after appending the column name and data to the right of the matrix
+        but if column_data is None, self.x is re-ordered according to column_order
         :param column_name: Name of column to be added
         :param column_data: List of column values to be added
         :param column_order: List of numbers specifying column order for the column to be added
@@ -315,25 +322,30 @@ class Samples:
         """
 
         if column_data is None:
-            raise AttributeError('No argument for add operation')
+            if column_order is not None:
+                self.x = self.x[:, np.array(column_order)]
+                self.x_name = list(self.x_name[i] for i in column_order)
+                return
+            else:
+                RuntimeError('No argument for add operation')
+        else:
+            column_data_ = np.array(column_data)
+            self.x = np.hstack((self.x, column_data_[:, np.newaxis]))
 
-        if column_name is None:
-            column_name = 'Column_{}'.format(str(len(self.x_name) + 1))
+            if column_name is None:
+                column_name = 'Column_{}'.format(str(len(self.x_name) + 1))
 
-        if column_order is None or len(column_order) != len(self.x):
-            print('Inconsistent or missing order - ignored')
-            column_order = list(range(0, len(self.x)))
+            self.x_name.append(column_name)
 
-        temp = list()
-        for i, j in enumerate(column_order):
-            prev_samp = list(val for val in self.x[j])
-            prev_samp.append(column_data[i])
-            temp.append(prev_samp)
+            if column_order is None or len(column_order) != self.x.shape[1]:
+                warnings.warn('Inconsistent or missing order - ignored')
+                column_order = list(range(0, self.x.shape[1]))
 
-        self.x = temp
-        self.x_name.append(column_name)
-        self.columns = list(range(0, len(self.x_name)))
-        self.nvar = len(self.columns)
+            self.x = self.x[:, np.array(column_order)]
+            self.x_name = list(self.x_name[i] for i in column_order)
+
+            self.columns = list(range(0, self.x.shape[1]))
+            self.nvar = len(self.columns)
 
     def save_to_file(self,
                      out_file):
@@ -343,15 +355,8 @@ class Samples:
         :return: Write to file
         """
 
-        samp_matrix = list()
-        for i, j in enumerate(range(0, len(self.x))):
-            samples = list(val for val in self.x[j])
-            samples.append(self.y)
-            samp_matrix.append(samples)
-
-        out_arr = np.array(samp_matrix)
-        out_names = self.x_name
-        out_names.append(self.y_name)
+        out_arr = np.hstack((self.x, self.y[:, np.newaxis]))
+        out_names = self.x_name + list(self.y_name)
 
         Handler(out_file).write_numpy_array_to_file(np_array=out_arr,
                                                     colnames=out_names)
@@ -365,52 +370,43 @@ class Samples:
         (e.g. 75 for 75% training samples and 25% validation samples)
         :return: Tuple (Training sample object, validation sample object)
         """
+        t1 = time.time()
 
         ntrn = int((percentage * self.nsamp) / 100.0)
 
         # randomly select training samples based on number
-        trn_sites = random.sample(self.index, ntrn)
-        val_sites = self.index.remove(trn_sites)
+        trn_sites = np.random.choice(self.index, ntrn)
+        val_sites = self.index[~np.in1d(self.index, trn_sites)]
 
         # training sample object
         trn_samp = Samples()
         trn_samp.x_name = self.x_name
         trn_samp.y_name = self.y_name
-        trn_samp.x = [self.x[i] for i in trn_sites]
-        trn_samp.y = [self.y[i] for i in trn_sites]
-        trn_samp.nsamp = len(trn_samp.x)
-        trn_samp.index = Sublist(range(0, trn_samp.nsamp))
-        trn_samp.nfeat = len(trn_samp.x[0])
+        trn_samp.x = self.x[trn_sites, :]
+        trn_samp.y = self.y[trn_sites]
+        trn_samp.nsamp = trn_samp.x.shape[0]
+        trn_samp.index = np.arange(0, trn_samp.nsamp)
+        trn_samp.nfeat = trn_samp.x.shape[1]
 
-        trn_samp.xmin = list()
-        trn_samp.xmax = list()
-
-        for i in range(0, trn_samp.nfeat):
-            trn_samp.xmin.append(min(list(x_elem[i] for x_elem in trn_samp.x)))
-            trn_samp.xmax.append(max(list(x_elem[i] for x_elem in trn_samp.x)))
-
-        trn_samp.ymin = min(trn_samp.y)
-        trn_samp.ymax = max(trn_samp.y)
+        trn_samp.xmin = trn_samp.x.min(0)
+        trn_samp.xmax = trn_samp.x.max(0)
+        trn_samp.ymin = trn_samp.y.min()
+        trn_samp.ymax = trn_samp.y.max()
 
         # validation sample object
         val_samp = Samples()
         val_samp.x_name = self.x_name
         val_samp.y_name = self.y_name
-        val_samp.x = [self.x[i] for i in val_sites]
-        val_samp.y = [self.y[i] for i in val_sites]
-        val_samp.nsamp = len(val_samp.x)
-        val_samp.index = Sublist(range(0, val_samp.nsamp))
-        val_samp.nfeat = len(val_samp.x[0])
+        val_samp.x = self.x[val_sites, :]
+        val_samp.y = self.y[val_sites]
+        val_samp.nsamp = val_samp.x.shape[0]
+        val_samp.index = np.arange(0, val_samp.nsamp)
+        val_samp.nfeat = val_samp.x.shape[1]
 
-        val_samp.xmin = list()
-        val_samp.xmax = list()
-
-        for i in range(0, val_samp.nfeat):
-            val_samp.xmin.append(min(list(x_elem[i] for x_elem in val_samp.x)))
-            val_samp.xmax.append(max(list(x_elem[i] for x_elem in val_samp.x)))
-
-        val_samp.ymin = min(val_samp.y)
-        val_samp.ymax = max(val_samp.y)
+        val_samp.xmin = val_samp.x.min(0)
+        val_samp.xmax = val_samp.x.max(0)
+        val_samp.ymin = val_samp.y.min()
+        val_samp.ymax = val_samp.y.max()
 
         return trn_samp, val_samp
 
@@ -423,32 +419,28 @@ class Samples:
         :return: Samples object
         """
 
-        if num >= len(self.index):
+        if num >= self.index.shape[0]:
             print('Number larger than population: {} specified for {} samples'.format(str(num),
                                                                                       str(len(self.index))))
             ran_samp_n = self.index
         else:
-            ran_samp_n = random.sample(self.index, num)
+            ran_samp_n = np.random.choice(self.index, num)
 
         # training sample object
         ran_samp = Samples()
         ran_samp.x_name = self.x_name
         ran_samp.y_name = self.y_name
-        ran_samp.x = [self.x[i] for i in ran_samp_n]
-        ran_samp.y = [self.y[i] for i in ran_samp_n]
-        ran_samp.nsamp = len(ran_samp.x)
-        ran_samp.nfeat = len(ran_samp.x[0])
-        ran_samp.index = Sublist(range(0, ran_samp.nsamp))
+        ran_samp.x = self.x[ran_samp_n, :]
+        ran_samp.y = self.y[ran_samp_n]
+        ran_samp.nsamp = self.x.shape[0]
+        ran_samp.nfeat = self.x.shape[1]
+        ran_samp.index = np.arange(0, ran_samp.nsamp)
 
-        ran_samp.xmin = list()
-        ran_samp.xmax = list()
+        ran_samp.xmin = self.x.min(0)
+        ran_samp.xmax = self.x.max(0)
 
-        for i in range(0, ran_samp.nfeat):
-            ran_samp.xmin.append(min(list(x_elem[i] for x_elem in ran_samp.x)))
-            ran_samp.xmax.append(max(list(x_elem[i] for x_elem in ran_samp.x)))
-
-        ran_samp.ymin = min(ran_samp.y)
-        ran_samp.ymax = max(ran_samp.y)
+        ran_samp.ymin = self.y.min()
+        ran_samp.ymax = self.y.max()
 
         return ran_samp
 
@@ -459,49 +451,31 @@ class Samples:
         :param index_list:
         :return: Samples object
         """
-
         samp = Samples()
         samp.x_name = self.x_name
         samp.y_name = self.y_name
-        samp.x = [self.x[i] for i in index_list]
-        samp.y = [self.y[i] for i in index_list]
-        samp.nsamp = len(samp.x)
-        samp.nfeat = len(samp.x[0])
-        samp.index = Sublist(range(0, samp.nsamp))
+        samp.x = self.x[np.array(index_list), :]
+        samp.y = self.y[np.array(index_list)]
+        samp.nsamp = self.x.shape[0]
+        samp.nfeat = self.x.shape[1]
+        samp.index = np.arange(0, samp.nsamp)
 
-        samp.xmin = list()
-        samp.xmax = list()
+        samp.xmin = self.x.min(0)
+        samp.xmax = self.x.max(0)
 
-        for i in range(0, samp.nfeat):
-            samp.xmin.append(min(list(x_elem[i] for x_elem in samp.x)))
-            samp.xmax.append(max(list(x_elem[i] for x_elem in samp.x)))
-
-        samp.ymin = min(samp.y)
-        samp.ymax = max(samp.y)
+        samp.ymin = self.y.min()
+        samp.ymax = self.y.max()
 
         return samp
 
     def add_samp(self,
                  samp):
         """
-        merge s Samples object into another
+        merge a Samples object into another
         :param samp:
         :return: None
         """
-
-        for i in range(samp.nsamp):
-            self.x.append(samp.x[i])
-            self.y.append(samp.y[i])
-
-        self.nsamp += samp.nsamp
-        self.index = Sublist(range(0, self.nsamp))
-
-        for i in range(0, self.nfeat):
-            self.xmin.append(min(list(x_elem[i] for x_elem in self.x)))
-            self.xmax.append(max(list(x_elem[i] for x_elem in self.x)))
-
-        self.ymin = min(self.y)
-        self.ymax = max(self.y)
+        self.merge_data(samp)
 
     def make_folds(self,
                    n_folds=5):
@@ -512,35 +486,21 @@ class Samples:
         :return: list of tuples [(training samp, validation samp)...]
         """
 
-        nsamp_list = list(len(self.index) // n_folds for _ in range(n_folds))
-        if len(self.index) % n_folds > 0:
-            nsamp_list[-1] += len(self.index) % n_folds
+        nsamp_list = list(self.index.shape[0] // n_folds for _ in range(n_folds))
+        if self.index.shape[0] % n_folds > 0:
+            nsamp_list[-1] += self.index.shape[0] % n_folds
 
-        index_list = Opt.__copy__(self.index)
+        index_list = self.index.copy()
         fold_samples = list()
 
         for fold_samp in nsamp_list:
 
-            val_index = random.sample(index_list, fold_samp)
+            val_index = np.random.choice(index_list, fold_samp)
 
-            index_list = index_list.remove(val_index)
+            index_list = index_list[~np.in1d(index_list, val_index)]
 
-            trn_index = self.index.remove(val_index)
+            trn_index = self.index[~np.in1d(self.index, val_index)]
 
             fold_samples.append((self.selection(trn_index), self.selection(val_index)))
 
         return fold_samples
-
-
-
-
-
-
-
-
-
-
-
-
-
-
