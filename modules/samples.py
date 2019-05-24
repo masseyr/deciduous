@@ -496,7 +496,7 @@ class Samples:
 
         for fold_samp in nsamp_list:
 
-            val_index = np.random.choice(a=index_list,
+            val_index = np.random.choice(index_list,
                                          size=fold_samp,
                                          replace=False)
 
