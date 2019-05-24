@@ -646,8 +646,7 @@ class RFRegressor(_Regressor):
 
         temp_arr = arr[tile_start:tile_end, feature_index]
 
-        out_tile = np.empty([tile_end - tile_start]) * 0.0
-
+        out_tile = np.zeros([tile_end - tile_start])
         tile_arr = np.zeros([regressor.trees, (tile_end - tile_start)], dtype=float)
 
         if output_type in ('mean', 'median', 'full'):
@@ -757,7 +756,7 @@ class RFRegressor(_Regressor):
 
         # define output array
         if output_type == 'full':
-            out_arr = np.empty([self.trees, arr.shape[0]])
+            out_arr = np.zeros([self.trees, arr.shape[0]])
         else:
             out_arr = Opt.__copy__(arr[:, 0]) * 0.0
 
@@ -1165,7 +1164,7 @@ class HRFRegressor(RFRegressor):
         if min_variance is None:
             min_variance = 0.05 * np.min(arr.astype(np.float32))
 
-        out_tile = np.empty([tile_end - tile_start]) * 0.0
+        out_tile = np.zeros([tile_end - tile_start])
         if nodatavalue is not None:
             out_tile += nodatavalue
 
@@ -1194,7 +1193,7 @@ class HRFRegressor(RFRegressor):
         for ii, regressor in enumerate(regressors):
             Opt.cprint(' . {}'.format(str(ii + 1)), newline='')
 
-            temp_tile = np.empty([tile_index[ii].shape[0]]) * 0.0
+            temp_tile = np.zeros([tile_index[ii].shape[0]]) * 0.0
 
             if temp_tile.shape[0] > 0:
 
