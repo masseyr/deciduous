@@ -449,11 +449,14 @@ class Samples:
         :param index_list:
         :return: Samples object
         """
+        if type(index_list).__name__ in ('list', 'tuple', 'NoneType'):
+            index_list = np.array(Opt.__copy__(index_list))
+
         samp = Samples()
         samp.x_name = self.x_name
         samp.y_name = self.y_name
-        samp.x = self.x[np.array(index_list), :]
-        samp.y = self.y[np.array(index_list)]
+        samp.x = self.x[index_list, :]
+        samp.y = self.y[index_list]
         samp.nsamp = self.x.shape[0]
         samp.nfeat = self.x.shape[1]
         samp.index = np.arange(0, samp.nsamp)
@@ -493,11 +496,12 @@ class Samples:
 
         for fold_samp in nsamp_list:
 
-            val_index = np.random.choice(index_list, fold_samp)
-
-            index_list = index_list[~np.in1d(index_list, val_index)]
+            val_index = np.random.choice(a=index_list,
+                                         size=fold_samp,
+                                         replace=False)
 
             trn_index = self.index[~np.in1d(self.index, val_index)]
+            index_list = index_list[~np.in1d(index_list, val_index)]
 
             fold_samples.append((self.selection(trn_index), self.selection(val_index)))
 
