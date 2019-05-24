@@ -143,6 +143,11 @@ class _Regressor(object):
         else:
             out_nodatavalue = nodatavalue
 
+        if 'verbose' in kwargs:
+            verbose = kwargs['verbose']
+        else:
+            verbose = False
+
         # file handler object
         handler = Handler(raster_obj.name)
 
@@ -193,7 +198,8 @@ class _Regressor(object):
                                     output_type=output_type,
                                     z_val=z_val,
                                     nodatavalue=nodatavalue,
-                                    out_nodatavalue=out_nodatavalue)
+                                    out_nodatavalue=out_nodatavalue,
+                                    verbose=verbose)
 
         Opt.cprint("\n\nTile processing completed")
 
@@ -220,40 +226,28 @@ class _Regressor(object):
                        ylim=None):
         """
         Calculate linear regression attributes
-        :param x: Vector of independent variables
-        :param y: Vector of dependent variables
-        :param xlim: 2 element list or tuple [lower limit, upper limit] of starting and ending values for x vector
-        :param ylim: 2 element list or tuple [lower limit, upper limit] of starting and ending values for y vector
+        :param x: Vector of independent variables 1D
+        :param y: Vector of dependent variables 1D
+        :param xlim: 2 element list or tuple [lower limit, upper limit]
+        :param ylim: 2 element list or tuple [lower limit, upper limit]
         """
+        if type(x).__name__ in ('list', 'tuple', 'NoneType'):
+            x_ = np.array(x)
+        else:
+            x_ = x.copy()
 
-        xindex = list()
-        yindex = list()
+        if type(y).__name__ in ('list', 'tuple', 'NoneType'):
+            y_ = np.array(y)
+        else:
+            y_ = y.copy()
 
         if xlim is not None:
-
-            for ii, elem in enumerate(x):
-                if xlim[0] <= elem <= xlim[1]:
-                    xindex.append(ii)
-
-            if not any(xindex):
-                raise ValueError("Minimum or maximum argument for x outside data limits")
+            y_ = y_[np.where((x_ >= xlim[0]) & (x_ <= xlim[1]))]
+            x_ = x_[np.where((x_ >= xlim[0]) & (x_ <= xlim[1]))]
 
         if ylim is not None:
-
-            for ii, elem in enumerate(y):
-                if ylim[0] <= elem <= ylim[1]:
-                    yindex.append(ii)
-
-            if not any(yindex):
-                raise ValueError("Minimum or maximum argument for y outside data limits")
-
-        samp_index = sorted(list(set(xindex + yindex)))
-
-        if len(samp_index) == 0:
-            samp_index = range(len(x))
-
-        x_ = list(x[ii] for ii in samp_index)
-        y_ = list(y[ii] for ii in samp_index)
+            x_ = x_[np.where((y_ >= ylim[0]) & (y_ <= ylim[1]))]
+            y_ = y_[np.where((y_ >= ylim[0]) & (y_ <= ylim[1]))]
 
         slope, intercept, r_value, p_value, std_err = stats.linregress(x_, y_)
         rsq = r_value ** 2
@@ -347,6 +341,7 @@ class MRegressor(_Regressor):
         :return: 1d image array (that will need reshaping if image output)
         """
         nodatavalue = None
+        verbose = False
 
         if kwargs is not None:
             for key, value in kwargs.items():
@@ -355,6 +350,9 @@ class MRegressor(_Regressor):
 
                 if key == 'nodatavalue':
                     nodatavalue = value
+
+                if key == 'verbose':
+                    verbose = value
 
         # define output array
         out_arr = arr[:, 0] * 0.0
@@ -373,6 +371,8 @@ class MRegressor(_Regressor):
         if ntiles > ntile_max:
 
             for i in range(0, ntiles - 1):
+                if verbose:
+                    Opt.cprint('Processing tile {} of {}'.format(str(i+1), ntiles))
 
                 # calculate predictions for each pixel in a 2d array
                 out_arr[i * npx_tile:(i + 1) * npx_tile] = \
@@ -381,6 +381,8 @@ class MRegressor(_Regressor):
             if npx_last > 0:  # number of total pixels for the last tile
 
                 i = ntiles - 2
+                if verbose:
+                    Opt.cprint('Processing tile {} of {}'.format(str(i+1), ntiles))
                 out_arr[i * npx_last:(i + 1) * npx_last] = \
                     self.regressor.predict(arr[i * npx_tile:(i * npx_tile + npx_last), self.feature_index])
 
@@ -420,11 +422,16 @@ class MRegressor(_Regressor):
         :param picklefile: Random Forest pickle file
         :param outfile: output csv file name
         """
+        if 'verbose' in kwargs:
+            verbose = kwargs['verbose']
+        else:
+            verbose = False
 
         self.feature_index = list(data['feature_names'].index(feat) for feat in self.features)
 
         # calculate variance of tree predictions
-        y = self.predict(np.array(data['features']))
+        y = self.predict(data['features'],
+                         verbose=verbose)
 
         # rms error of the predicted versus actual
         rmse = sqrt(mean_squared_error(data['labels'], y))
@@ -441,8 +448,8 @@ class MRegressor(_Regressor):
         # then write to file and proceed to return
         elif outfile is not None:
             # write y, y_hat_bar, var_y to file (<- rows in this order)
-            out_list = ['obs_y,' + ', '.join([str(elem) for elem in data['labels']]),
-                        'mean_y,' + ', '.join([str(elem) for elem in y]),
+            out_list = ['obs_y,' + ', '.join([str(elem) for elem in data['labels'].tolist()]),
+                        'mean_y,' + ', '.join([str(elem) for elem in y.tolist()]),
                         'rmse,' + str(rmse),
                         'rsq,' + str(lm['rsq']),
                         'slope,' + str(lm['slope']),
@@ -496,7 +503,7 @@ class MRegressor(_Regressor):
         :return: None
         """
         if data_limits is None:
-            data_limits = [min(self.data['labels']), max(self.data['labels'])]
+            data_limits = [self.data['labels'].min(), self.data['labels'].max()]
 
         regress_limit = [data_limits[0] + clip * (data_limits[1]-data_limits[0]),
                          data_limits[1] - clip * (data_limits[1]-data_limits[0])]
@@ -737,6 +744,7 @@ class RFRegressor(_Regressor):
         :return: 1d image array (that will need reshaping if image output)
         """
         nodatavalue = None
+        verbose = False
 
         if kwargs is not None:
             for key, value in kwargs.items():
@@ -744,6 +752,8 @@ class RFRegressor(_Regressor):
                     self.adjustment[key] = value
                 if key == 'nodatavalue':
                     nodatavalue = value
+                if key == 'verbose':
+                    verbose = value
 
         # define output array
         if output_type == 'full':
@@ -765,8 +775,8 @@ class RFRegressor(_Regressor):
         if ntiles > ntile_max:
 
             for i in range(0, ntiles - 1):
-
-                Opt.cprint('Processing tile {} of {}'.format(str(i+1), ntiles))
+                if verbose:
+                    Opt.cprint('Processing tile {} of {}'.format(str(i+1), ntiles))
 
                 if output_type == 'full':
                     out_arr[:, i * npx_tile:(i + 1) * npx_tile] = self.regress_tile(arr,
@@ -792,8 +802,8 @@ class RFRegressor(_Regressor):
             if npx_last > 0:  # number of total pixels for the last tile
 
                 i = ntiles - 2
-
-                Opt.cprint('Processing tile {} of {}'.format(str(i+2), ntiles))
+                if verbose:
+                    Opt.cprint('Processing tile {} of {}'.format(str(i+2), ntiles))
 
                 if output_type == 'full':
                     out_arr[:, i * npx_tile:(i * npx_tile + npx_last)] = self.regress_tile(arr,
@@ -840,6 +850,7 @@ class RFRegressor(_Regressor):
         Get tree predictions from the RF regressor
         :param data: Dictionary object from Samples.format_data
         :param picklefile: Random Forest pickle file
+        :param output: Metric to be omputed from the random forest (options: 'mean','median','sd')
         :param outfile: output csv file name
         :param kwargs: Keyword arguments:
                'gain': Adjustment of the predicted output by linear adjustment of gain (slope)
@@ -850,11 +861,14 @@ class RFRegressor(_Regressor):
                'all_y': Boolean (if all lef outputs should be calculated)
                'var_y': Boolean (if variance of leaf nodes should be calculated)
         """
+        for key, value in kwargs.items():
+            if key in ('gain', 'bias', 'upper_limit', 'lower_limit'):
+                self.adjustment[key] = value
 
-        if kwargs is not None:
-            for key, value in kwargs.items():
-                if key in ('gain', 'bias', 'upper_limit', 'lower_limit'):
-                    self.adjustment[key] = value
+        if 'verbose' in kwargs:
+            verbose = kwargs['verbose']
+        else:
+            verbose = False
 
         self.feature_index = list(data['feature_names'].index(feat) for feat in self.features)
 
@@ -868,32 +882,37 @@ class RFRegressor(_Regressor):
         if 'var_y' in kwargs:
             if kwargs['var_y']:
                 var_y = self.predict(data['features'],
-                                     output='var')
+                                     output='var',
+                                     verbose=verbose)
 
         # calculate mean of tree predictions
         all_y = None
         if 'all_y' in kwargs:
             if kwargs['all_y']:
                 all_y = self.predict(data['features'],
-                                     output='full')
+                                     output='full',
+                                     verbose=verbose)
 
         # calculate sd of tree predictions
         sd_y = None
         if 'sd_y' in kwargs:
             if kwargs['sd_y']:
                 sd_y = self.predict(data['features'],
-                                    output='sd')
+                                    output='sd',
+                                    verbose=verbose)
 
         # calculate sd of tree predictions
         mean = None
         if 'mean' in kwargs:
             if kwargs['se_y']:
                 mean = self.predict(data['features'],
-                                    output='mean')
+                                    output='mean',
+                                    verbose=verbose)
 
         # calculate median tree predictions
         pred_y = self.predict(data['features'],
-                              output=output)
+                              output=output,
+                              verbose=verbose)
 
         # rms error of the predicted versus actual
         rmse = sqrt(mean_squared_error(data['labels'], pred_y))
@@ -975,6 +994,7 @@ class RFRegressor(_Regressor):
 
         """
         Find out how well the training samples fit the model
+        :param output: Metric to be omputed from the random forest (options: 'mean','median','sd')
         :param regress_limit: List of upper and lower regression limits for training fit prediction
         :return: None
         """
@@ -998,6 +1018,7 @@ class RFRegressor(_Regressor):
                              over_adjust=1.0):
         """
         get the model adjustment parameters based on training fit
+        :param output: Metric to be omputed from the random forest (options: 'mean','median','sd')
         :param clip: Ratio of samples not to be used at each tail end
         :param data_limits: tuple of (min, max) limits of output data
         :param over_adjust: Amount of over adjustment needed to adjust slope of the output data
@@ -1005,7 +1026,7 @@ class RFRegressor(_Regressor):
         """
 
         if data_limits is None:
-            data_limits = [min(self.data['labels']), max(self.data['labels'])]
+            data_limits = [self.data['labels'].min(), self.data['labels'].max()]
 
         regress_limit = [data_limits[0] + clip * (data_limits[1]-data_limits[0]),
                          data_limits[1] - clip * (data_limits[1]-data_limits[0])]
@@ -1269,11 +1290,14 @@ class HRFRegressor(RFRegressor):
         """
 
         nodatavalue = None
+        verbose = False
 
         if kwargs is not None:
             for key, value in kwargs.items():
                 if key == 'nodatavalue':
                     nodatavalue = value
+                if key == 'verbose':
+                    verbose = value
 
         # define output array
         out_arr = Opt.__copy__(arr[:, 0]) * 0.0
@@ -1293,7 +1317,8 @@ class HRFRegressor(RFRegressor):
 
             for i in range(0, ntiles - 1):
 
-                Opt.cprint('\nProcessing tile {} of {}'.format(str(i + 1), ntiles), newline='')
+                if verbose:
+                    Opt.cprint('\nProcessing tile {} of {}'.format(str(i + 1), ntiles), newline='')
 
                 out_arr[i * npx_tile:(i + 1) * npx_tile] = self.regress_tile(arr,
                                                                              i * npx_tile,
@@ -1308,7 +1333,8 @@ class HRFRegressor(RFRegressor):
             if npx_last > 0:
 
                 i = ntiles - 2
-                Opt.cprint('\nProcessing tile {} of {}'.format(str(i + 2), ntiles), newline='')
+                if verbose:
+                    Opt.cprint('\nProcessing tile {} of {}'.format(str(i + 2), ntiles), newline='')
 
                 out_arr[i * npx_tile:(i * npx_tile + npx_last)] = self.regress_tile(arr,
                                                                                     i * npx_tile,
@@ -1320,7 +1346,8 @@ class HRFRegressor(RFRegressor):
                                                                                     output_type=output_type,
                                                                                     intvl=intvl)
         else:
-            Opt.cprint('Processing image as one tile', newline='')
+            if verbose:
+                Opt.cprint('Processing image as one tile', newline='')
 
             out_arr = self.regress_tile(arr,
                                         0,
