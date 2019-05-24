@@ -176,7 +176,8 @@ class Samples:
         :return: Samples class representation
         """
         if self.csv_file is not None:
-            return "<Samples object from {cf} with {v} variables, {n} samples>".format(cf=Handler(self.csv_file).basename,
+            return "<Samples object from {cf} with {v} variables, {n} samples>".format(cf=Handler(
+                                                                                       self.csv_file).basename,
                                                                                        n=len(self.x),
                                                                                        v=len(self.x_name))
         elif self.csv_file is None and self.x is not None:
