@@ -4,7 +4,7 @@ import warnings
 from timer import Timer
 from resources import bname_dict
 from scipy.stats.stats import pearsonr
-import time
+
 
 __all__ = ['Samples']
 
@@ -369,7 +369,6 @@ class Samples:
         (e.g. 75 for 75% training samples and 25% validation samples)
         :return: Tuple (Training sample object, validation sample object)
         """
-        t1 = time.time()
 
         ntrn = int((percentage * self.nsamp) / 100.0)
 
