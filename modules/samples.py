@@ -373,7 +373,9 @@ class Samples:
         ntrn = int((percentage * self.nsamp) / 100.0)
 
         # randomly select training samples based on number
-        trn_sites = np.random.choice(self.index, ntrn)
+        trn_sites = np.random.choice(self.index,
+                                     size=ntrn,
+                                     replace=False)
         val_sites = self.index[~np.in1d(self.index, trn_sites)]
 
         # training sample object
@@ -422,7 +424,9 @@ class Samples:
                                                                                       str(len(self.index))))
             ran_samp_n = self.index
         else:
-            ran_samp_n = np.random.choice(self.index, num)
+            ran_samp_n = np.random.choice(self.index,
+                                          size=num,
+                                          replace=False)
 
         # training sample object
         ran_samp = Samples()
