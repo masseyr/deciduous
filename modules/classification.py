@@ -354,8 +354,11 @@ class MRegressor(_Regressor):
                 if key == 'verbose':
                     verbose = value
 
+        if type(arr).__name__ != 'ndarray':
+            arr = np.array(arr)
+
         # define output array
-        out_arr = arr[:, 0] * 0.0
+        out_arr = np.zeros(arr.shape[0])
 
         # input image size
         npx_inp = long(arr.shape[0])  # number of pixels in input image
@@ -754,11 +757,14 @@ class RFRegressor(_Regressor):
                 if key == 'verbose':
                     verbose = value
 
+        if type(arr).__name__ != 'ndarray':
+            arr = np.array(arr)
+
         # define output array
         if output_type == 'full':
             out_arr = np.zeros([self.trees, arr.shape[0]])
         else:
-            out_arr = Opt.__copy__(arr[:, 0]) * 0.0
+            out_arr = np.zeros(arr.shape[0])
 
         # input image size
         npx_inp = long(arr.shape[0])  # number of pixels in input image
@@ -1298,8 +1304,11 @@ class HRFRegressor(RFRegressor):
                 if key == 'verbose':
                     verbose = value
 
+        if type(arr).__name__ != 'ndarray':
+            arr = np.array(arr)
+
         # define output array
-        out_arr = Opt.__copy__(arr[:, 0]) * 0.0
+        out_arr = np.zeros(arr.shape[0])
         if nodatavalue is not None:
             out_arr += nodatavalue
 
