@@ -380,7 +380,7 @@ class MRegressor(_Regressor):
 
             if npx_last > 0:  # number of total pixels for the last tile
 
-                i = ntiles - 2
+                i = ntiles - 1
                 if verbose:
                     Opt.cprint('Processing tile {} of {}'.format(str(i+1), ntiles))
                 out_arr[i * npx_last:(i + 1) * npx_last] = \
@@ -800,9 +800,9 @@ class RFRegressor(_Regressor):
 
             if npx_last > 0:  # number of total pixels for the last tile
 
-                i = ntiles - 2
+                i = ntiles - 1
                 if verbose:
-                    Opt.cprint('Processing tile {} of {}'.format(str(i+2), ntiles))
+                    Opt.cprint('Processing tile {} of {}'.format(str(i+1), ntiles))
 
                 if output_type == 'full':
                     out_arr[:, i * npx_tile:(i * npx_tile + npx_last)] = self.regress_tile(arr,
@@ -1331,9 +1331,9 @@ class HRFRegressor(RFRegressor):
 
             if npx_last > 0:
 
-                i = ntiles - 2
+                i = ntiles - 1
                 if verbose:
-                    Opt.cprint('\nProcessing tile {} of {}'.format(str(i + 2), ntiles), newline='')
+                    Opt.cprint('\nProcessing tile {} of {}'.format(str(i + 1), ntiles), newline='')
 
                 out_arr[i * npx_tile:(i * npx_tile + npx_last)] = self.regress_tile(arr,
                                                                                     i * npx_tile,
