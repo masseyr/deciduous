@@ -1342,7 +1342,7 @@ class HRFRegressor(RFRegressor):
 
                 i = ntiles - 1
                 if verbose:
-                    Opt.cprint('\nProcessing tile {} of {}'.format(str(i + 1), ntiles), newline='')
+                    Opt.cprint('\nProcessing tile {} of {}\n'.format(str(i + 1), ntiles), newline='')
 
                 out_arr[i * npx_tile:(i * npx_tile + npx_last)] = self.regress_tile(arr,
                                                                                     i * npx_tile,
@@ -1355,7 +1355,7 @@ class HRFRegressor(RFRegressor):
                                                                                     intvl=intvl)
         else:
             if verbose:
-                Opt.cprint('Processing image as one tile', newline='')
+                Opt.cprint('\nProcessing image as one tile\n', newline='')
 
             out_arr = self.regress_tile(arr,
                                         0,
