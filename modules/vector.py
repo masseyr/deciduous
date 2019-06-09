@@ -1,4 +1,5 @@
-from osgeo import ogr, osr
+from osgeo import ogr, osr, gdal
+import math
 import json
 import sys
 import os
@@ -1016,4 +1017,64 @@ class Vector(object):
 
         else:
             return geom_list
+
+    def rasterize(self,
+                  outfile=None,
+                  pixel_size=None,
+                  out_type=gdal.GDT_Byte,
+                  nodatavalue=0,
+                  extent=None):
+
+        """
+        Method to rasterize a vector layer
+        :param outfile: Output file name
+        :param pixel_size: Pixel size (x, y) in spatial ref units
+        :param out_type: Output data type: gdal.GDT_Byte or 1, etc.
+        :param nodatavalue: No data Value
+        :param extent: Extent in spatial ref units (x_min, x_max, y_min, y_max)
+        :return: None
+        """
+
+        if pixel_size is None:
+            pixel_size = (30, 30)
+
+        if outfile is None:
+            outfile = self.filename.split('.')[0] + '_.tif'
+
+        if extent is None:
+            x_min, x_max, y_min, y_max = self.layer.GetExtent()
+        else:
+            x_min, x_max, y_min, y_max = extent
+
+        cols = int(math.ceil((x_max - x_min) / pixel_size[1]))
+        rows = int(math.ceil((y_max - y_min) / pixel_size[0]))
+
+        target_ds = gdal.GetDriverByName('GTiff').Create(outfile,
+                                                         cols,
+                                                         rows,
+                                                         1,
+                                                         out_type)
+
+        target_ds.SetGeoTransform((x_min,
+                                  pixel_size[0],
+                                  0,
+                                  y_max,
+                                  0,
+                                  -1.0*pixel_size[1]))
+
+        target_ds_srs = self.spref
+        target_ds.SetProjection(target_ds_srs.ExportToWkt())
+
+        band = target_ds.GetRasterBand(1)
+        band.SetNoDataValue(nodatavalue)
+
+        gdal.RasterizeLayer(target_ds,
+                            [1],
+                            self.layer,
+                            None,
+                            None,
+                            [1],
+                            ['ALL_TOUCHED=TRUE'])
+
+        target_ds = None
 
