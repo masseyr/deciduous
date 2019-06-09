@@ -315,7 +315,7 @@ class MRegressor(_Regressor):
         else:
             # if empty return empty
             return "<Multiple Linear Regressor: __empty__>"
-        
+
     @Timer.timing(time_it)
     def predict(self,
                 arr,
