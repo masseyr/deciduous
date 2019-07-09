@@ -1051,7 +1051,8 @@ class RFRegressor(_Regressor):
 class HRFRegressor(RFRegressor):
 
     """
-    Hierarchical Random Forest Regressor
+    Hierarchical Random Forest Regressor 
+    (based on hierarchical regression of available features)
     """
 
     time_it = False
