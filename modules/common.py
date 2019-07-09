@@ -948,7 +948,7 @@ class Handler(object):
                                 sys.stdout.write('{}..'.format(str(perc_)))
                                 perc_ += 10
 
-                    sys.stdout.write('100!\n')
+                    sys.stdout.write('!\n')
 
                 else:
                     for line in f:
@@ -961,7 +961,7 @@ class Handler(object):
                             sys.stdout.write('{}..'.format(str(perc_)))
                             perc_ += 10
 
-                    sys.stdout.write('100!\n')
+                    sys.stdout.write('!\n')
 
             else:
                 if len(index_list) > 0:
@@ -978,7 +978,7 @@ class Handler(object):
                                 sys.stdout.write('{}..'.format(str(perc_)))
                                 perc_ += 10
 
-                    sys.stdout.write('100!\n')
+                    sys.stdout.write('!\n')
 
                 else:
                     for line in f:
@@ -989,7 +989,7 @@ class Handler(object):
                             sys.stdout.write('{}..'.format(str(perc_)))
                             perc_ += 10
 
-                    sys.stdout.write('100!\n')
+                    sys.stdout.write('!\n')
 
         # convert col names to list of strings
         names = list(elem.strip() for elem in lines[0])
