@@ -209,6 +209,30 @@ class Raster:
         else:
             raise ValueError('No matching file found on disk')
 
+    def set_nodataval(self,
+                      in_nodataval=255,
+                      out_nodataval=0,
+                      outfile=None,
+                      in_array=True,
+                      **kwargs):
+        """
+        replace no data value in raster and write to tiff file
+        :param in_nodataval: no data value in input raster
+        :param out_nodataval: no data value in output raster
+        :param in_array: if the no data value should be changed in raster array
+        :param outfile: output file name
+        """
+        if in_array:
+            if not self.init:
+                self.initialize(get_array=True,
+                                **kwargs)
+            self.array[np.where(self.array == in_nodataval)] = out_nodataval
+
+        self.nodatavalue = out_nodataval
+
+        if outfile is not None:
+            self.write_to_file(outfile)
+
     @property
     def chk_for_empty_tiles(self):
         """
