@@ -599,7 +599,8 @@ class Handler(object):
         """
         Delete a file
         """
-        os.remove(self.filename)
+        if self.file_exists():
+            os.remove(self.filename)
 
     def file_lines(self,
                    nlines=True):
@@ -1060,6 +1061,12 @@ class Handler(object):
                         result.append(os.path.join(root, name))
 
         return result  # list
+
+    def find_files(self,
+                   pattern='*'):
+        return list(f_ for f_ in list(f for f in os.listdir(self.dirname)
+                                      if os.path.isfile(os.path.join(self.dirname, f)))
+                    if pattern in f_)
 
     @staticmethod
     def string_to_type(x):
