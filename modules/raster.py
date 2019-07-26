@@ -1,6 +1,6 @@
 import numpy as np
 from common import *
-from osgeo import gdal, gdal_array
+from osgeo import gdal, gdal_array, ogr, gdalconst
 np.set_printoptions(suppress=True)
 
 # Tell GDAL to throw Python exceptions, and register all drivers
@@ -11,7 +11,7 @@ gdal.AllRegister()
 __all__ = ['Raster']
 
 
-class Raster:
+class Raster(object):
     """
     Class to read and write rasters from/to files and numpy arrays
     """
@@ -27,6 +27,7 @@ class Raster:
                  crs_string=None):
 
         self.array = array
+        self.array_offsets = None  # (px, py, xoff, yoff)
         self.bnames = bnames
         self.datasource = None
         self.shape = shape
@@ -47,7 +48,7 @@ class Raster:
                                                                          bands=self.shape[0],
                                                                          rows=self.shape[1],
                                                                          cols=self.shape[2]) + \
-                "datatype {dt} 'no-data' value {nd}>".format(dt=str(GDAL_FIELD_DEF_INV[self.dtype]),
+                "datatype {dt} 'no-data' value {nd}>".format(dt=str(self.dtype),
                                                              nd=str(self.nodatavalue))
         else:
             return "<raster with path {ras}>".format(ras=self.name,)
@@ -63,9 +64,9 @@ class Raster:
             outfile = self.name
             outfile = Handler(filename=outfile).file_remove_check()
 
-        print('')
-        print('Writing ' + outfile)
-        print('')
+        Opt.cprint('')
+        Opt.cprint('Writing ' + outfile)
+        Opt.cprint('')
         gtiffdriver = gdal.GetDriverByName('GTiff')
         fileptr = gtiffdriver.Create(outfile, self.shape[2], self.shape[1],
                                      self.shape[0], self.dtype)
@@ -76,7 +77,7 @@ class Raster:
         if nbands == 1:
             fileptr.GetRasterBand(1).WriteArray(self.array, 0, 0)
             fileptr.GetRasterBand(1).SetDescription(self.bnames[0])
-            print('Writing band: ' + self.bnames[0])
+            Opt.cprint('Writing band: ' + self.bnames[0])
         else:
             for i in range(0, nbands):
                 fileptr.GetRasterBand(i + 1).WriteArray(self.array[i, :, :], 0, 0)
@@ -85,11 +86,57 @@ class Raster:
                 if self.nodatavalue is not None:
                     fileptr.GetRasterBand(i + 1).SetNoDataValue(self.nodatavalue)
 
-                print('Writing band: ' + self.bnames[i])
+                Opt.cprint('Writing band: ' + self.bnames[i])
 
         fileptr.FlushCache()
-        print('File written to disk!')
+        Opt.cprint('File written to disk!')
         fileptr = None
+
+    def read_array(self,
+                   offsets=None,
+                   band_order=None):
+        """
+        read raster array with offsets
+        :param offsets: tuple or list - (xoffset, yoffset, xcount, ycount)
+        :param band_order: order of bands to read
+        """
+
+        if not self.init:
+            self.initialize()
+
+        nbands, nrows, ncols = self.shape
+
+        fileptr = self.datasource
+        self.array_offsets = offsets
+
+        if self.array_offsets is None:
+            array3d = np.zeros((nbands,
+                                nrows,
+                                ncols),
+                               gdal_array.GDALTypeCodeToNumericTypeCode(fileptr.GetRasterBand(1).DataType))
+        else:
+            array3d = np.zeros((nbands,
+                                self.array_offsets[3],
+                                self.array_offsets[2]),
+                               gdal_array.GDALTypeCodeToNumericTypeCode(fileptr.GetRasterBand(1).DataType))
+
+        # read array and store the band values and name in array
+        if band_order is not None:
+            for b in band_order:
+                self.bnames.append(self.datasource.GetRasterBand(b + 1).GetDescription())
+        else:
+            band_order = list(range(nbands))
+
+        # read array and store the band values and name in array
+        for i, b in enumerate(band_order):
+            if self.array_offsets is None:
+                array3d[i, :, :] = fileptr.GetRasterBand(b + 1).ReadAsArray()
+            else:
+                array3d[i, :, :] = fileptr.GetRasterBand(b + 1).ReadAsArray(*self.array_offsets,
+                                                                            resample_alg=gdalconst.GRA_NearestNeighbour)
+
+        self.array = array3d
+        self.array_offsets = offsets
 
     def initialize(self,
                    get_array=False,
@@ -139,9 +186,9 @@ class Raster:
                         if np.isnan(array3d).any() or np.isinf(array3d).any():
                             array3d[np.isnan(array3d)] = nan_replacement
                             array3d[np.isinf(array3d)] = nan_replacement
-                            print("Non-finite values replaced with " + str(nan_replacement))
+                            Opt.cprint("Non-finite values replaced with " + str(nan_replacement))
                         else:
-                            print("Non-finite values absent in file")
+                            Opt.cprint("Non-finite values absent in file")
 
                     # get band names
                     for i in range(0, bands):
@@ -149,7 +196,7 @@ class Raster:
 
                 # band order present
                 else:
-                    print('Reading bands: {}'.format(" ".join([str(b) for b in band_order])))
+                    Opt.cprint('Reading bands: {}'.format(" ".join([str(b) for b in band_order])))
 
                     bands = len(band_order)
 
@@ -157,14 +204,27 @@ class Raster:
                     n_array_bands = len(band_order)
 
                     # initialize array
-                    array3d = np.zeros((n_array_bands, rows, cols),
-                                       gdal_array.GDALTypeCodeToNumericTypeCode(fileptr.GetRasterBand(1).DataType))
+                    if self.array_offsets is None:
+                        array3d = np.zeros((n_array_bands,
+                                            rows,
+                                            cols),
+                                           gdal_array.GDALTypeCodeToNumericTypeCode(fileptr.GetRasterBand(1).DataType))
+                    else:
+                        array3d = np.zeros((n_array_bands,
+                                            self.array_offsets[3],
+                                            self.array_offsets[2]),
+                                           gdal_array.GDALTypeCodeToNumericTypeCode(fileptr.GetRasterBand(1).DataType))
 
                     # read array and store the band values and name in array
                     for i, b in enumerate(band_order):
                         bandname = fileptr.GetRasterBand(b + 1).GetDescription()
-                        print('Reading band {}'.format(bandname))
-                        array3d[i, :, :] = fileptr.GetRasterBand(b + 1).ReadAsArray()
+                        Opt.cprint('Reading band {}'.format(bandname))
+
+                        if self.array_offsets is None:
+                            array3d[i, :, :] = fileptr.GetRasterBand(b + 1).ReadAsArray()
+                        else:
+                            array3d[i, :, :] = fileptr.GetRasterBand(b + 1).ReadAsArray(*self.array_offsets)
+
                         names.append(bandname)
 
                     # if flag for finite values is present
@@ -172,9 +232,9 @@ class Raster:
                         if np.isnan(array3d).any() or np.isinf(array3d).any():
                             array3d[np.isnan(array3d)] = nan_replacement
                             array3d[np.isinf(array3d)] = nan_replacement
-                            print("Non-finite values replaced with " + str(nan_replacement))
+                            Opt.cprint("Non-finite values replaced with " + str(nan_replacement))
                         else:
-                            print("Non-finite values absent in file")
+                            Opt.cprint("Non-finite values absent in file")
 
                 # assign to empty class object
                 self.array = array3d
@@ -183,6 +243,7 @@ class Raster:
                 self.transform = fileptr.GetGeoTransform()
                 self.crs_string = fileptr.GetProjection()
                 self.dtype = fileptr.GetRasterBand(1).DataType
+
                 self.metadict = Raster.get_raster_metadict(raster_name)
 
             # if get_array is false
@@ -198,6 +259,7 @@ class Raster:
                 self.transform = fileptr.GetGeoTransform()
                 self.crs_string = fileptr.GetProjection()
                 self.dtype = fileptr.GetRasterBand(1).DataType
+                self.nodatavalue = fileptr.GetRasterBand(1).GetNoDataValue()
                 self.metadict = Raster.get_raster_metadict(raster_name)
 
             self.bounds = self.get_bounds()
@@ -566,4 +628,3 @@ class Raster:
             yield self.tile_grid[ii]['tie_point'], tile_arr
 
             ii += 1
-
