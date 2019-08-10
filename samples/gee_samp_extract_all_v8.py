@@ -1,22 +1,21 @@
 import ee
-import os
 import sys
+import os
 import time
-import math
-import json
 import datetime
-import traceback
-from modules import *
-
+from geosoup import Vector, Handler, Timer, Logger
 
 if __name__ == '__main__':
+
+    script, elem_per_chunk, chunk_number, folder = sys.argv
+
     ee.Initialize()
 
-    folder = "D:/shared/Dropbox/projects/NAU/landsat_deciduous/data/"
+    # folder = "/home/richard/Dropbox/projects/NAU/landsat_deciduous/data/samples"
 
-    OUTFILE = folder + 'SAMPLES/gee_extract/' + \
-        'gee_samp_extract_postbin_v8_east_{}.csv'.format(datetime.datetime.now().isoformat()
-                                          .split('.')[0].replace('-', '_').replace(':', '_'))
+    OUTFILE = folder + 'gee_extract/' + \
+        'gee_samp_extract_postbin_v9_{}.csv'.format(datetime.datetime.now().isoformat()
+                                            .split('.')[0].replace('-', '_').replace(':', '_'))
 
     logfile = OUTFILE.split('.csv')[0] + '.log'
 
@@ -27,7 +26,7 @@ if __name__ == '__main__':
     log.lprint('Outfile: {}'.format(OUTFILE))
     log.lprint('Logfile: {}'.format(logfile))
 
-    infile = folder + "SAMPLES/all_samp_postbin_v8_east.shp"
+    infile = folder + "all_samp_post_v9.shp"
 
     # SPECIFY SEVERAL VARIABLES
     BUFFER_DIST = 0  # set it to 0 if buffer is not needed, else it will make script timed-out
@@ -46,7 +45,7 @@ if __name__ == '__main__':
     # wait time
     wait = 30  # seconds
 
-    max_elem = 1000
+    max_elem = int(elem_per_chunk)
 
     # boundary of the region
     bound_coords = [[-166.552734375, 56.218923189166624],
@@ -124,7 +123,6 @@ if __name__ == '__main__':
     topo_bandlist = ['elevation', 'slope', 'aspect']
     bands = bands + topo_bandlist
 
-
     feat_list = list()
 
     samp_vec = Vector(infile)
@@ -179,7 +177,6 @@ if __name__ == '__main__':
 
     log.lprint("Dividing into chunks: {}".format(', '.join(list(str(elem) for elem in len_chunks))))
 
-
     # function to identify year bins
     def get_year_limits(year):
         if year < year_bins[0][0]:
@@ -190,7 +187,6 @@ if __name__ == '__main__':
             for bins in year_bins:
                 if bins[0] <= year <= bins[1]:
                     return bins
-
 
     # merge all collections in one
     def ls_coll(start_day=startJulian,
@@ -216,7 +212,6 @@ if __name__ == '__main__':
             .select(bands) \
             .map(lambda image: image.float())
 
-
     # function to extract properties from collection as list of dictionaries
     def get_coll_dict(image_collection):
         n_images = ee.ImageCollection(image_collection).size()
@@ -229,7 +224,6 @@ if __name__ == '__main__':
             return ee.Dictionary.fromLists(PROPERTY_LIST.add('id'), val_list)
 
         return coll_list.map(get_prop)
-
 
     # function to extract a feature from a non-null collection
     def get_region(feature):
@@ -304,76 +298,79 @@ if __name__ == '__main__':
     site_count = 0
     time0 = datetime.datetime.now()
 
-    for j, chunk in enumerate(feat_list_chunks[2:3]):
-        log.lprint('\n ----------Working on chunk {} --------------\n'.format(str(j + 1)))
+    chunk = feat_list_chunks[int(chunk_number)]
+    # for j, chunk in enumerate(feat_list_chunks[2:3]):
+    log.lprint('\n ----------Working on chunk {} --------------\n'.format(str(int(chunk_number) + 1)))
 
-        n_sites = len(chunk)
-        sites_list = ee.List(chunk)
+    n_sites = len(chunk)
+    sites_list = ee.List(chunk)
 
-        log.lprint('Number of sites: {}'.format(str(n_sites)))
+    log.lprint('Number of sites: {}'.format(str(n_sites)))
 
-        # iterate thru site list
+    # iterate thru site list
+    '''
+    if j == 0:
+        i = 609
+    else:
+        i = 0
+    '''
+    i = 0
+    while i < n_sites:
 
-        if j == 0:
-            i = 609
-        else:
-            i = 0
+        time1 = datetime.datetime.now()
+        site = sites_list.get(i)
 
-        while i < n_sites:
+        try:
+            temp_dicts = get_region(site)
 
-            time1 = datetime.datetime.now()
-            site = sites_list.get(i)
+        # if any error occurs, print it and break the loop
+        except Exception as e:
+            log.lprint(e.args[0])
 
-            try:
-                temp_dicts = get_region(site)
+            if type(e.args[0]).__name__ == 'str':
 
-            # if any error occurs, print it and break the loop
-            except Exception as e:
-                log.lprint(e.args[0])
-
-                if type(e.args[0]).__name__ == 'str':
-
-                    if 'Earth Engine memory capacity exceeded' in e.args[0]:
-                        log.lprint('Waiting 30 secs...'.format(str(wait)))
-                        time.sleep(wait)
-                        continue
-
-                    elif 'ServerNotFoundError' in e.args[0] or \
-                            'Unable to find the server' in e.args[0] or \
-                            'getaddrinfo failed' in e.args[0] or \
-                            'connection attempt failed' in e.args[0]:
-
-                        log.lprint('Waiting 30 secs...'.format(str(wait)))
-                        time.sleep(wait)
-                        continue
-
-                else:
+                if 'Earth Engine memory capacity exceeded' in e.args[0]:
+                    log.lprint('Waiting 30 secs...'.format(str(wait)))
+                    time.sleep(wait)
                     continue
 
-            # all extracted dictionaries to file
-            if not Handler(OUTFILE).file_exists():
-                Handler.write_to_csv(temp_dicts,
-                                     header=True,
-                                     append=False,
-                                     outfile=OUTFILE)
+                elif 'ServerNotFoundError' in e.args[0] or \
+                        'Unable to find the server' in e.args[0] or \
+                        'getaddrinfo failed' in e.args[0] or \
+                        'connection attempt failed' in e.args[0]:
+
+                    log.lprint('Waiting 30 secs...'.format(str(wait)))
+                    time.sleep(wait)
+                    continue
 
             else:
-                Handler.write_to_csv(temp_dicts,
-                                     header=False,
-                                     append=True,
-                                     outfile=OUTFILE)
+                continue
 
-            time2 = datetime.datetime.now()
+        # all extracted dictionaries to file
+        if not Handler(OUTFILE).file_exists():
+            Handler.write_to_csv(temp_dicts,
+                                 header=True,
+                                 append=False,
+                                 outfile=OUTFILE)
 
-            log.lprint('Time taken for site {s} ({ii} of {nn}): {t} seconds'.format(s=str(temp_dicts[0]['site']),
+        else:
+            Handler.write_to_csv(temp_dicts,
+                                 header=False,
+                                 append=True,
+                                 outfile=OUTFILE)
+
+        time2 = datetime.datetime.now()
+
+        log.lprint('Time taken for site {s} ({ii} of {nn}): {t} seconds'.format(s=str(temp_dicts[0]['site']),
                                                                                 ii=str(site_count + 1),
                                                                                 nn=str(n_samp),
-                                                                       t=str(round((time2 - time1).total_seconds(), 1))))
+                                                                                t=str(round((time2 - time1)
+                                                                                            .total_seconds(), 1))))
 
-            i += 1
-            site_count += 1
+        i += 1
+        site_count += 1
 
-        log.lprint('\n ----------completed chunk {} --------------\n'.format(str(j + 1)))
+    log.lprint('\n ----------completed chunk {} --------------\n'.format(str(int(chunk_number) + 1)))
 
     time0_ = datetime.datetime.now()
     log.lprint('Total Time taken: {t} seconds'.format(t=Timer.display_time((time0_ - time0).total_seconds(), precision=1)))
