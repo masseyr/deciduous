@@ -1,7 +1,7 @@
 from osgeo import gdal, osr
 import h5py
 import numpy as np
-from modules import Vector, Handler
+from geosoup import Vector, Handler
 import argparse
 import sys
 
