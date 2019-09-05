@@ -235,8 +235,12 @@ class Sublist(list):
         :param elem: item or list
         :return: list
         """
-        elem_ = set(list(elem))
-        return (np.array(self)[~np.in1d(np.array(self), np.array(elem_))]).tolist()
+        if type(elem).__name__ not in ('list', 'tuple', 'generator'):
+            return (np.array(self)[~np.in1d(np.array(self), np.array(elem))]).tolist()
+
+        else:
+            elem_ = list(set(list(elem)))
+            return (np.array(self)[~np.in1d(np.array(self), np.array(elem_))]).tolist()
 
     @staticmethod
     def list_size(query_list):
@@ -342,6 +346,60 @@ class Sublist(list):
         """
         return Sublist(self.index(x) if x in self else -1 for x in pattern)
 
+    @staticmethod
+    def hist(var_list,
+             nbins=20,
+             minmax=None):
+
+        if minmax is None:
+            minmax = (min(var_list), max(var_list))
+
+        bin_edges = Sublist.frange(minmax[0], minmax[1], div=nbins)
+        freq_list = list(0 for _ in range(len(bin_edges) - 1))
+
+        for elem in var_list:
+            for ii in range(len(bin_edges) - 1):
+                if bin_edges[ii] <= elem < bin_edges[ii + 1]:
+                    freq_list[ii] += 1
+                  
+        return freq_list, bin_edges
+
+    @staticmethod
+    def hist_equalize(list_dicts,
+                      pctl=50,
+                      nbins=20,
+                      var=None,
+                      minmax=None):
+        if var is None:
+            raise ValueError('Variable not specified')
+        else:
+            var_list = list(elem[var] for elem in list_dicts)
+
+            if minmax is None:
+                minmax = (min(var_list), max(var_list))
+
+            freq_list, bin_edges = np.histogram(var_list, bins=nbins, range=minmax)
+
+            pctl_val = Sublist.percentile(freq_list, pctl=pctl)
+
+            print(pctl_val)
+            print(freq_list)
+
+            out_list = list()
+
+            for ii, _ in enumerate(freq_list):
+
+                indices = np.where((var_list >= bin_edges[ii]) & (var_list < bin_edges[ii + 1]))[0]
+
+                if indices.shape[0] > pctl_val:
+                    out_indices = np.random.choice(indices, size=pctl_val, replace=False)
+                else:
+                    out_indices = indices
+
+                out_list += list(list_dicts[jj] for jj in out_indices.tolist())
+
+            return out_list
+
     def count_in_range(self,
                        llim,
                        ulim):
@@ -364,36 +422,50 @@ class Sublist(list):
         :param start: start number
         :param end: end number
         :param step: step
-        :param div: Division between start and end
+        :param div: Number of divisions between start and end
         :return: list
         """
         if end > start:
+            return_rev = False
+        elif end < start:
+            start, end = end, start
+            return_rev = True
+        else:
+            raise ValueError("Start and end value are the same!")
 
-            if div is not None:
-                step = (end-start)/float(div)
-            elif step is not None:
-                if (end - start) % step > 0.0:
-                    div = long((end - start) / step)
-                else:
-                    div = long((end - start) / step) - 1
+        if div is not None:
+            temp = Sublist(start + i * ((end-start)/float(div)) for i in range(0, div)) + [end]
+
+        elif step is not None:
+            if (end - start) % step == 0.0:
+                temp = Sublist(start + i * step for i in range(0, int((end - start) / step))) + [end]
             else:
-                raise ValueError("No step or division defined")
-
-            temp = Sublist(0.0 for _ in range(div + 1))
-
-            for i in range(0, div):
-                temp[i] = start + i * step
-
-            temp[div] = end
-
-            return temp
+                temp = Sublist(start + i * step for i in range(0, int((end - start) / step) + 1)) + [end]
 
         else:
-            raise ValueError("Start value is less than end value")
+            raise ValueError("No step or division defined")
+
+        if return_rev:
+            return Sublist(reversed(temp))
+        else:
+            return temp
 
     def reverse(self):
         """reversed list"""
         return Sublist(reversed(self))
+
+    def shuffle(self):
+        """
+        shuffle the list items
+        :return: list
+        """
+        x_ = self.copy()
+        np.random.shuffle(x_)
+        return x_
+
+    def copy(self):
+        """returns copied instance"""
+        return copy.deepcopy(self)
 
     @classmethod
     def column(cls,
@@ -603,14 +675,16 @@ class Handler(object):
             os.remove(self.filename)
 
     def file_lines(self,
-                   nlines=True):
+                   nlines=True,
+                   bufsize=102400):
         """
         Find number of lines or get text lines in a text or csv file
         :param nlines: If only the number of lines in a file should be returned
-        :return:
+        :param bufsize: size of buffer to be read
+        :return: list or number
         """
         with open(self.filename, 'r') as f:
-            bufgen = takewhile(lambda x: x, (f.read(1024 * 1024) for _ in repeat(None)))
+            bufgen = takewhile(lambda x: x, (f.read(bufsize) for _ in repeat(None)))
 
             if nlines:
                 val = sum(buf.count(b'\n') for buf in bufgen if buf)
@@ -764,22 +838,27 @@ class Handler(object):
         :param append: if the lines should be appended to the file
         :return: write to file
         """
-        input_list = list(delim.join(list(str(elem) for elem in line)) for line in input_list)
 
-        # add rownames and colnames
-        if rownames is not None:
-            if len(rownames) != len(input_list):
-                raise ValueError('Row name list does not have sufficient elements')
+        if type(input_list[0]).__name__ in ('list', 'tuple'):
+            if rownames is not None:
+                if len(rownames) != len(input_list):
+                    raise ValueError('Row name list does not have sufficient elements')
+                else:
+                    input_list = list([rownames[i]] + elem for i, elem in enumerate(input_list))
 
-            input_list = list(str(rownames[i]) + delim + elem for i, elem in enumerate(input_list))
+            if colnames is not None:
+                if len(rownames) != len(input_list[0]):
+                    raise ValueError('Column name list does not have sufficient elements')
+                else:
+                    input_list = [colnames] + input_list
 
-            header_add = delim
+            input_list = '\n'.join(list(delim.join(list(str(elem) for elem in line)) for line in input_list))
+
+        elif type(input_list[0]).__name__ == 'str':
+            input_list = '\n'.join(input_list)
+
         else:
-            header_add = ""
-
-        if colnames is not None:
-            header = header_add + delim.join(list(str(elem) for elem in colnames))
-            input_list = [header] + input_list
+            raise ValueError('Input list not in types: list of list, list of tuples, list of strings')
 
         # create dir path if it does not exist
         self.dir_create()
@@ -791,8 +870,7 @@ class Handler(object):
             open_type = 'w'  # write
 
         with open(self.filename, open_type) as fileptr:
-            for line in input_list:
-                fileptr.write('{}\n'.format(str(line)))
+            fileptr.write('{}\n'.format(input_list))
 
     def write_slurm_script(self,
                            job_name='pyscript',
@@ -1022,6 +1100,9 @@ class Handler(object):
 
         if outfile is None:
             raise ValueError("No file name for writing")
+
+        if type(list_of_dicts).__name__ not in ('tuple', 'list'):
+            list_of_dicts = [list_of_dicts]
 
         lines = list()
         if header:
