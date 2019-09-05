@@ -13,7 +13,8 @@ from sklearn.metrics import mean_squared_error
 
 __all__ = ['HRFRegressor',
            'RFRegressor',
-           'MRegressor']
+           'MRegressor',
+           '_Regressor']
 
 
 sep = Handler().sep
