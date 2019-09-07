@@ -142,10 +142,8 @@ class Vector(object):
                     new_feat = feat
 
                 if verbose:
-                    attr_dict = json.dumps(all_items)
-                    sys.stdout.write('Feature {} of {} : attr {}\n'.format(str(feat_count+1),
-                                                                           str(self.nfeat),
-                                                                           attr_dict))
+                    sys.stdout.write('Feature {} of {}\n'.format(str(feat_count+1),
+                                                                 str(self.nfeat)))
 
                 self.attributes.append(all_items)
                 self.features.append(new_feat)
@@ -280,7 +278,7 @@ class Vector(object):
         :param coords: List of tuples [(x1,y1),(x2,y2),...] for multipoint
                        or a single tuple (x, y) in case of 'point'
                        x=longitude, y=latitude and so on
-        :param geom_type: multipoint, point,
+        :param geom_type: multipoint, point, polygon, linestring, multipolygon
         :return: WKT string representation
         """
 
@@ -296,6 +294,12 @@ class Vector(object):
 
             tempstring = ', '.join(list(' '.join([str(x), str(y)]) for (x, y) in coords))
             wktstring = 'POLYGON(({}))'.format(tempstring)
+
+        elif geom_type.upper() == 'MULTIPOLYGON':
+
+            tempstring = '), ('.join(', '.join(list(' '.join([str(x), str(y)]) for (x, y) in coord))
+                                     for coord in coords)
+            wktstring = 'MULTIPOLYGON((({})))'.format(tempstring)
 
         elif geom_type.upper() == 'LINESTRING' or geom_type.upper() == 'LINE':
 
@@ -329,6 +333,33 @@ class Vector(object):
         elif geom_type == 'wkb':
             try:
                 return ogr.CreateGeometryFromWkb(geom_string)
+            except:
+                return
+        else:
+            raise ValueError("Unsupported geometry type")
+
+    @staticmethod
+    def get_geom_str(osgeo_geom,
+                     str_type='wkt'):
+        """
+        Method to return a geometry string from an osgeo geometry object
+        :param osgeo_geom: OSGEO geometry object
+        :param str_type: 'wkt', 'json', or 'wkb
+        :return: wkt, json or wkb
+        """
+        if str_type == 'wkt':
+            try:
+                return osgeo_geom.ExportToWkt()
+            except:
+                return
+        elif str_type == 'json':
+            try:
+                return osgeo_geom.ExportToJson()
+            except:
+                return
+        elif str_type == 'wkb':
+            try:
+                return osgeo_geom.ExportToWkb()
             except:
                 return
         else:
@@ -827,7 +858,8 @@ class Vector(object):
                            out_epsg=4326,
                            attributes=None,
                            attribute_types=None,
-                           verbose=False):
+                           verbose=False,
+                           full=True):
         """
         Make a vector object from a list of geometries in string (json, wkt, or wkb) format.
         :param geom_strings: Single or a list of geometries in WKT format
@@ -848,7 +880,7 @@ class Vector(object):
         vector = cls()
 
         if verbose:
-            print('Creating Vector...')
+            print('\nCreating Vector...')
 
         if type(geom_strings).__name__ == 'str':
             vector.nfeat = 1
@@ -865,11 +897,16 @@ class Vector(object):
                 attributes = [attributes]
 
         if geom_string_type == 'wkt':
+            vector.wktlist = geom_strings
             geoms = list(ogr.CreateGeometryFromWkt(geom_string) for geom_string in geom_strings)
+
         elif geom_string_type == 'json':
             geoms = list(ogr.CreateGeometryFromJson(geom_string) for geom_string in geom_strings)
+            vector.wktlist = list(geom.ExportToWkt() for geom in geoms)
+
         elif geom_string_type == 'wkb':
             geoms = list(ogr.CreateGeometryFromWkb(geom_string) for geom_string in geom_strings)
+            vector.wktlist = list(geom.ExportToWkt() for geom in geoms)
         else:
             raise TypeError("Unsupported geometry type")
 
@@ -889,6 +926,9 @@ class Vector(object):
                 res = spref.ImportFromEPSG(out_epsg)
 
         vector.spref = spref
+
+        vector.attribute_def = attribute_types
+        vector.attributes = attributes
 
         # get driver to write to memory
         memory_driver = ogr.GetDriverByName('Memory')
@@ -913,7 +953,6 @@ class Vector(object):
                                                  geom_type=geom_type)
         vector.layer = temp_layer
         vector.fields = list()
-        vector.attribute_def = attribute_types
 
         if (attributes is not None) != (attribute_types is not None):
             raise RuntimeError('One of attribute values or attribute definitions is missing')
@@ -933,31 +972,27 @@ class Vector(object):
 
         # layer definition with new fields
         temp_layer_definition = temp_layer.GetLayerDefn()
-        vector.wktlist = list()
-        vector.attributes = attributes
 
-        if verbose:
-            print('Adding geometries...\n')
-
-        for i, geom in enumerate(geoms):
-            # create new feature using geometry
-            temp_feature = ogr.Feature(temp_layer_definition)
-            temp_feature.SetGeometry(geom)
-
+        if full:
             if verbose:
-                print('geometry {} of {}'.format(str(i+1),
-                                                 str(len(geoms))))
+                print('Adding geometries...\n')
 
-            # copy attributes to each feature, the order is the order of features
-            for attribute in attributes:
-                for attrname, attrval in attribute.items():
+            for i, geom in enumerate(geoms):
+                if verbose:
+                    print('geometry {} of {}'.format(str(i+1),
+                                                     str(len(geoms))))
+
+                # create new feature using geometry
+                temp_feature = ogr.Feature(temp_layer_definition)
+                temp_feature.SetGeometry(geom)
+
+                # copy attributes to each feature, the order is the order of features
+                for attrname, attrval in attributes[i].items():
                     temp_feature.SetField(attrname, attrval)
 
-            # create feature in layer
-            temp_layer.CreateFeature(temp_feature)
-
-            vector.features.append(temp_feature)
-            vector.wktlist.append(geom.ExportToWkt())
+                # create feature in layer
+                temp_layer.CreateFeature(temp_feature)
+                vector.features.append(temp_feature)
 
         return vector
 
