@@ -148,7 +148,7 @@ def poly_regress(x,
 
 if __name__ == '__main__':
 
-    in_dir = "c:/users/rm885/Dropbox/projects/NAU/landsat_deciduous/data/SAMPLES/fires/burn_samp_250/"
+    in_dir = "d:/shared/Dropbox/projects/NAU/landsat_deciduous/data/SAMPLES/fires/burn_samp_250/"
 
     decid_bands = ['decid1992', 'decid2000', 'decid2005', 'decid2010', 'decid2015']
     tc_bands = ['tc1992', 'tc2000', 'tc2005', 'tc2010', 'tc2015']
@@ -171,7 +171,7 @@ if __name__ == '__main__':
     xlabel = xvar.upper()
 
     tc_thresh = 25
-    weight = False
+    weight = True
 
     density_bins = (100, 100)
 
@@ -183,27 +183,157 @@ if __name__ == '__main__':
     xlim = (0, 1)
     ylim = (0, 1)
 
+    version = 3
+
     filelist = list(in_dir + 'year{}_{}_{}_fire.csv'.format(str(year_edge[0])[2:],
                                                             str(year_edge[1])[2:],
                                                             fire_type) for year_edge in year_edges
                     for fire_type in fire_types)
 
     for filename in filelist:
+        '''
         if 'single' in filename:
             print(filename)
             val_dicts = Handler(filename).read_from_csv(return_dicts=True)
 
             print(len(val_dicts))
 
-            if weight:
-                outfile = filename.split('.csv')[0] + '_tc_wghtd_tc_thresh_{}.csv'.format(str(tc_thresh))
+            # weight:
+            plotfile = filename.split('.csv')[0] + '_tc_wghtd_tc_thresh_{}_v{}.png'.format(str(tc_thresh),
+                                                                                           str(version))
 
-                plot_dicts = list()
-                for val_dict in val_dicts:
-                    temp_dict = dict()
-                    for i, decid_band in enumerate(decid_bands):
-                        temp_dict[decid_band] = float(val_dict[decid_band]) * float(val_dict[tc_bands[i]])
+            x = list()
+            y = list()
+            for val_dict in val_dicts:
+                temp_dict = dict()
+                for i, decid_band in enumerate(decid_bands):
 
+                    if (type(val_dict[decid_band]).__name__ in ('int', 'float')) and \
+                            (type(val_dict[tc_bands[i]]).__name__ in ('int', 'float')):
 
+                        if val_dict[tc_bands[i]] >= tc_thresh:
+                            y.append((float(val_dict[decid_band]) * float(val_dict[tc_bands[i]]))/10000.0)
+                            x.append(int(decid_band.split('decid')[1]))
 
+            f, (ax) = plt.subplots(1, 1, figsize=(8, 4))
+            f.suptitle(Handler(plotfile).basename, fontsize=14)
+
+            sns.boxplot(x, y, ax=ax, color='orange', showfliers=False)
+            # ax.set_xlabel(self.dict['xlabel'], size=12, alpha=0.8)
+            # ax.set_ylabel(self.dict['ylabel'], size=12, alpha=0.8)
+
+            plt.savefig(plotfile)
+            plt.close()
+
+            print('Plotted: {}'.format(plotfile))
+
+            # thresh only
+            plotfile = filename.split('.csv')[0] + '_tc_thresh_{}_v{}.png'.format(str(tc_thresh),
+                                                                                  str(version))
+
+            x = list()
+            y = list()
+            for val_dict in val_dicts:
+                temp_dict = dict()
+                for i, decid_band in enumerate(decid_bands):
+
+                    if (type(val_dict[decid_band]).__name__ in ('int', 'float')) and \
+                            (type(val_dict[tc_bands[i]]).__name__ in ('int', 'float')):
+
+                        if val_dict[tc_bands[i]] >= tc_thresh:
+                            y.append(float(val_dict[decid_band]) / 100.0)
+                            x.append(int(decid_band.split('decid')[1]))
+
+            f, (ax) = plt.subplots(1, 1, figsize=(8, 4))
+            f.suptitle(Handler(plotfile).basename, fontsize=14)
+
+            sns.boxplot(x, y, ax=ax, color='orange', showfliers=False)
+            # ax.set_xlabel(self.dict['xlabel'], size=12, alpha=0.8)
+            # ax.set_ylabel(self.dict['ylabel'], size=12, alpha=0.8)
+
+            # plt.ylim(ylim)
+
+            plt.savefig(plotfile)
+            plt.close()
+
+            print('Plotted: {}'.format(plotfile))
+            '''
+
+        if 'single' in filename:
+            print(filename)
+            val_dicts = Handler(filename).read_from_csv(return_dicts=True)
+
+            print(len(val_dicts))
+
+            # weight:
+            plotfile = filename.split('.csv')[0] + '_tc_wghtd_tc_thresh_{}_v{}.png'.format(str(tc_thresh),
+                                                                                           str(version))
+
+            x = list()
+            y = list()
+            z = list()
+            for val_dict in val_dicts:
+                temp_dict = dict()
+                for i, decid_band in enumerate(decid_bands):
+
+                    if (type(val_dict[decid_band]).__name__ in ('int', 'float')) and \
+                            (type(val_dict[tc_bands[i]]).__name__ in ('int', 'float')):
+
+                        if val_dict[tc_bands[i]] >= tc_thresh:
+                            y.append((float(val_dict[decid_band]) * float(val_dict[tc_bands[i]])) / 10000.0)
+                            x.append(int(decid_band.split('decid')[1]))
+                            z.append('Deciduous_fraction')
+
+                            y.append(float(val_dict[tc_bands[i]]) / 100.0)
+                            x.append(int(tc_bands[i].split('tc')[1]))
+                            z.append('Tree_cover')
+
+            f, (ax) = plt.subplots(1, 1, figsize=(8, 4))
+            f.suptitle(Handler(plotfile).basename, fontsize=14)
+
+            sns.boxplot(x, y, ax=ax, hue=z, showfliers=False)
+            # ax.set_xlabel(self.dict['xlabel'], size=12, alpha=0.8)
+            # ax.set_ylabel(self.dict['ylabel'], size=12, alpha=0.8)
+
+            plt.savefig(plotfile)
+            plt.close()
+
+            print('Plotted: {}'.format(plotfile))
+
+            # thresh only
+            plotfile = filename.split('.csv')[0] + '_tc_thresh_{}_v{}.png'.format(str(tc_thresh),
+                                                                                  str(version))
+
+            x = list()
+            y = list()
+            z = list()
+            for val_dict in val_dicts:
+                temp_dict = dict()
+                for i, decid_band in enumerate(decid_bands):
+
+                    if (type(val_dict[decid_band]).__name__ in ('int', 'float')) and \
+                            (type(val_dict[tc_bands[i]]).__name__ in ('int', 'float')):
+
+                        if val_dict[tc_bands[i]] >= tc_thresh:
+                            y.append(float(val_dict[decid_band]) / 100.0)
+                            x.append(int(decid_band.split('decid')[1]))
+                            z.append('Deciduous_fraction')
+
+                            y.append(float(val_dict[tc_bands[i]]) / 100.0)
+                            x.append(int(tc_bands[i].split('tc')[1]))
+                            z.append('Tree_cover')
+
+            f, (ax) = plt.subplots(1, 1, figsize=(8, 4))
+            f.suptitle(Handler(plotfile).basename, fontsize=14)
+
+            sns.boxplot(x, y, ax=ax, hue=z, showfliers=False)
+            # ax.set_xlabel(self.dict['xlabel'], size=12, alpha=0.8)
+            # ax.set_ylabel(self.dict['ylabel'], size=12, alpha=0.8)
+
+            # plt.ylim(ylim)
+
+            plt.savefig(plotfile)
+            plt.close()
+
+            print('Plotted: {}'.format(plotfile))
 

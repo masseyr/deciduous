@@ -591,13 +591,17 @@ class Raster(object):
     def get_next_tile(self,
                       tile_xsize=1024,
                       tile_ysize=1024,
-                      bands=(1,)):
+                      bands=(1,),
+                      finite_only=True,
+                      nan_replacement=None):
 
         """
         Generator to extract raster tile by tile
         :param tile_xsize: Number of columns in the tile block
         :param tile_ysize: Number of rows in the tile block
         :param bands: Band to extract (default: (1,))
+        :param finite_only: If only finite values should be returned
+        :param nan_replacement: replacement for NAN values
         :return: Yields tuple: (tiepoint xy tuple, tile numpy array(2d array if only one band, else 3d array)
         """
 
@@ -607,6 +611,11 @@ class Raster(object):
         if self.ntiles is None:
             self.make_tile_grid(tile_xsize,
                                 tile_ysize)
+        if nan_replacement is None:
+            if self.nodatavalue is None:
+                nan_replacement = 0
+            else:
+                nan_replacement = self.nodatavalue
 
         ii = 0
         while ii < self.ntiles:
@@ -625,6 +634,89 @@ class Raster(object):
                     temp_band = self.datasource.GetRasterBand(band)
                     tile_arr[jj, :, :] = temp_band.ReadAsArray(*self.tile_grid[ii]['block_coords'])
 
+            if finite_only:
+                if np.isnan(tile_arr).any() or np.isinf(tile_arr).any():
+                    tile_arr[np.isnan(tile_arr)] = nan_replacement
+                    tile_arr[np.isinf(tile_arr)] = nan_replacement
+
             yield self.tile_grid[ii]['tie_point'], tile_arr
 
             ii += 1
+
+
+class VRaster:
+
+    def __init__(self,
+                 filelist=None,
+                 initialize=True,
+                 get_array=False):
+
+        self.filelist = filelist
+        self.rasters = list()
+
+        if filelist is not None:
+
+            if type(filelist).__name__ not in ('list', 'tuple'):
+                filelist = [filelist]
+            for filename in filelist:
+                ras = Raster(filename)
+                if initialize:
+                    ras.initialize(get_array=get_array)
+                self.rasters.append(ras)
+
+        self.intersection = None
+        self.nodatavalue = list(raster.nodatavalue for raster in self.rasters)
+
+    def get_intersection(self,
+                         index=None):
+
+        wkt_list = list()
+        if index is not None:
+            for ii in index:
+                bounds = self.rasters[ii].get_bounds()
+                wktstring = 'POLYGON(({}))'.format(', '.join(list(' '.join([str(x), str(y)]) for (x, y) in bounds)))
+                wkt_list.append(wktstring)
+        else:
+            for raster in self.rasters:
+                bounds = raster.get_bounds()
+                wktstring = 'POLYGON(({}))'.format(', '.join(list(' '.join([str(x), str(y)]) for (x, y) in bounds)))
+                wkt_list.append(wktstring)
+
+        geoms = list(ogr.CreateGeometryFromWkt(wktstring) for wktstring in wkt_list)
+
+        temp_geom = geoms[0]
+
+        for geom in geoms[1:]:
+            temp_geom = temp_geom.intersection(geom)
+
+        temp_geom = temp_geom.ExportToWkt()
+
+        temp_coords = list(list(float(elem.strip()) for elem in elem_.split(' '))
+                           for elem_ in temp_geom.replace('POLYGON((', '').replace('))', '').split(','))
+
+        minx = min(list(coord[0] for coord in temp_coords))
+        miny = min(list(coord[1] for coord in temp_coords))
+
+        maxx = max(list(coord[0] for coord in temp_coords))
+        maxy = max(list(coord[1] for coord in temp_coords))
+
+        self.intersection = (minx, miny, maxx, maxy)
+
+    def layerstack(self,
+                   order=None,
+                   nodatavalue=-9999.0):
+
+        vrt_options = {
+            'resolution': 'highest',
+            'outputBounds': self.intersection,
+            'separate': True,
+            'resampleAlg': 'bilinear',
+            'srcNodata': self.nodatavalue,
+            'VRTNodata': nodatavalue,
+            'hideNodata': True
+        }
+
+        if order is None:
+            order = list(range(len(self.rasters)))
+
+        ls_vrt = gdal.BuildVRTOptions()
