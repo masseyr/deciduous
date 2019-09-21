@@ -8,7 +8,7 @@ gdal.UseExceptions()
 gdal.AllRegister()
 
 
-__all__ = ['Raster']
+__all__ = ['Raster', 'MultiRaster']
 
 
 class Raster(object):
@@ -644,12 +644,22 @@ class Raster(object):
             ii += 1
 
 
-class VRaster:
+class MultiRaster:
+    """
+    Virtual raster class to manipulate GDAL virtual raster object
+    """
 
     def __init__(self,
                  filelist=None,
                  initialize=True,
                  get_array=False):
+
+        """
+        Class constructor
+        :param filelist: List of raster (.tif) files
+        :param initialize: if the rasters from file list should be initialized
+        :param get_array: if raster arrays should be read to memory
+        """
 
         self.filelist = filelist
         self.rasters = list()
@@ -666,9 +676,17 @@ class VRaster:
 
         self.intersection = None
         self.nodatavalue = list(raster.nodatavalue for raster in self.rasters)
+        self.resolutions = list((raster.transform[1], raster.transform[5]) for raster in self.rasters)
 
     def get_intersection(self,
-                         index=None):
+                         index=None,
+                         _return=False):
+        """
+        Method to get intersecting bounds of the raster objects
+        :param index: list of indices of raster files/objects
+        :param _return: Should the method return the bound coordinates
+        :return: coordinates of intersection (minx, miny, maxx, maxy)
+        """
 
         wkt_list = list()
         if index is not None:
@@ -687,12 +705,12 @@ class VRaster:
         temp_geom = geoms[0]
 
         for geom in geoms[1:]:
-            temp_geom = temp_geom.intersection(geom)
+            temp_geom = temp_geom.Intersection(geom)
 
         temp_geom = temp_geom.ExportToWkt()
 
-        temp_coords = list(list(float(elem.strip()) for elem in elem_.split(' '))
-                           for elem_ in temp_geom.replace('POLYGON((', '').replace('))', '').split(','))
+        temp_coords = list(list(float(elem.strip()) for elem in elem_.strip().split(' '))
+                           for elem_ in temp_geom.replace('POLYGON', '').replace('((', '').replace('))', '').split(','))
 
         minx = min(list(coord[0] for coord in temp_coords))
         miny = min(list(coord[1] for coord in temp_coords))
@@ -702,21 +720,85 @@ class VRaster:
 
         self.intersection = (minx, miny, maxx, maxy)
 
+        if _return:
+            return self.intersection
+
     def layerstack(self,
                    order=None,
-                   nodatavalue=-9999.0):
+                   verbose=False,
+                   outfile=None,
+                   **kwargs):
 
-        vrt_options = {
-            'resolution': 'highest',
-            'outputBounds': self.intersection,
-            'separate': True,
-            'resampleAlg': 'bilinear',
-            'srcNodata': self.nodatavalue,
-            'VRTNodata': nodatavalue,
-            'hideNodata': True
-        }
+        """
+        Method to layerstack
+        :param order: order of raster layerstack
+        :param verbose: If some of the steps should be printed to console
+        :param outfile: Name of the output file (.tif)
+        :return: None
+        """
 
         if order is None:
             order = list(range(len(self.rasters)))
 
-        ls_vrt = gdal.BuildVRTOptions()
+        vrt_dict = dict()
+
+        if 'output_bounds' in kwargs:
+            vrt_dict['outputBounds'] = kwargs['output_bounds']
+        else:
+            vrt_dict['outputBounds'] = self.intersection
+
+        output_res = min(list(np.abs(self.resolutions[i][0]) for i in order))
+
+        if 'outputresolution' in kwargs:
+            vrt_dict['xRes'] = kwargs['outputresolution'][0]
+            vrt_dict['yRes'] = kwargs['outputresolution'][1]
+        else:
+            vrt_dict['xRes'] = output_res
+            vrt_dict['yRes'] = output_res
+
+        if 'nodatavalue' in kwargs:
+            vrt_dict['srcNodata'] = kwargs['nodatavalue']
+        else:
+            vrt_dict['srcNodata'] = self.nodatavalue[0]
+
+        if 'outnodatavalue' in kwargs:
+            vrt_dict['VRTNodata'] = kwargs['outnodatavalue']
+        else:
+            vrt_dict['VRTNodata'] = self.nodatavalue[0]
+
+        if 'resample' in kwargs:
+            vrt_dict['resampleAlg'] = kwargs['resample']
+        else:
+            vrt_dict['resampleAlg'] = 'cubic'
+
+        if verbose:
+            Opt.cprint('Getting bounds ...')
+
+        vrt_dict['outputBounds'] = self.get_intersection(index=order,
+                                                         _return=True)
+        vrt_dict['separate'] = True
+        vrt_dict['hideNodata'] = False
+
+        if verbose:
+            Opt.cprint('Files: \n{}'.format('\n'.join(list(self.filelist[i] for i in order))))
+
+        _vrt_opt_ = gdal.BuildVRTOptions(**vrt_dict)
+
+        if outfile is None:
+            vrtfile = Handler(self.filelist[0]).dirname + Handler().sep + 'layerstack1.vrt'
+            outfile = Handler(self.filelist[0]).dirname + Handler().sep + 'layerstack1.tif'
+        else:
+            vrtfile = outfile.split('.tif')[0] + '.vrt'
+
+        _vrt_ = gdal.BuildVRT(vrtfile, list(self.filelist[i] for i in order), options=_vrt_opt_)
+
+        gdal.Translate(outfile, _vrt_)
+
+        _vrt_ = None
+
+        if verbose:
+            outras = Raster(outfile)
+
+            Opt.cprint(outras)
+
+            Opt.cprint('Done!')
