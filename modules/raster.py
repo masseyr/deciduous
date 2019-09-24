@@ -1,5 +1,6 @@
 import numpy as np
 from common import *
+import multiprocessing as mp
 from osgeo import gdal, gdal_array, ogr, gdalconst
 np.set_printoptions(suppress=True)
 
@@ -54,20 +55,26 @@ class Raster(object):
             return "<raster with path {ras}>".format(ras=self.name,)
 
     def write_to_file(self,
-                      outfile=None):
+                      outfile=None,
+                      driver='GTiff'):
         """
         Write raster to file, given all the properties
-        :param self - Raster object
-        :param outfile - Name of output file
+        :param self: Raster object
+        :param driver: raster driver
+        :param outfile: Name of output file
         """
         if outfile is None:
-            outfile = self.name
-            outfile = Handler(filename=outfile).file_remove_check()
+
+            if driver == 'MEM':
+                outfile = 'tmp'
+            else:
+                outfile = self.name
+                outfile = Handler(filename=outfile).file_remove_check()
 
         Opt.cprint('')
         Opt.cprint('Writing ' + outfile)
         Opt.cprint('')
-        gtiffdriver = gdal.GetDriverByName('GTiff')
+        gtiffdriver = gdal.GetDriverByName(driver)
         fileptr = gtiffdriver.Create(outfile, self.shape[2], self.shape[1],
                                      self.shape[0], self.dtype)
         nbands = self.shape[0]
@@ -155,121 +162,121 @@ class Raster(object):
         :param use_dict: Dictionary to use for renaming bands
         :param sensor: Sensor to be used with dictionary (resources.bname_dict)
         (ignored if finite_only, get_array is false)
-        :return raster object
+        :return None
         """
         self.init = True
         raster_name = self.name
 
-        if Handler(raster_name).file_exists():
-
-            # open file
-            fileptr = gdal.Open(raster_name)
+        if Handler(raster_name).file_exists() or 'vsimem' in self.name:
+            fileptr = gdal.Open(raster_name)  # open file
             self.datasource = fileptr
+            self.metadict = Raster.get_raster_metadict(file_name=raster_name)
 
-            # get shape metadata
-            bands = fileptr.RasterCount
-            rows = fileptr.RasterYSize
-            cols = fileptr.RasterXSize
+        elif self.datasource is not None:
+            fileptr = self.datasource
+            self.metadict = Raster.get_raster_metadict(file_ptr=fileptr)
 
-            # if get_array flag is true
-            if get_array:
+        else:
+            raise ValueError('No datasource found')
 
-                # get band names
-                names = list()
+        # get shape metadata
+        bands = fileptr.RasterCount
+        rows = fileptr.RasterYSize
+        cols = fileptr.RasterXSize
 
-                # band order
-                if band_order is None:
-                    array3d = fileptr.ReadAsArray()
+        # if get_array flag is true
+        if get_array:
 
-                    # if flag for finite values is present
-                    if finite_only:
-                        if np.isnan(array3d).any() or np.isinf(array3d).any():
-                            array3d[np.isnan(array3d)] = nan_replacement
-                            array3d[np.isinf(array3d)] = nan_replacement
-                            Opt.cprint("Non-finite values replaced with " + str(nan_replacement))
-                        else:
-                            Opt.cprint("Non-finite values absent in file")
+            # get band names
+            names = list()
 
-                    # get band names
-                    for i in range(0, bands):
-                        names.append(fileptr.GetRasterBand(i + 1).GetDescription())
+            # band order
+            if band_order is None:
+                array3d = fileptr.ReadAsArray()
 
-                # band order present
-                else:
-                    Opt.cprint('Reading bands: {}'.format(" ".join([str(b) for b in band_order])))
-
-                    bands = len(band_order)
-
-                    # bands in array
-                    n_array_bands = len(band_order)
-
-                    # initialize array
-                    if self.array_offsets is None:
-                        array3d = np.zeros((n_array_bands,
-                                            rows,
-                                            cols),
-                                           gdal_array.GDALTypeCodeToNumericTypeCode(fileptr.GetRasterBand(1).DataType))
+                # if flag for finite values is present
+                if finite_only:
+                    if np.isnan(array3d).any() or np.isinf(array3d).any():
+                        array3d[np.isnan(array3d)] = nan_replacement
+                        array3d[np.isinf(array3d)] = nan_replacement
+                        Opt.cprint("Non-finite values replaced with " + str(nan_replacement))
                     else:
-                        array3d = np.zeros((n_array_bands,
-                                            self.array_offsets[3],
-                                            self.array_offsets[2]),
-                                           gdal_array.GDALTypeCodeToNumericTypeCode(fileptr.GetRasterBand(1).DataType))
+                        Opt.cprint("Non-finite values absent in file")
 
-                    # read array and store the band values and name in array
-                    for i, b in enumerate(band_order):
-                        bandname = fileptr.GetRasterBand(b + 1).GetDescription()
-                        Opt.cprint('Reading band {}'.format(bandname))
-
-                        if self.array_offsets is None:
-                            array3d[i, :, :] = fileptr.GetRasterBand(b + 1).ReadAsArray()
-                        else:
-                            array3d[i, :, :] = fileptr.GetRasterBand(b + 1).ReadAsArray(*self.array_offsets)
-
-                        names.append(bandname)
-
-                    # if flag for finite values is present
-                    if finite_only:
-                        if np.isnan(array3d).any() or np.isinf(array3d).any():
-                            array3d[np.isnan(array3d)] = nan_replacement
-                            array3d[np.isinf(array3d)] = nan_replacement
-                            Opt.cprint("Non-finite values replaced with " + str(nan_replacement))
-                        else:
-                            Opt.cprint("Non-finite values absent in file")
-
-                # assign to empty class object
-                self.array = array3d
-                self.bnames = names
-                self.shape = [bands, rows, cols]
-                self.transform = fileptr.GetGeoTransform()
-                self.crs_string = fileptr.GetProjection()
-                self.dtype = fileptr.GetRasterBand(1).DataType
-
-                self.metadict = Raster.get_raster_metadict(raster_name)
-
-            # if get_array is false
-            else:
                 # get band names
-                names = list()
                 for i in range(0, bands):
                     names.append(fileptr.GetRasterBand(i + 1).GetDescription())
 
-                # assign to empty class object without the array
-                self.bnames = names
-                self.shape = [bands, rows, cols]
-                self.transform = fileptr.GetGeoTransform()
-                self.crs_string = fileptr.GetProjection()
-                self.dtype = fileptr.GetRasterBand(1).DataType
-                self.nodatavalue = fileptr.GetRasterBand(1).GetNoDataValue()
-                self.metadict = Raster.get_raster_metadict(raster_name)
+            # band order present
+            else:
+                Opt.cprint('Reading bands: {}'.format(" ".join([str(b) for b in band_order])))
 
-            self.bounds = self.get_bounds()
+                bands = len(band_order)
 
-            # remap band names
-            if use_dict is not None:
-                self.bnames = [use_dict[sensor][b] for b in self.bnames]
+                # bands in array
+                n_array_bands = len(band_order)
 
+                # initialize array
+                if self.array_offsets is None:
+                    array3d = np.zeros((n_array_bands,
+                                        rows,
+                                        cols),
+                                       gdal_array.GDALTypeCodeToNumericTypeCode(fileptr.GetRasterBand(1).DataType))
+                else:
+                    array3d = np.zeros((n_array_bands,
+                                        self.array_offsets[3],
+                                        self.array_offsets[2]),
+                                       gdal_array.GDALTypeCodeToNumericTypeCode(fileptr.GetRasterBand(1).DataType))
+
+                # read array and store the band values and name in array
+                for i, b in enumerate(band_order):
+                    bandname = fileptr.GetRasterBand(b + 1).GetDescription()
+                    Opt.cprint('Reading band {}'.format(bandname))
+
+                    if self.array_offsets is None:
+                        array3d[i, :, :] = fileptr.GetRasterBand(b + 1).ReadAsArray()
+                    else:
+                        array3d[i, :, :] = fileptr.GetRasterBand(b + 1).ReadAsArray(*self.array_offsets)
+
+                    names.append(bandname)
+
+                # if flag for finite values is present
+                if finite_only:
+                    if np.isnan(array3d).any() or np.isinf(array3d).any():
+                        array3d[np.isnan(array3d)] = nan_replacement
+                        array3d[np.isinf(array3d)] = nan_replacement
+                        Opt.cprint("Non-finite values replaced with " + str(nan_replacement))
+                    else:
+                        Opt.cprint("Non-finite values absent in file")
+
+            # assign to empty class object
+            self.array = array3d
+            self.bnames = names
+            self.shape = [bands, rows, cols]
+            self.transform = fileptr.GetGeoTransform()
+            self.crs_string = fileptr.GetProjection()
+            self.dtype = fileptr.GetRasterBand(1).DataType
+
+        # if get_array is false
         else:
-            raise ValueError('No matching file found on disk')
+            # get band names
+            names = list()
+            for i in range(0, bands):
+                names.append(fileptr.GetRasterBand(i + 1).GetDescription())
+
+            # assign to empty class object without the array
+            self.bnames = names
+            self.shape = [bands, rows, cols]
+            self.transform = fileptr.GetGeoTransform()
+            self.crs_string = fileptr.GetProjection()
+            self.dtype = fileptr.GetRasterBand(1).DataType
+            self.nodatavalue = fileptr.GetRasterBand(1).GetNoDataValue()
+
+        self.bounds = self.get_bounds()
+
+        # remap band names
+        if use_dict is not None:
+            self.bnames = [use_dict[sensor][b] for b in self.bnames]
 
     def set_nodataval(self,
                       in_nodataval=255,
@@ -680,7 +687,7 @@ class MultiRaster:
 
     def get_intersection(self,
                          index=None,
-                         _return=False):
+                         _return=True):
         """
         Method to get intersecting bounds of the raster objects
         :param index: list of indices of raster files/objects
@@ -727,14 +734,72 @@ class MultiRaster:
                    order=None,
                    verbose=False,
                    outfile=None,
+                   return_vrt=True,
                    **kwargs):
 
         """
-        Method to layerstack
+        Method to layerstack rasters in a given order
         :param order: order of raster layerstack
         :param verbose: If some of the steps should be printed to console
         :param outfile: Name of the output file (.tif)
+        :param return_vrt: If the file should be written to disk or vrt object should be returned
         :return: None
+
+        valid build vrt options in kwargs
+        (from https://gdal.org/python/osgeo.gdal-module.html#BuildVRT):
+
+          options --- can be be an array of strings, a string or let empty and filled from other keywords..
+          resolution --- 'highest', 'lowest', 'average', 'user'.
+          outputBounds --- output bounds as (minX, minY, maxX, maxY) in target SRS.
+          xRes --- output horizontal resolution in target SRS.
+          yRes --- output vertical resolution in target SRS.
+          targetAlignedPixels --- whether to force output bounds to be multiple of output resolution.
+          separate --- whether each source file goes into a separate stacked band in the VRT band.
+          bandList --- array of band numbers (index start at 1).
+          addAlpha --- whether to add an alpha mask band to the VRT when the source raster have none.
+          resampleAlg --- resampling mode.
+          outputSRS --- assigned output SRS.
+          allowProjectionDifference --- whether to accept input datasets have not the same projection. Note: they will *not* be reprojected.
+          srcNodata --- source nodata value(s).
+          VRTNodata --- nodata values at the VRT band level.
+          hideNodata --- whether to make the VRT band not report the NoData value.
+          callback --- callback method.
+          callback_data --- user data for callback.
+
+        valid translate options in kwargs
+        (from https://gdal.org/python/osgeo.gdal-module.html#TranslateOptions):
+
+          options --- can be be an array of strings, a string or let empty and filled from other keywords.
+          format --- output format ("GTiff", etc...)
+          outputType --- output type (gdal.GDT_Byte, etc...)
+          bandList --- array of band numbers (index start at 1)
+          maskBand --- mask band to generate or not ("none", "auto", "mask", 1, ...)
+          width --- width of the output raster in pixel
+          height --- height of the output raster in pixel
+          widthPct --- width of the output raster in percentage (100 = original width)
+          heightPct --- height of the output raster in percentage (100 = original height)
+          xRes --- output horizontal resolution
+          yRes --- output vertical resolution
+          creationOptions --- list of creation options
+          srcWin --- subwindow in pixels to extract: [left_x, top_y, width, height]
+          projWin --- subwindow in projected coordinates to extract: [ulx, uly, lrx, lry]
+          projWinSRS --- SRS in which projWin is expressed
+          strict --- strict mode
+          unscale --- unscale values with scale and offset metadata
+          scaleParams --- list of scale parameters, each of the form [src_min,src_max] or [src_min,src_max,dst_min,dst_max]
+          exponents --- list of exponentiation parameters
+          outputBounds --- assigned output bounds: [ulx, uly, lrx, lry]
+          metadataOptions --- list of metadata options
+          outputSRS --- assigned output SRS
+          GCPs --- list of GCPs
+          noData --- nodata value (or "none" to unset it)
+          rgbExpand --- Color palette expansion mode: "gray", "rgb", "rgba"
+          stats --- whether to calculate statistics
+          rat --- whether to write source RAT
+          resampleAlg --- resampling mode
+          callback --- callback method
+          callback_data --- user data for callback
+
         """
 
         if order is None:
@@ -774,8 +839,7 @@ class MultiRaster:
         if verbose:
             Opt.cprint('Getting bounds ...')
 
-        vrt_dict['outputBounds'] = self.get_intersection(index=order,
-                                                         _return=True)
+        vrt_dict['outputBounds'] = self.get_intersection(index=order)
         vrt_dict['separate'] = True
         vrt_dict['hideNodata'] = False
 
@@ -792,13 +856,154 @@ class MultiRaster:
 
         _vrt_ = gdal.BuildVRT(vrtfile, list(self.filelist[i] for i in order), options=_vrt_opt_)
 
-        gdal.Translate(outfile, _vrt_)
+        if not return_vrt:
+            if verbose:
+                Opt.cprint('Writing layer stack file : {} ...'.format(outfile))
+            gdal.Translate(outfile, _vrt_, **kwargs)
+            _vrt_ = None
+            if verbose:
+                outras = Raster(outfile)
+                Opt.cprint(outras)
+                Opt.cprint('Done!')
+        else:
+            return _vrt_
 
-        _vrt_ = None
+    def composite(self,
+                  layer_indices=None,
+                  verbose=False,
+                  outfile=None,
+                  composite_type='mean',
+                  tile_size=1024,
+                  write_raster=False,
+                  **kwargs):
+        """
+        Method to calculate raster composite in a given order
+        :param layer_indices: list of layer indices
+        :param verbose: If some of the steps should be printed to console
+        :param outfile: Name of the output file (.tif)
+        :param tile_size: Size of internal tile
+        :param write_raster: If the raster file should be written or a raster object be returned
+        :param composite_type: mean, median, pctl_xxx (eg: pctl_5, pctl_99, pctl_100, etc.),
+        :return: None
+        """
 
-        if verbose:
-            outras = Raster(outfile)
+        if layer_indices is None:
+            layer_indices = list(range(len(self.rasters)))  # list of layer indices
+            t_order = list(range(1, len(self.rasters) + 1))  # list of bands to include in raster tiles
+        else:
+            t_order = list(elem + 1 for elem in layer_indices)  # list of bands to include in raster tiles
 
-            Opt.cprint(outras)
+        # layer stack vrt
+        _ls_vrt_ = self.layerstack(order=layer_indices,
+                                   verbose=verbose,
+                                   return_vrt=True,
+                                   **kwargs)
 
-            Opt.cprint('Done!')
+        # raster object from vrt
+        lras = Raster('tmp_layerstack')
+        lras.datasource = _ls_vrt_
+        lras.initialize()
+        lras.make_tile_grid(tile_size, tile_size)
+
+        Opt.cprint(lras)
+
+        # make numpy array to hold the final result
+        out_arr = np.zeros((lras.shape[1], lras.shape[2]),
+                           dtype=gdal_array.GDALTypeCodeToNumericTypeCode(lras.dtype))
+
+        # loop through raster tiles
+        count = 0
+        for tie_pt, tile_arr in lras.get_next_tile(bands=t_order):
+
+            Opt.cprint(lras.tile_grid[count]['block_coords'])
+
+            _x, _y, _cols, _rows = lras.tile_grid[count]['block_coords']
+
+            if composite_type == 'mean':
+                temp_arr = np.apply_along_axis(lambda x: np.mean(x[x != lras.nodatavalue]), 0, tile_arr)
+            elif composite_type == 'median':
+                temp_arr = np.apply_along_axis(lambda x: np.median(x[x != lras.nodatavalue]), 0, tile_arr)
+            elif 'pctl' in composite_type:
+                pctl = int(composite_type.split('_')[1])
+                temp_arr = np.apply_along_axis(lambda x: np.percentile(x[x != lras.nodatavalue], pctl), 0, tile_arr)
+            else:
+                raise ValueError('Unknown composite option')
+
+            # update output array with tile composite
+            out_arr[_y: (_y+_rows), _x: (_x+_cols)] = temp_arr
+            count += 1
+
+        # write array to raster
+        lras.array = out_arr
+
+        if write_raster:
+            # write raster
+            lras.write_to_file(outfile)
+            Opt.cprint('Written {}'.format(outfile))
+        else:
+            return lras
+
+    def mosaic(self,
+               order=None,
+               verbose=False,
+               outfile=None,
+               return_vrt=True,
+               **kwargs):
+        """
+        Under construction
+
+        Method to mosaic rasters in a given order
+        :param order: order of raster layerstack
+        :param verbose: If some of the steps should be printed to console
+        :param outfile: Name of the output file (.tif)
+        :param return_vrt: If the file should be written to disk or vrt object should be returned
+        :return: None
+
+        valid warp options in kwargs
+        (from https://gdal.org/python/osgeo.gdal-module.html#WarpOptions):
+
+          options --- can be be an array of strings, a string or let empty and filled from other keywords.
+          format --- output format ("GTiff", etc...)
+          outputBounds --- output bounds as (minX, minY, maxX, maxY) in target SRS
+          outputBoundsSRS --- SRS in which output bounds are expressed, in the case they are not expressed in dstSRS
+          xRes, yRes --- output resolution in target SRS
+          targetAlignedPixels --- whether to force output bounds to be multiple of output resolution
+          width --- width of the output raster in pixel
+          height --- height of the output raster in pixel
+          srcSRS --- source SRS
+          dstSRS --- output SRS
+          srcAlpha --- whether to force the last band of the input dataset to be considered as an alpha band
+          dstAlpha --- whether to force the creation of an output alpha band
+          outputType --- output type (gdal.GDT_Byte, etc...)
+          workingType --- working type (gdal.GDT_Byte, etc...)
+          warpOptions --- list of warping options
+          errorThreshold --- error threshold for approximation transformer (in pixels)
+          warpMemoryLimit --- size of working buffer in bytes
+          resampleAlg --- resampling mode
+          creationOptions --- list of creation options
+          srcNodata --- source nodata value(s)
+          dstNodata --- output nodata value(s)
+          multithread --- whether to multithread computation and I/O operations
+          tps --- whether to use Thin Plate Spline GCP transformer
+          rpc --- whether to use RPC transformer
+          geoloc --- whether to use GeoLocation array transformer
+          polynomialOrder --- order of polynomial GCP interpolation
+          transformerOptions --- list of transformer options
+          cutlineDSName --- cutline dataset name
+          cutlineLayer --- cutline layer name
+          cutlineWhere --- cutline WHERE clause
+          cutlineSQL --- cutline SQL statement
+          cutlineBlend --- cutline blend distance in pixels
+          cropToCutline --- whether to use cutline extent for output bounds
+          copyMetadata --- whether to copy source metadata
+          metadataConflictValue --- metadata data conflict value
+          setColorInterpretation --- whether to force color interpretation of input bands to output bands
+          callback --- callback method
+          callback_data --- user data for callback
+
+        For valid translate options, see MultiRaster.layerstack()
+        """
+
+        pass
+
+
