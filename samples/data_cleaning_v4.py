@@ -2,58 +2,76 @@ from geosoup import Vector, Handler, Sublist
 from geosoupML import Euclidean
 import numpy as np
 import scipy.stats as stats
-'''
 import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 
 plt.rcParams.update({'font.size': 18, 'font.family': 'Times New Roman'})
 plt.rcParams['axes.labelweight'] = 'bold'
 font = FontProperties()
 font.set_family('serif')
 font.set_name('Times New Roman')
+
 '''
-'''
-v3: This version of data cleaning is without Mahalanobis distance and uses only 
-the histogram of decid fraction bins to clean samples. The samples have not been used to extract
-Landsat data yet. Once the samples are cleaned they can then be used to extract Landsat data.
-This cleaning code is for generating graphics data only
+This data cleaning code uses the histogram only of deciduous fraction 
+bins to clean samples. The samples have not been used to extract Landsat data yet. 
+Once the samples are cleaned they are then be used to extract 
+Landsat data from GEE in subsequent codes.
 '''
 
 
 if __name__ == '__main__':
 
     # static vars--------------------------------------------------------------------------------------------
-    version = 8
-    trn_perc = 66  # percentage of training samples
-    nbins = 100
-    cutoff = 55  # percentile at which to cutoff the samples in each bin
-    divider_lon = -97.0
-    divid_multiplier = 0.3  # multipler for the east side samples
-    thresh = 0.025  # distance threshold
+    version = 9  # version number
+    nbins = 100  # number of bins
+    cutoff = 66  # percentile at which to cutoff the samples in each bin
 
-    # output file dirsctory
-    outdir = "D:/shared/Dropbox/projects/NAU/landsat_deciduous/data/SAMPLES/"
+    east_west_bounds = "/home/richard/Dropbox/projects/NAU/landsat_deciduous/data/STUDY_AREA/" \
+                       "CAN_AK_east_west_boreal.shp"
 
-    # input file directory
-    infile = outdir + "all_samp_pre_v1.csv"
-    ini_outfile = outdir + "all_samp_pre_v1.shp"
-    outfile = outdir + "all_samp_postbin_v{}.csv".format(version)
-    outshpfile = outdir + "all_samp_postbin_v{}.shp".format(version)
-
-    trn_outfile = outdir + "all_samp_post_v{}_trn_samp.shp".format(version)
-    val_outfile = outdir + "all_samp_post_v{}_val_samp.shp".format(version)
-
-    boreal_bounds = "D:/shared/Dropbox/projects/NAU/landsat_deciduous/data/STUDY_AREA/boreal/" \
+    boreal_bounds = "/home/richard/Dropbox/projects/NAU/landsat_deciduous/data/STUDY_AREA/boreal/" \
                     "NABoreal_simple_10km_buffer_geo.shp"
 
+    # sample file dirsctory
+    samp_dir = "/home/richard/Dropbox/projects/NAU/landsat_deciduous/data/samples/"
+
+    # input files
+    infile = samp_dir + "all_samp_pre_v1.csv"
+    infile_shp = samp_dir + "all_samp_pre_v1.shp"
+
+    # output files
+    outfile = samp_dir + "all_samp_post_v{}.csv".format(version)
+    outshpfile = samp_dir + "all_samp_post_v{}.shp".format(version)
+
+    # plot files
+    pre_qq_file = samp_dir + 'pre_qq_file_v{}.png'.format(version)
+    post_qq_file = samp_dir + 'post_qq_file_v{}.png'.format(version)
+    plot_file = samp_dir + 'sample_distribution_plot_v{}.png'.format(version)
+
+    # years bins for samples, based on Landsat data temporal ranges
     year_bins = [(1984, 1997), (1998, 2002), (2003, 2007), (2008, 2012), (2013, 2018)]
 
-    # script-----------------------------------------------------------------------------------------------
-
+    # year samp calculation -----------------------------------------------------------------------------------------
+    # read bounds
     boreal_vec = Vector(boreal_bounds)
     boreal_geom = Vector.get_osgeo_geom(boreal_vec.wktlist[0])
 
+    sep_vec = Vector(east_west_bounds)
+
+    # geometries of east and west boreal regions
+    sep_geom_west = Vector.get_osgeo_geom(sep_vec.wktlist[0])
+    sep_geom_east = Vector.get_osgeo_geom(sep_vec.wktlist[1])
+
+    # area of east and west regions
+    area_west = sep_vec.attributes[0]['area']
+    area_east = sep_vec.attributes[1]['area']
+
+    # ratio of east and west areas
+    area_ratio = area_east/area_west
+
+    # make list of year bins
     year_samp = list(list() for _ in range(len(year_bins)))
     year_samp_reduced = list(list() for _ in range(len(year_bins)))
 
@@ -69,15 +87,25 @@ if __name__ == '__main__':
     for elem in file_data:
         for i, years in enumerate(year_bins):
             if years[0] <= elem['year'] <= years[1]:
+
+                # add samples to a year-wise list of samples
                 year_samp[i].append(elem)
 
-    # take mean of all samples of the same site that fall in the same year bin
+    for year_samp_ in year_samp:
+        print(len(year_samp_))
+
+    # iterate thru year list of samples
     for i, samp_list in enumerate(year_samp):
         print('year: {}'.format(str(year_bins[i])))
         samp_count = 0
+
+        # gather all site IDs
         site_ids = list(set(list(attr_dict['site'] for attr_dict in samp_list)))
 
-        for site_id in site_ids[0:100]:
+        # iterate thru sites
+        for site_id in site_ids:
+
+            # choose the sites that have the same ID
             same_site_samp_list = list(samp for samp in samp_list if samp['site'] == site_id)
 
             lat = same_site_samp_list[0]['Latitude']
@@ -88,6 +116,8 @@ if __name__ == '__main__':
 
             if boreal_geom.Intersects(samp_geom):
 
+                # take mean of decid fraction and year of all samples
+                # at the same site that fall in the same year bin
                 decid_frac = np.mean(list(site_samp['decid_frac'] for site_samp in same_site_samp_list))
                 year = int(np.mean(list(site_samp['year'] for site_samp in same_site_samp_list)))
 
@@ -110,8 +140,6 @@ if __name__ == '__main__':
 
     print('Reduced samples: {}'.format(str(len(decid_frac_samp))))
 
-    print(decid_frac_samp[0])
-
     attribute_types = {'site': 'str',
                        'year': 'int',
                        'decid_frac': 'float'}
@@ -119,6 +147,8 @@ if __name__ == '__main__':
     wkt_list = list()
     attr_list = list()
 
+    # loop thru decid fraction samples and add to
+    # WKT geometry and attributes list
     for i, row in enumerate(decid_frac_samp):
         elem = dict()
         for header in list(attribute_types):
@@ -130,17 +160,17 @@ if __name__ == '__main__':
         wkt_list.append(wkt)
         attr_list.append(elem)
 
+    # create a Vector object from wktlist
     vector = Vector.vector_from_string(wkt_list,
                                        out_epsg=4326,
                                        vector_type='point',
                                        attributes=attr_list,
-                                       attribute_types=attribute_types,
-                                       verbose=True)
+                                       attribute_types=attribute_types)
 
     print(vector)
-    vector.write_vector(ini_outfile)
+    vector.write_vector(infile_shp)
 
-    exit()
+    # sample histogram calculation -----------------------------------------------------------------------------
 
     # extract all decid frac values for calculating histogram
     decid_frac_list = list(samp['decid_frac'] for samp in decid_frac_samp)
@@ -148,7 +178,6 @@ if __name__ == '__main__':
     # histogram calculation
     step = 1.0 / float(nbins)
     hist, bin_edges = np.histogram(decid_frac_list, bins=nbins)
-    hist = hist.tolist()
     print(hist)
 
     # calculate the cutoff number per bin
@@ -197,6 +226,12 @@ if __name__ == '__main__':
     out_decid_frac_samp = list()
     for sublist in out_binned_decid_dicts:
         for elem in sublist:
+            lat = elem['latitude']
+            lon = elem['longitude']
+
+            wkt = Vector.wkt_from_coords([float(lon), float(lat)], geom_type='point')
+            elem['wkt'] = wkt
+
             out_decid_frac_samp.append(elem)
 
     # This portion of code calculates the number of samples on each side
@@ -207,44 +242,61 @@ if __name__ == '__main__':
     east_count = 0
     west_index = list()
     east_index = list()
+
+    # place the samples in appropriate lists based on where they lie
     for i, elem in enumerate(out_decid_frac_samp):
-        if elem['longitude'] <= divider_lon:
+        geom = Vector.get_osgeo_geom(elem['wkt'])
+
+        if geom.Intersects(sep_geom_west):
             west_count += 1
             west_index.append(i)
-        else:
+        elif geom.Intersect(sep_geom_east):
             east_count += 1
             east_index.append(i)
-
+        else:
+            print('No intersection with boreal domain for {}'.format(elem['site']))
+    
     print('West count:  {}'.format(west_count))
     print('East count:  {}'.format(east_count))
 
     # if more samples in the east, randomly select same number or a fraction of samples as west
     if east_count > west_count:
-        east_index = Sublist(east_index).random_selection(int(west_count * divid_multiplier))
+        east_index = Sublist(east_index).random_selection(int(west_count * area_ratio))
 
+        print('East count after random selection: {}'.format(str(len(east_index))))
+
+    '''
+    # get east samples from the selected random indices
     east_samp = list(out_decid_frac_samp[i] for i in east_index)
 
-    east_eu = Euclidean(samples=east_samp,
-                        names=['longitude', 'latitude'])
-    east_eu.calc_dist_matrix()
-    east_eu.proximity_filter(thresh=thresh)
+    # Remove the east samples that are closer to each other
+    # than thresh (default: median value)
+    # this is done only for east samples due to
+    # proximity/spatial auto-correlation issues
+    east_euc = Euclidean(samples=east_samp,
+                         names=['longitude', 'latitude'])
+    east_euc.calc_dist_matrix()
+    east_euc.proximity_filter(thresh=thresh)
 
-    east_samp = east_eu.samples
+    east_samp = east_euc.samples
     east_index = list(range(len(east_samp)))
 
     print('East count after processing: {}'.format(len(east_index)))
+    '''
 
     indices = east_index + west_index
 
-    out_decid_frac_samp = list(out_decid_frac_samp[i] for i in west_index) + \
-        list(east_samp[i] for i in east_index)
+    wkt_list = list(wkt_list[i] for i in indices)
+    attr_list = list(attr_list[i] for i in indices)
+
+    out_decid_frac_samp = list(out_decid_frac_samp[i] for i in indices)
 
     print('Total count after processing: {}'.format(len(out_decid_frac_samp)))
 
     out_decid_frac_list = list(samp['decid_frac'] for samp in out_decid_frac_samp)
     # ----------------------
 
-    # fint uniform distribution for the given distribution
+    # find uniform distribution for the given distribution
     resp, fit_stats = stats.probplot(np.array(decid_frac_list),
                                      dist='uniform')
 
@@ -260,20 +312,21 @@ if __name__ == '__main__':
 
     print('R-sq after removal: {}'.format(str(fit_stats2[2] ** 2 * 100.0)))
 
-    '''
+    # sample distribution plot --------------------------------------------------------------------------------
     fig1, ax1 = plt.subplots()
 
     ax1.plot(theo_quantiles, actual_quantiles, '.', markersize=15, markerfacecolor='none', markeredgecolor='#0C92CA')
     ax1.plot((0.0, 1.0), (0.0, 1.0), '-', color='red')
-    fig1.savefig(outdir + '/unitary_pre_qq_plot_v{}.png'.format(version), bbox_inches='tight')
+    fig1.savefig(samp_dir + '/unitary_pre_qq_plot_v{}.png'.format(version), bbox_inches='tight')
 
     fig2, ax1 = plt.subplots()
 
     ax1.plot(theo_quantiles2, actual_quantiles2, '.', markersize=15, markerfacecolor='none', markeredgecolor='#0C92CA')
     ax1.plot((0.0, 1.0), (0.0, 1.0), '-', color='red')
-    fig2.savefig(outdir + '/unitary_post_qq_plot_v{}.png'.format(version), bbox_inches='tight')
+    fig2.savefig(samp_dir + '/unitary_post_qq_plot_v{}.png'.format(version), bbox_inches='tight')
 
     perc_out = 100.0 * (float(len(decid_frac_list) - len(out_decid_frac_list)) / float(len(decid_frac_list)))
+
     print('Percentage of samples removed: {} %'.format(str(perc_out)))
     print('Final number of samples: {}'.format(str(len(out_decid_frac_list))))
 
@@ -294,12 +347,10 @@ if __name__ == '__main__':
     # ax1.tick_params(axis='y', pad=0.2)
     ax1.spines['top'].set_visible(False)
 
-    
     ax1.axhline(med,
                 color='Red',
                 linestyle='dashed',
                 linewidth=2)
-    
 
     res2 = ax2.hist(decid_frac_list,
                     color='#0C92CA',
@@ -327,8 +378,8 @@ if __name__ == '__main__':
                     bins=int(nbins))
 
     # save plot
-    fig3.savefig(outdir + '/sample_distribution_plot_v{}.png'.format(version), bbox_inches='tight')
-    '''
+    fig3.savefig(plot_file, bbox_inches='tight')
+
     out_samp_index = list(range(len(out_decid_frac_samp)))
     np.random.shuffle(out_samp_index)
 
@@ -338,85 +389,16 @@ if __name__ == '__main__':
     Handler.write_to_csv(out_decid_frac_samp,
                          outfile)
 
-    # write shp file---------
-    attribute_types = {'site': 'str',
-                       'year': 'int',
-                       'decid_frac': 'float'}
-
-    trn_data = list()
-
-    print('Total {} sites'.format(str(len(out_decid_frac_samp))))
-
-    ntrn = int((trn_perc * len(out_decid_frac_samp))/100.0)
-    nval = len(out_decid_frac_samp) - ntrn
-
-    # randomly select training samples based on number
-    trn_sites = Sublist(range(len(out_decid_frac_samp))).random_selection(ntrn)
-
-    # get the rest of samples as validation samples
-    val_sites = Sublist(range(len(out_decid_frac_samp))).remove(trn_sites)
-
-    # print IDs
-    print(len(trn_sites))
-    print(len(val_sites))
-
-    wkt_list = list()
-    attr_list = list()
-
-    trn_wkt_list = list()
-    trn_attr_list = list()
-
-    val_wkt_list = list()
-    val_attr_list = list()
-
-    for i, row in enumerate(out_decid_frac_samp):
-        elem = dict()
-        for header in list(attribute_types):
-            elem[header] = row[header]
-
-        wkt = Vector.wkt_from_coords([row['longitude'], row['latitude']],
-                                     geom_type='point')
-
-        if i in trn_sites:
-            trn_wkt_list.append(wkt)
-            trn_attr_list.append(elem)
-        elif i in val_sites:
-            val_wkt_list.append(wkt)
-            val_attr_list.append(elem)
-
-        wkt_list.append(wkt)
-        attr_list.append(elem)
-
+    # write shp file ---------------------------------------------------------------------------------
     vector = Vector.vector_from_string(wkt_list,
                                        out_epsg=4326,
                                        vector_type='point',
                                        attributes=attr_list,
-                                       attribute_types=attribute_types,
-                                       verbose=True,
-                                       full=False)
+                                       attribute_types=attribute_types)
 
     print(vector)
     vector.write_vector(outshpfile)
 
-    trn_vec = Vector.vector_from_string(trn_wkt_list,
-                                        out_epsg=4326,
-                                        vector_type='point',
-                                        attributes=trn_attr_list,
-                                        attribute_types=attribute_types,
-                                        verbose=True,
-                                        full=False)
-    print(trn_vec)
-    trn_vec.write_vector(trn_outfile)
-
-    val_vec = Vector.vector_from_string(val_wkt_list,
-                                        out_epsg=4326,
-                                        vector_type='point',
-                                        attributes=val_attr_list,
-                                        attribute_types=attribute_types,
-                                        verbose=True,
-                                        full=False)
-    print(val_vec)
-    val_vec.write_vector(val_outfile)
     # write shp file: end---------
 
     print('Done!')
