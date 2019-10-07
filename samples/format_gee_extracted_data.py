@@ -1,4 +1,5 @@
-from modules import *
+from geosoup import Vector, Handler, Opt
+from geosoupML import Mahalanobis
 import datetime
 import numpy as np
 import copy
@@ -100,7 +101,7 @@ def ndvi_pctl_composite(site_samp_dict,
     for ii, data_dict in site_samp_dict.items():
         ndvi = int(normalized_difference(data_dict['bands']['nir'],
                                          data_dict['bands']['red'],
-                                         canopy_adj=0.0) * 10000.0)
+                                         adj=0.0) * 10000.0)
 
         if jday_start <= data_dict['img_jday'] <= jday_end:
 
@@ -116,26 +117,24 @@ def ndvi_pctl_composite(site_samp_dict,
         out_dict = copy.deepcopy(site_samp_dict[ii])
 
         out_dict['bands'].update({'ndvi': normalized_difference(out_dict['bands']['nir'],
-                                                                out_dict['bands']['red'],
-                                                                canopy_adj=0.0)})
+                                                                out_dict['bands']['red'])})
 
         out_dict['bands'].update({'ndwi': normalized_difference(out_dict['bands']['nir'],
-                                                                out_dict['bands']['swir2'],
-                                                                canopy_adj=0.0)})
+                                                                out_dict['bands']['swir2'])})
 
         out_dict['bands'].update({'nbr': normalized_difference(out_dict['bands']['nir'],
-                                                               out_dict['bands']['swir1'],
-                                                               canopy_adj=0.0)})
+                                                               out_dict['bands']['swir1'])})
 
         out_dict['bands'].update({'savi': normalized_difference(out_dict['bands']['nir'],
                                                                 out_dict['bands']['red'],
-                                                                canopy_adj=0.5)})
+                                                                adj=0.5)})
 
         out_dict['bands'].update({'vari': enhanced_normalized_difference(out_dict['bands']['red'],
                                                                          out_dict['bands']['green'],
                                                                          out_dict['bands']['blue'],
-                                                                         canopy_adj=0.0,
-                                                                         gain=1.0)})
+                                                                         gain=1.0,
+                                                                         c3=-1.0,
+                                                                         adj=0.0)})
         return {ii: out_dict}
 
     else:
@@ -144,7 +143,7 @@ def ndvi_pctl_composite(site_samp_dict,
 
 def normalized_difference(b1,
                           b2,
-                          canopy_adj=0.5,
+                          adj=0.0,
                           adj_index=1.0,
                           additive=0.0):
 
@@ -152,14 +151,14 @@ def normalized_difference(b1,
     Normalized difference between two bands (based on NDVI formula)
     :param b1: First band
     :param b2: Second band
-    :param canopy_adj: Adjustment for canopy cover (useful for indices such as SAVi)
+    :param adj: Adjustment (useful for indices such as SAVI, as canopy cover adjustment)
     :param adj_index: Adjustment index
     :param additive: Additive
     :return: Float
     """
 
-    if float(b1)+float(b2)+canopy_adj != 0.0:
-        return ((1 + canopy_adj**adj_index)*(float(b1)-float(b2)))/(float(b1)+float(b2)+canopy_adj)+additive
+    if float(b1)+float(b2)+adj != 0.0:
+        return ((1 + adj**adj_index)*(float(b1)-float(b2)))/(float(b1)+float(b2)+adj)+additive
     else:
         return 0.0
 
@@ -167,56 +166,86 @@ def normalized_difference(b1,
 def enhanced_normalized_difference(b1,
                                    b2,
                                    b3,
-                                   canopy_adj=0.5,
+                                   adj=0.0,
                                    c1=1.0,
                                    c2=1.0,
-                                   gain=2.5):
+                                   c3=1.0,
+                                   gain=0.0):
+    """
+    Method to calculate enhanced normalized difference between two bands using a third band
+    This is equivalent to:
+                        GAIN * [(BAND1  -  BAND2)/(BAND1 * COEFF1  +  BAND2 * COEFF1  +  BAND3 * COEFF3 + ADJSTMNT)]
 
-    if (float(b1) + c1*float(b2) - c2*float(b3) + canopy_adj) != 0.0:
-        return gain*((float(b1)-float(b2))/(float(b1) + c1*float(b2) - c2*float(b3) + canopy_adj))
+    :param b1: First band
+    :param b2: Second Band
+    :param b3: Third Band
+    :param adj: Adjustment factor
+    :param c1: First Coefficient
+    :param c2: Second Coefficient
+    :param c3: Third Coefficient
+    :param gain: Gain value for the index
+    :return: Float
+    """
+    if (c1*float(b1) + c2*float(b2) + c3*float(b3) + adj) != 0.0:
+        return gain*((float(b1)-float(b2))/(c1*float(b1) + c2*float(b2) + c3*float(b3) + adj))
     else:
         return 0.0
 
 
 def correct_landsat_sr(bands_dict,
-                       sensor):
+                       sensor,
+                       scale=1.0):
+    """
+    Function to correct reflectance values in the bands_dict to match Landsat 7 output
+    Landsat 8 coefficients based on roy et al 2016 DOI: 10.1016/j.rse.2015.12.024
+    Landsat 5 coefficients based on sulla-menashe et al 2016 DOI: 10.1016/j.rse.2016.02.041
+    :param sensor: Options- LT05, LE07, LC08
+    :param bands_dict: Dictionary of band values
+    :param scale: Number to scale bands with
+    :return:
+    """
 
-    out_dict = dict()
+    in_bands = {
+        'LT05': ['B1', 'B2', 'B3', 'B4', 'B5', 'B6'],
+        'LE07': ['B1', 'B2', 'B3', 'B4', 'B5', 'B7'],
+        'LC08': ['B2', 'B3', 'B4', 'B5', 'B6', 'B7'],
+    }
+
+    if sensor not in in_bands:
+        raise ValueError('Invalid sensor name. Valid names are: landsat_5, landsat_7, landsat_8')
+
     out_bands = ['blue', 'green', 'red', 'nir', 'swir1', 'swir2']
 
-    if sensor == 'LT05' or sensor == 'LE07' or sensor == 'LC08':
+    multi_coeff = {
+        'LT05': [0.91996, 0.92764, 0.88810, 0.95057, 0.96525, 0.99601],
+        'LE07': [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        'LC08': [0.8850, 0.9317, 0.9372, 0.8339, 0.8639, 0.9165]
+    }
 
-        out_dict['blue'] = float(bands_dict['B1'])/10000.0
-        out_dict['green'] = float(bands_dict['B2'])/10000.0
-        out_dict['red'] = float(bands_dict['B3'])/10000.0
-        out_dict['nir'] = float(bands_dict['B4'])/10000.0
-        out_dict['swir1'] = float(bands_dict['B5'])/10000.0
-        out_dict['swir2'] = float(bands_dict['B7'])/10000.0
+    add_coeff = {
+        'LT05': [0.0037, 0.0084, 0.0098, 0.0038, 0.0029, 0.0020],
+        'LE07': [1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+        'LC08': [0.0183, 0.0123, 0.0123, 0.0448, 0.0306, 0.0116]
+    }
 
-        for band_name in ('slope', 'aspect', 'elevation'):
-            if band_name in bands_dict:
-                out_dict[band_name] = bands_dict[band_name]
-    else:
-        raise ValueError('Invalid sensor specified')
-    '''
-    elif sensor == 'LC08':
+    out_dict = {}
+    for ib, in_band in enumerate(in_bands[sensor]):
+        out_dict[out_bands[ib]] = (float(bands_dict[in_band]) * scale) * multi_coeff[sensor][ib] + \
+                                  add_coeff[sensor][ib]
 
-        out_dict['blue'] = 0.8850 * (float(bands_dict['B2'])/10000.0) + 0.0183
-        out_dict['green'] = 0.9317 * (float(bands_dict['B3'])/10000.0) + 0.0123
-        out_dict['red'] = 0.9372 * (float(bands_dict['B4'])/10000.0) + 0.0123
-        out_dict['nir'] = 0.8339 * (float(bands_dict['B5'])/10000.0) + 0.0448
-        out_dict['swir1'] = 0.8639 * (float(bands_dict['B6'])/10000.0) + 0.0306
-        out_dict['swir2'] = 0.9165 * (float(bands_dict['B7'])/10000.0) + 0.0116
-
-        for band_name in ('slope', 'aspect', 'elevation'):
-            if band_name in bands_dict:
-                out_dict[band_name] = bands_dict[band_name]
-    '''
+    for band_name in ('slope', 'aspect', 'elevation'):
+        if band_name in bands_dict:
+            out_dict[band_name] = bands_dict[band_name]
 
     return out_dict
 
 
 def extract_date(string):
+    """
+    Method to extract dates from a Landsat file name
+    :param string: Landsat file name
+    :return: Dictionary
+    """
     # LT05_L1TP_035020_19960605_20170104_01_T1
     list_str = string.split('_')
     return {
@@ -233,6 +262,16 @@ def unclear_value(x,
                   verbose=False):
     """
     Clear value using pixel_qa band
+        fill_bit = (0,)
+        clear_bit = (1,)
+        water_bit = (2,)
+        cloud_shadow_bit = (3,)
+        snow_bit = (4,)
+        cloud_bit = (5,)
+        cloud_conf_bit = (6, 7)
+        cirrus_conf_bit = (8, 9)
+        terrain_occlusion = (10,)
+
     :param x: pixel_qa band value
     :param length: length of bit string
     :param verbose: if the qa inference should be printed
@@ -245,19 +284,6 @@ def unclear_value(x,
         return True
 
     bit_str = ''.join(reversed(np.binary_repr(val, length)))
-
-    '''
-    fill_bit = (0,)
-    clear_bit = (1,)
-    water_bit = (2,)
-    cloud_shadow_bit = (3,)
-    snow_bit = (4,)
-    cloud_bit = (5,)
-    cloud_conf_bit = (6, 7)
-    cirrus_conf_bit = (8, 9)
-    terrain_occlusion = (10,)
-    '''
-
     fill = bit_str[0] == '1'
     clear = bit_str[1] == '1'
     water = bit_str[2] == '1'
@@ -327,11 +353,13 @@ def saturated_bands(x, length=8):
 
 
 def read_gee_extract_data(filename):
+    """
+    Method to read sample data in the form of a site dictionary with samples dicts by year
+    :param filename: Input data file name
+    :return: dict of list of dicts by year
+    """
 
     lines = Handler(filename).read_from_csv(return_dicts=True)
-
-    # sites = list(set(list(str(line['site']) for line in lines)))
-    # print(len(sites))
 
     site_dict = dict()
     line_counter = 0
@@ -376,7 +404,8 @@ def read_gee_extract_data(filename):
                     band_dict[band] = line[band]
 
             temp_dict['bands'] = correct_landsat_sr(band_dict,
-                                                    sensor_dict['sensor'])
+                                                    sensor_dict['sensor'],
+                                                    scale=0.0001)
 
             site_dict[site_year]['data'].update({'{}_{}'.format(str(temp_dict['img_jday']),
                                                                 str(temp_dict['img_year'])): temp_dict})
@@ -415,8 +444,8 @@ if __name__ == '__main__':
 
     # ----------------------------------------------------------------------------------------------------
 
-    folder = "c:/users/rm885" \
-             "/Dropbox/projects/NAU/landsat_deciduous/data/SAMPLES/gee_extract/"
+    folder = "/home/richard" \
+             "/Dropbox/projects/NAU/landsat_deciduous/data/samples/gee_extract/"
 
     # datafile = folder + "gee_samp_extract_v2019_01_29T08_06_32.csv"
     datafile = folder + "gee_samp_extract_postbin_v8_east_2019_08_29T_all.csv"
@@ -429,33 +458,6 @@ if __name__ == '__main__':
 
     for elem in gee_data_dict.items()[0:10]:
         Opt.cprint(elem)
-
-    '''
-    example of a site dict: 
-
-    {'1_70066 G000005_1994': {'decid_frac': 0.24758, 
-                              'geom': 'POINT(-121.298569584 55.7763510752)', 
-                              'site_year': 1994,
-                              'data':  {                                       
-                                       '262_1993': {'sensor': 'LT05', 'img_year': 1993, 'img_jday': 262,
-                                                    'bands': {'blue': 0.0266, 'swir1': 0.0756, 'swir2': 0.0244,
-                                                              'green': 0.0481, 'nir': 0.1523, 'red': 0.0344
-                                                              }
-                                                   },
-                                       '263_1984': {'sensor': 'LT05', 'img_year': 1984, 'img_jday': 263,
-                                                    'bands': {'blue': 0.0205, 'swir1': 0.0801, 'swir2': 0.0352,
-                                                              'green': 0.0516, 'nir': 0.1649, 'red': 0.0491
-                                                             }
-                                                    }
-                                       '264_1984': {'sensor': 'LT05', 'img_year': 1984, 'img_jday': 263,
-                                                    'bands': {'blue': 0.0205, 'swir1': 0.0801, 'swir2': 0.0352,
-                                                              'green': 0.0516, 'nir': 0.1649, 'red': 0.0491
-                                                             }
-                                                    }
-                                       }
-                             }
-    }
-    '''
 
     # ----------------------------------------------------------------------------------------------------
     Opt.cprint('Total number of data points before cleaning : {}'.format(len(gee_data_dict)))
