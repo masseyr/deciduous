@@ -551,6 +551,28 @@ class Sublist(list):
         """
         return np.std(arr)
 
+    @staticmethod
+    def reduce(array,
+               method='mean'):
+        """
+        Method to reduce a 2D or 3D array using a specific method
+        :param array: Numpy array
+        :param method: Method to use for reduction (options: mean, median, std_dev, percentile_x, default:mean
+                                                             here x is the percentile)
+        :return: float
+        """
+        if method == 'mean':
+            return np.mean(array)
+        elif method == 'median':
+            return np.median(array)
+        elif method == 'std_dev':
+            return np.std(array)
+        elif 'percentile' in method:
+            perc = int(method.split('_')[1])
+            return np.percentile(array, perc)
+        else:
+            raise ValueError("Invalid method type\nValid types: mean, median, std_dev, percentile_x")
+
 
 class Handler(object):
     """
