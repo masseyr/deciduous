@@ -1,7 +1,6 @@
 import numpy as np
 from common import *
-import multiprocessing as mp
-from osgeo import gdal, gdal_array, ogr, gdalconst
+from osgeo import gdal, gdal_array, ogr, osr, gdalconst
 np.set_printoptions(suppress=True)
 
 # Tell GDAL to throw Python exceptions, and register all drivers
@@ -44,6 +43,7 @@ class Raster(object):
         self.init = False
 
     def __repr__(self):
+
         if self.shape is not None:
             return "<raster {ras} of size {bands}x{rows}x{cols} ".format(ras=Handler(self.name).basename,
                                                                          bands=self.shape[0],
@@ -517,12 +517,12 @@ class Raster(object):
 
     @staticmethod
     def get_coords(xy_list,
-                   pixel_size=None,
-                   tie_point=None,
+                   pixel_size,
+                   tie_point,
                    pixel_center=True):
 
         """
-        Method to convert pixel coord to image coords
+        Method to convert pixel locations to image coords
         :param xy_list: List of tuples [(x1,y1), (x2,y2)....]
         :param pixel_size: tuple of x and y pixel size
         :param tie_point: tuple of x an y coordinates of tie point for the xy list
@@ -530,23 +530,35 @@ class Raster(object):
         :return: List of coordinates in tie point coordinate system
         """
 
-        if type(xy_list).__name__ != 'list':
-            xy_list = list(xy_list)
+        if type(xy_list) != list:
+            xy_list = [xy_list]
 
         if pixel_center:
             add_const = (float(pixel_size[0])/2.0, float(pixel_size[1])/2.0)
         else:
             add_const = (0.0, 0.0)
 
-        coord_list = list()
-        for xy in xy_list:
+        return list((float(xy[0]) * float(pixel_size[0]) + tie_point[0] + add_const[0],
+                     float(xy[1]) * float(pixel_size[1]) + tie_point[1] + add_const[1])
+                    for xy in xy_list)
 
-            xcoord = float(xy[0]) * float(pixel_size[0]) + tie_point[0] + add_const[0]
-            ycoord = float(xy[1]) * float(pixel_size[1]) + tie_point[1] + add_const[1]
+    @staticmethod
+    def get_locations(coords_list,
+                      pixel_size,
+                      tie_point):
+        """
+        Method to convert global coordinates to image pixel locations
+        :param coords_list: Lit of coordinates in image CRS [(x1,y1), (x2,y2)....]
+        :param pixel_size: Pixel size
+        :param tie_point: Tie point of the raster or tile
+        :return: list of pixel locations
+        """
+        if type(coords_list) != list:
+            coords_list = [coords_list]
 
-            coord_list.append([xcoord, ycoord])
-
-        return coord_list
+        return list(((coord[0] - tie_point[0])//pixel_size[0],
+                     (coord[1] - tie_point[1])//pixel_size[1])
+                    for coord in coords_list)
 
     def get_bounds(self):
         """
@@ -587,11 +599,20 @@ class Raster(object):
                 else:
                     cols = self.shape[2] - x
 
+                tie_pt = self.get_coords([(x, y)],
+                                         (self.transform[1], self.transform[5]),
+                                         (self.transform[0], self.transform[3]),
+                                         pixel_center=False)[0]
+
+                bounds = [tie_pt,
+                          [tie_pt[0] + self.transform[1] * cols, tie_pt[1]],
+                          [tie_pt[0] + self.transform[1] * cols, tie_pt[1] + self.transform[5] * rows],
+                          [tie_pt[0], tie_pt[1] + self.transform[5] * rows],
+                          tie_pt]
+
                 self.tile_grid.append({'block_coords': (x, y, cols, rows),
-                                       'tie_point': self.get_coords([(x, y)],
-                                                                    pixel_size=(self.transform[1], self.transform[5]),
-                                                                    tie_point=(self.transform[0], self.transform[3]),
-                                                                    pixel_center=False)[0]})
+                                       'tie_point': tie_pt,
+                                       'bound_coords': bounds})
 
         self.ntiles = len(self.tile_grid)
 
@@ -649,6 +670,97 @@ class Raster(object):
             yield self.tile_grid[ii]['tie_point'], tile_arr
 
             ii += 1
+
+    def extract_geom(self,
+                     wkt_strings,
+                     **kwargs):
+        """
+        Extract all pixels that intersect a feature in a Raster.
+        The raster object should be initialized before using this method.
+        Currently this method only supports single geometries per query.
+        :param wkt_strings: Vector geometries (e.g. point) in WKT string format
+                           this geometry should be in the same CRS as the raster
+                           Currently only 'Point' or 'MultiPoint' geometry is supported.
+                           Accepted wkt_strings: List of POINT wkts or one MULTIPOINT wkt
+        :param kwargs: List of additional arguments
+                        tile_size : (256, 256) default
+                        band_order: None default
+
+        :return: List of pixel band values as tuples for each pixel
+        """
+
+        # define tile size
+        if 'tile_size' in kwargs:
+            tile_size = kwargs['tile_size']
+        else:
+            tile_size = (256, 256)
+
+        if 'band_order' in kwargs:
+            band_order = np.array(kwargs['band_order'])
+        else:
+            band_order = np.array(range(0, self.shape[0]))
+
+        # initialize raster
+        if not self.init or self.array is None:
+            self.initialize()
+
+        if type(wkt_strings) == list:
+            geom_list = list()
+            for wkt_string in wkt_strings:
+                if 'POINT' in wkt_string:
+                    geom_list.append(wkt_string)
+                else:
+                    geom_list.append(None)
+
+        elif 'MULTIPOINT' in wkt_strings:
+            multi_geom = ogr.CreateGeometryFromWkt(wkt_strings)
+            geom_list = list(multi_geom.GetGeometryRef(j) for j in range(multi_geom.GetGeometryCount()))
+        elif 'POINT' in wkt_strings:
+            geom_list = [ogr.CreateGeometryFromWkt(wkt_strings)]
+        else:
+            raise RuntimeError("This geometry type is unsupported or unknown")
+
+        self.make_tile_grid(*tile_size)
+
+        tile_samp_output = list([] for _ in range(len(geom_list)))
+
+        for tile in self.tile_grid:
+            tile_wkt = 'POLYGON(({}))'.format(', '.join(list(' '.join([str(x), str(y)])
+                                                             for (x, y) in tile['bound_coords'])))
+            tile_geom = ogr.CreateGeometryFromWkt(tile_wkt)
+
+            tile_samp_list = list(elem for elem in enumerate(geom_list) if (elem[1] is not None) and
+                                  (tile_geom.Intersects(elem[1])))
+
+            if len(tile_samp_list) > 0:
+                samp_index = list(idx for idx, _ in tile_samp_list)
+
+                self.read_array(tile['block_coords'])
+
+                samp_coords = list(list(float(elem) for elem in samp_geom[1].ExportToWkt()
+                                                                            .replace('POINT', '')
+                                                                            .replace('(', '')
+                                                                            .replace(')', '')
+                                                                            .strip()
+                                                                            .split(' '))
+                                   for samp_geom in tile_samp_list)
+
+                if self.shape[0] == 1:
+                    samp_values = list(self.array[y, x] for x, y in self.get_locations(samp_coords,
+                                                                                       (self.transform[1],
+                                                                                        self.transform[5]),
+                                                                                       tile['tie_point']))
+                else:
+                    samp_values = list(self.array[band_order, y, x].tolist()
+                                       for x, y in self.get_locations(samp_coords,
+                                                                      (self.transform[1],
+                                                                       self.transform[5]),
+                                                                      tile['tie_point']))
+
+                for j, idx in enumerate(samp_index):
+                    tile_samp_output[idx] = samp_values[j]
+
+            return tile_samp_output
 
 
 class MultiRaster:
@@ -947,7 +1059,10 @@ class MultiRaster:
                order=None,
                verbose=False,
                outfile=None,
-               return_vrt=True,
+               vectorize_values=None,
+               blend_bands=(1,),
+               cutline_file=None,
+               blend_pixels=0,
                **kwargs):
         """
         Under construction
@@ -956,7 +1071,10 @@ class MultiRaster:
         :param order: order of raster layerstack
         :param verbose: If some of the steps should be printed to console
         :param outfile: Name of the output file (.tif)
-        :param return_vrt: If the file should be written to disk or vrt object should be returned
+        :param vectorize_values: Value or tuple of values used to vectorize bands
+        :param cutline_file: Name of the cutline file used for blending
+        :param blend_bands: band or tuple of bands (index starts at 1)
+        :param blend_pixels: width of pixels to blend around the cutline for multiple rasters
         :return: None
 
         valid warp options in kwargs
@@ -1002,8 +1120,33 @@ class MultiRaster:
           callback_data --- user data for callback
 
         For valid translate options, see MultiRaster.layerstack()
+
+
+        if vectorize_values is None:
+            vectorize_values = list(self.nodatavalue[i-1] for i in blend_bands)
+
+        elif type(vectorize_values) not in (list, tuple):
+            if type(vectorize_values) != np.ndarray:
+                vectorize_values = list(vectorize_values for _ in blend_bands)
+            else:
+                raise ValueError('Values to vectorize should be one of: tuple, list, int, or float')
+
+        vector_list = list()
+        for ii, val in enumerate(vectorize_values):
+            temp_vec =
+
         """
 
-        pass
+
+
+
+
+
+
+
+
+
+
+
 
 
