@@ -1,18 +1,16 @@
+import ee
+from eehelper import EEHelper
 """
 Script to preprocess Landsat 5, 7, and 8 datasets into Mosaicked layerstacks
 for deciduous fraction and tree cover regression
 """
 
 if __name__ == '__main__':
-    import ee
-    import sys
-    import os
-
-    module_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    sys.path.append(module_path)
-    from modules import EEFunc
 
     ee.Initialize()
+
+    maxval_comp_ndvi = EEHelper(composite_index='NDVI',
+                                composite_function='median').composite_image
 
     def get_landsat_images(collection, bounds, start_date, end_date, start_julian, end_julian):
         """ Make collections based on given parameters"""
@@ -20,9 +18,9 @@ if __name__ == '__main__':
             .filterDate(start_date, end_date)\
             .filter(ee.Filter.calendarRange(start_julian, end_julian))\
             .filterBounds(bounds)\
-            .map(EEFunc.ls_sr_band_correction)\
-            .map(EEFunc.ls_sr_only_clear)\
-            .map(EEFunc.add_indices)
+            .map(EEHelper.ls_sr_band_correction)\
+            .map(EEHelper.ls_sr_only_clear)\
+            .map(EEHelper.add_indices)
 
     def make_ls(args):
         """ function to make image collection"""
@@ -37,11 +35,11 @@ if __name__ == '__main__':
         all_images3 = ee.ImageCollection(get_landsat_images(collection, bounds, start_date, end_date,
                                                             start_julian[2], end_julian[2]))
 
-        img_season1 = ee.Image(EEFunc.add_suffix(EEFunc.maxval_comp_ndvi(all_images1, pctl, index).select(bands), '1'))\
+        img_season1 = ee.Image(EEHelper.add_suffix(maxval_comp_ndvi(all_images1, bounds).select(bands), '1'))\
             .unmask(unmask_val)
-        img_season2 = ee.Image(EEFunc.add_suffix(EEFunc.maxval_comp_ndvi(all_images2, pctl, index).select(bands), '2'))\
+        img_season2 = ee.Image(EEHelper.add_suffix(maxval_comp_ndvi(all_images2, bounds).select(bands), '2'))\
             .unmask(unmask_val)
-        img_season3 = ee.Image(EEFunc.add_suffix(EEFunc.maxval_comp_ndvi(all_images3, pctl, index).select(bands), '3'))\
+        img_season3 = ee.Image(EEHelper.add_suffix(maxval_comp_ndvi(all_images3, bounds).select(bands), '3'))\
             .unmask(unmask_val)
 
         slope = ee.Terrain.slope(elevation_image).multiply(elev_scale_factor)
@@ -257,7 +255,7 @@ if __name__ == '__main__':
 
     all_images = ls5.merge(ls7).merge(ls8)
 
-    print(EEFunc.expand_image_meta(all_images.first()))
+    print(EEHelper.expand_image_meta(all_images.first()))
 
     for year, dates in years.items():
 
