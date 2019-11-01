@@ -1,4 +1,4 @@
-from modules import Handler, Opt, Sublist, RFRegressor, MRegressor, Samples
+from geosoup import Handler, Opt, Sublist, RFRegressor, MRegressor, Samples
 from datetime import datetime
 import numpy as np
 import matplotlib
@@ -617,15 +617,20 @@ if __name__ == '__main__':
     width = 0.35  # the width of the bars
 
     ax4.barh(ind + width, tc, width, edgecolor='k', color='#FFC300')
-    ax4.barh(ind, df, width, edgecolor='k')
+    ax4.barh(ind, df, width, edgecolor='k', color='#1762B2')
 
     ax4.set_yticks(ind + width / 2)
     ax4.set_yticklabels(('Fall', 'Summer', 'Spring'),  va='center', rotation='vertical')
 
     # font = fp()
     # font.set_size('small')
-    ax4.legend(('DF', 'TC'), edgecolor='k')  # prop=font,
+    ax4.legend(('DF', 'TC'), ncol=2, loc='upper right',  fancybox=None,  #frameon=None,
+               handletextpad=0.25, borderaxespad=0, handlelength=1 )  # prop=font,edgecolor='k',
     ax4.set_xlim(0, 1)
+
+    leg = ax4.get_legend()
+    leg.get_frame().set_linewidth(1)
+    leg.get_frame().set_edgecolor('k')
 
     ax4.spines['right'].set_color('none')
     ax4.spines['top'].set_color('none')
