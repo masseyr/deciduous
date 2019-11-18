@@ -105,6 +105,14 @@ class Samples:
         else:
             ValueError("No data found for label.")
 
+        if self.x is not None and self.y is not None:
+            if self.y_name is None:
+                self.y_name = 'y'
+            if (self.x_name is None) or \
+                    (type(self.x_name) not in (list, tuple)) or \
+                    (len(self.x_name) != self.x.shape[1]):
+                self.x_name = list('x{}'.format(str(i+1)) for i in range(self.x.shape[1]))
+
         if weights is None:
             if weights_colname is not None:
                 if csv_file is not None:
@@ -169,6 +177,14 @@ class Samples:
         if self.y is not None:
             self.ymin = self.y.min()
             self.ymax = self.y.max()
+
+        if self.y is not None:
+            self.head = '\n'.join(list(str(elem) for elem in
+                                       [' '.join(list(self.x_name) + [self.y_name])] +
+                                       list(' '.join(list(str(elem_) for elem_ in self.x[i, :].tolist() + [self.y[i]]))
+                                            for i in range(10))))
+        else:
+            self.head = '<empty>'
 
     def __repr__(self):
         """
