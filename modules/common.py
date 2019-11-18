@@ -366,33 +366,47 @@ class Sublist(list):
 
     @staticmethod
     def hist_equalize(list_dicts,
+                      num=None,
                       pctl=50,
                       nbins=20,
                       var=None,
                       minmax=None):
+
         if var is None:
             raise ValueError('Variable not specified')
         else:
-            var_list = list(elem[var] for elem in list_dicts)
+            var_list = np.array(list(elem[var] for elem in list_dicts))
 
             if minmax is None:
-                minmax = (min(var_list), max(var_list))
+                minmax = (np.min(var_list),
+                          np.max(var_list))
 
-            freq_list, bin_edges = np.histogram(var_list, bins=nbins, range=minmax)
+            freq_list, bin_edges = np.histogram(var_list,
+                                                bins=nbins,
+                                                range=minmax)
 
-            pctl_val = Sublist.percentile(freq_list, pctl=pctl)
-
-            print(pctl_val)
-            print(freq_list)
+            if num is None:
+                pctl_val = Sublist.percentile(freq_list,
+                                              pctl=pctl)
+            else:
+                pctl_val = num
 
             out_list = list()
 
-            for ii, _ in enumerate(freq_list):
+            for ii in range(len(freq_list)):
 
-                indices = np.where((var_list >= bin_edges[ii]) & (var_list < bin_edges[ii + 1]))[0]
+                if ii == (len(freq_list) - 1):
+                    indices = np.where((var_list >= bin_edges[ii]) &
+                                       (var_list <= bin_edges[ii + 1]))[0]
+
+                else:
+                    indices = np.where((var_list >= bin_edges[ii]) &
+                                       (var_list < bin_edges[ii + 1]))[0]
 
                 if indices.shape[0] > pctl_val:
-                    out_indices = np.random.choice(indices, size=pctl_val, replace=False)
+                    out_indices = np.random.choice(indices,
+                                                   size=pctl_val,
+                                                   replace=False)
                 else:
                     out_indices = indices
 
@@ -717,7 +731,7 @@ class Handler(object):
                     if buf:
                         temp_lines = (remaining + buf).split(b'\n')
                         if len(temp_lines) <= 1:
-                            remaining += temp_lines
+                            remaining += ''.join(temp_lines)
                         else:
                             val += temp_lines[:-1]
                             remaining = temp_lines[-1]
@@ -860,8 +874,10 @@ class Handler(object):
         :param append: if the lines should be appended to the file
         :return: write to file
         """
+        if len(input_list) == 0:
+            raise ValueError('Empty input list supplied')
 
-        if type(input_list[0]).__name__ in ('list', 'tuple'):
+        elif type(input_list[0]).__name__ in ('list', 'tuple'):
             if rownames is not None:
                 if len(rownames) != len(input_list):
                     raise ValueError('Row name list does not have sufficient elements')
