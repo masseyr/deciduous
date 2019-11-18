@@ -84,6 +84,10 @@ class Raster(object):
         if nbands == 1:
             fileptr.GetRasterBand(1).WriteArray(self.array, 0, 0)
             fileptr.GetRasterBand(1).SetDescription(self.bnames[0])
+
+            if self.nodatavalue is not None:
+                fileptr.GetRasterBand(1).SetNoDataValue(self.nodatavalue)
+
             Opt.cprint('Writing band: ' + self.bnames[0])
         else:
             for i in range(0, nbands):
@@ -576,28 +580,86 @@ class Raster(object):
                        tie_pt]
         return rast_coords
 
+    def get_pixel_bounds(self,
+                         bound_coords=None,
+                         coords_type='pixel'):
+        """
+        Method to return image bounds in the format xmin, xmax, ymin, ymax
+        :param bound_coords: (xmin, xmax, ymin, ymax)
+        :param coords_type: type of coordinates specified in bound_coords: 'pixel' for pixel coordinates,
+                                                                           'crs' for image reference system coordinates
+        :return: tuple: (xmin, xmax, ymin, ymax) in pixel coordinates
+        """
+        if not self.init:
+            self.initialize()
+
+        if bound_coords is not None:
+            if coords_type == 'pixel':
+                xmin, xmax, ymin, ymax = bound_coords
+            elif coords_type == 'crs':
+                _xmin, _xmax, _ymin, _ymax = bound_coords
+                coords_list = [(_xmin, _ymax), (_xmax, _ymax), (_xmax, _ymin), (_xmin, _ymin)]
+                coords_locations = np.array(self.get_locations(coords_list,
+                                                               (self.transform[1], self.transform[5]),
+                                                               (self.transform[0], self.transform[3])))
+                xmin, xmax, ymin, ymax = \
+                    int(coords_locations[:, 0].min()), \
+                    int(coords_locations[:, 0].max()), \
+                    int(coords_locations[:, 1].min()), \
+                    int(coords_locations[:, 1].max())
+            else:
+                raise ValueError("Unknown coordinate types")
+
+            if xmin < 0:
+                xmin = 0
+            if xmax > self.shape[2]:
+                xmax = self.shape[2]
+            if ymin < 0:
+                ymin = 0
+            if ymax > self.shape[1]:
+                ymax = self.shape[1]
+
+            if xmin >= xmax:
+                raise ValueError("Image x-size should be greater than 0")
+            if ymin >= ymax:
+                raise ValueError("Image y-size should be greater than 0")
+        else:
+            xmin, xmax, ymin, ymax = 0, self.shape[2], 0, self.shape[1]
+
+        return xmin, xmax, ymin, ymax
+
     def make_tile_grid(self,
                        tile_xsize=1024,
-                       tile_ysize=1024):
+                       tile_ysize=1024,
+                       bound_coords=None,
+                       coords_type='pixel'):
         """
         Returns the coordinates of the blocks to be extracted
         :param tile_xsize: Number of columns in the tile block
         :param tile_ysize: Number of rows in the tile block
+        :param bound_coords: (xmin, xmax, ymin, ymax)
+        :param coords_type: type of coordinates specified in bound_coords: 'pixel' for pixel coordinates,
+                                                                           'crs' for image reference system coordinates
         :return: list of lists
         """
         if not self.init:
             self.initialize()
 
-        for y in xrange(0, self.shape[1], tile_ysize):
-            if y + tile_ysize < self.shape[1]:
+        xmin, xmax, ymin, ymax = self.get_pixel_bounds(bound_coords,
+                                                       coords_type)
+
+        for y in xrange(ymin, ymax, tile_ysize):
+
+            if y + tile_ysize < ymax:
                 rows = tile_ysize
             else:
-                rows = self.shape[1] - y
-            for x in xrange(0, self.shape[2], tile_xsize):
-                if x + tile_xsize < self.shape[2]:
+                rows = ymax - y
+
+            for x in xrange(xmin, xmax, tile_xsize):
+                if x + tile_xsize < xmax:
                     cols = tile_xsize
                 else:
-                    cols = self.shape[2] - x
+                    cols = xmax - x
 
                 tie_pt = self.get_coords([(x, y)],
                                          (self.transform[1], self.transform[5]),
@@ -612,14 +674,63 @@ class Raster(object):
 
                 self.tile_grid.append({'block_coords': (x, y, cols, rows),
                                        'tie_point': tie_pt,
-                                       'bound_coords': bounds})
+                                       'bound_coords': bounds,
+                                       'first_pixel': (xmin, ymin)})
 
         self.ntiles = len(self.tile_grid)
+
+    def get_tile(self,
+                 bands=None,
+                 block_coords=None,
+                 finite_only=True,
+                 nan_replacement=None):
+        """
+        Method to get raster numpy array of a tile
+        :param bands: bands to get in the array, index starts from one. (default: all)
+        :param finite_only:  If only finite values should be returned
+        :param nan_replacement: replacement for NAN values
+        :param block_coords: coordinates of tile to retrieve in image coords (x, y, cols, rows)
+        :return: numpy array
+        """
+
+        if not self.init:
+            self.initialize()
+
+        if nan_replacement is None:
+            if self.nodatavalue is None:
+                nan_replacement = 0
+            else:
+                nan_replacement = self.nodatavalue
+
+        if bands is None:
+            bands = list(range(1, self.shape[0] + 1))
+
+        if len(bands) == 1:
+            temp_band = self.datasource.GetRasterBand(bands[0])
+            tile_arr = temp_band.ReadAsArray(*block_coords)
+
+        else:
+            tile_arr = np.zeros((len(bands),
+                                 block_coords[3],
+                                 block_coords[2]),
+                                gdal_array.GDALTypeCodeToNumericTypeCode(self.dtype))
+
+            for jj, band in enumerate(bands):
+                temp_band = self.datasource.GetRasterBand(band)
+                tile_arr[jj, :, :] = temp_band.ReadAsArray(*block_coords)
+
+            if finite_only:
+                if np.isnan(tile_arr).any() or np.isinf(tile_arr).any():
+                    tile_arr[np.isnan(tile_arr)] = nan_replacement
+                    tile_arr[np.isinf(tile_arr)] = nan_replacement
+
+        return tile_arr
 
     def get_next_tile(self,
                       tile_xsize=1024,
                       tile_ysize=1024,
-                      bands=(1,),
+                      bands=None,
+                      get_array=True,
                       finite_only=True,
                       nan_replacement=None):
 
@@ -627,7 +738,8 @@ class Raster(object):
         Generator to extract raster tile by tile
         :param tile_xsize: Number of columns in the tile block
         :param tile_ysize: Number of rows in the tile block
-        :param bands: Band to extract (default: (1,))
+        :param bands: Band to extract (default: None, gets all bands)
+        :param get_array: If raster array should be retrieved as well
         :param finite_only: If only finite values should be returned
         :param nan_replacement: replacement for NAN values
         :return: Yields tuple: (tiepoint xy tuple, tile numpy array(2d array if only one band, else 3d array)
@@ -645,6 +757,9 @@ class Raster(object):
             else:
                 nan_replacement = self.nodatavalue
 
+        if bands is None:
+            bands = list(range(1, self.shape[0] + 1))
+
         ii = 0
         while ii < self.ntiles:
 
@@ -653,19 +768,23 @@ class Raster(object):
                 tile_arr = temp_band.ReadAsArray(*self.tile_grid[ii]['block_coords'])
 
             else:
-                tile_arr = np.zeros((len(bands),
-                                     self.tile_grid[ii]['block_coords'][3],
-                                     self.tile_grid[ii]['block_coords'][2]),
-                                    gdal_array.GDALTypeCodeToNumericTypeCode(self.dtype))
+                if get_array:
+                    tile_arr = np.zeros((len(bands),
+                                         self.tile_grid[ii]['block_coords'][3],
+                                         self.tile_grid[ii]['block_coords'][2]),
+                                        gdal_array.GDALTypeCodeToNumericTypeCode(self.dtype))
 
-                for jj, band in enumerate(bands):
-                    temp_band = self.datasource.GetRasterBand(band)
-                    tile_arr[jj, :, :] = temp_band.ReadAsArray(*self.tile_grid[ii]['block_coords'])
+                    for jj, band in enumerate(bands):
+                        temp_band = self.datasource.GetRasterBand(band)
+                        tile_arr[jj, :, :] = temp_band.ReadAsArray(*self.tile_grid[ii]['block_coords'])
 
-            if finite_only:
-                if np.isnan(tile_arr).any() or np.isinf(tile_arr).any():
-                    tile_arr[np.isnan(tile_arr)] = nan_replacement
-                    tile_arr[np.isinf(tile_arr)] = nan_replacement
+                    if finite_only:
+                        if np.isnan(tile_arr).any() or np.isinf(tile_arr).any():
+                            tile_arr[np.isnan(tile_arr)] = nan_replacement
+                            tile_arr[np.isinf(tile_arr)] = nan_replacement
+
+                else:
+                    tile_arr = None
 
             yield self.tile_grid[ii]['tie_point'], tile_arr
 
@@ -811,12 +930,14 @@ class MultiRaster:
         if index is not None:
             for ii in index:
                 bounds = self.rasters[ii].get_bounds()
-                wktstring = 'POLYGON(({}))'.format(', '.join(list(' '.join([str(x), str(y)]) for (x, y) in bounds)))
+                wktstring = 'POLYGON(({}))'.format(', '.join(list(' '.join([str(x), str(y)])
+                                                                  for (x, y) in bounds)))
                 wkt_list.append(wktstring)
         else:
             for raster in self.rasters:
                 bounds = raster.get_bounds()
-                wktstring = 'POLYGON(({}))'.format(', '.join(list(' '.join([str(x), str(y)]) for (x, y) in bounds)))
+                wktstring = 'POLYGON(({}))'.format(', '.join(list(' '.join([str(x), str(y)])
+                                                                  for (x, y) in bounds)))
                 wkt_list.append(wktstring)
 
         geoms = list(ogr.CreateGeometryFromWkt(wktstring) for wktstring in wkt_list)
@@ -828,8 +949,12 @@ class MultiRaster:
 
         temp_geom = temp_geom.ExportToWkt()
 
-        temp_coords = list(list(float(elem.strip()) for elem in elem_.strip().split(' '))
-                           for elem_ in temp_geom.replace('POLYGON', '').replace('((', '').replace('))', '').split(','))
+        temp_coords = list(list(float(elem.strip()) for elem in elem_.strip()
+                                                                     .split(' '))
+                           for elem_ in temp_geom.replace('POLYGON', '')
+                                                 .replace('((', '')
+                                                 .replace('))', '')
+                                                 .split(','))
 
         minx = min(list(coord[0] for coord in temp_coords))
         miny = min(list(coord[1] for coord in temp_coords))
@@ -871,7 +996,8 @@ class MultiRaster:
           addAlpha --- whether to add an alpha mask band to the VRT when the source raster have none.
           resampleAlg --- resampling mode.
           outputSRS --- assigned output SRS.
-          allowProjectionDifference --- whether to accept input datasets have not the same projection. Note: they will *not* be reprojected.
+          allowProjectionDifference --- whether to accept input datasets have not the same projection.
+           Note: they will *not* be reprojected.
           srcNodata --- source nodata value(s).
           VRTNodata --- nodata values at the VRT band level.
           hideNodata --- whether to make the VRT band not report the NoData value.
@@ -971,11 +1097,11 @@ class MultiRaster:
         if not return_vrt:
             if verbose:
                 Opt.cprint('Writing layer stack file : {} ...'.format(outfile))
+
             gdal.Translate(outfile, _vrt_, **kwargs)
             _vrt_ = None
+
             if verbose:
-                outras = Raster(outfile)
-                Opt.cprint(outras)
                 Opt.cprint('Done!')
         else:
             return _vrt_
@@ -1015,7 +1141,21 @@ class MultiRaster:
         lras = Raster('tmp_layerstack')
         lras.datasource = _ls_vrt_
         lras.initialize()
-        lras.make_tile_grid(tile_size, tile_size)
+
+        if 'bound_coords' in kwargs:
+            if 'coords_type' in kwargs:
+                lras.make_tile_grid(tile_size,
+                                    tile_size,
+                                    bound_coords=kwargs['bound_coords'],
+                                    coords_type=kwargs['coords_type'])
+            else:
+                lras.make_tile_grid(tile_size,
+                                    tile_size,
+                                    bound_coords=kwargs['bound_coords'],
+                                    coords_type='crs')
+        else:
+            lras.make_tile_grid(tile_size,
+                                tile_size)
 
         Opt.cprint(lras)
 
@@ -1035,6 +1175,10 @@ class MultiRaster:
                 temp_arr = np.apply_along_axis(lambda x: np.mean(x[x != lras.nodatavalue]), 0, tile_arr)
             elif composite_type == 'median':
                 temp_arr = np.apply_along_axis(lambda x: np.median(x[x != lras.nodatavalue]), 0, tile_arr)
+            elif composite_type == 'min':
+                temp_arr = np.apply_along_axis(lambda x: np.min(x[x != lras.nodatavalue]), 0, tile_arr)
+            elif composite_type == 'max':
+                temp_arr = np.apply_along_axis(lambda x: np.max(x[x != lras.nodatavalue]), 0, tile_arr)
             elif 'pctl' in composite_type:
                 pctl = int(composite_type.split('_')[1])
                 temp_arr = np.apply_along_axis(lambda x: np.percentile(x[x != lras.nodatavalue], pctl), 0, tile_arr)
@@ -1060,9 +1204,9 @@ class MultiRaster:
                verbose=False,
                outfile=None,
                vectorize_values=None,
-               blend_bands=(1,),
-               cutline_file=None,
-               blend_pixels=0,
+               blend_layers=None,
+               blend_pixels=10,
+               blend_ratio=1.0,
                **kwargs):
         """
         Under construction
@@ -1071,10 +1215,13 @@ class MultiRaster:
         :param order: order of raster layerstack
         :param verbose: If some of the steps should be printed to console
         :param outfile: Name of the output file (.tif)
-        :param vectorize_values: Value or tuple of values used to vectorize bands
-        :param cutline_file: Name of the cutline file used for blending
-        :param blend_bands: band or tuple of bands (index starts at 1)
+        :param vectorize_values: Value or tuple of values used to vectorize bands for blending
+        :param blend_layers: band or tuple of bands (index starts at 1)
         :param blend_pixels: width of pixels to blend around the cutline for multiple rasters
+        :param blend_ratio: Ratio of outside versus inside buffer blend.
+                            1.0 is blend surface completely outside (default)
+                            0.0 is blend surface completely inside the upper layers
+                            The actual ratio is closest to the integer ratios based on blend pixels
         :return: None
 
         valid warp options in kwargs
@@ -1120,6 +1267,13 @@ class MultiRaster:
           callback_data --- user data for callback
 
         For valid translate options, see MultiRaster.layerstack()
+
+
+        steps:
+        1) vectorize each layer in blend_layers according to vectorize_values
+        2) calculate buffer in 1 pixel step from vectorized shapes
+        3) Apply the weighting function surface based on band order to buffered surfaces
+        4) calculate weighting function output using vrt via tiling
 
 
         if vectorize_values is None:
