@@ -465,6 +465,8 @@ class Vector(object):
                 if self.filename is None:
                     raise ValueError("No filename for output")
 
+            self.name = Handler(outfile).basename.split('.')[0]
+
             if os.path.basename(outfile).split('.')[-1] == 'json':
                 driver_type = 'GeoJSON'
             elif os.path.basename(outfile).split('.')[-1] == 'csv':
@@ -475,7 +477,7 @@ class Vector(object):
             out_driver = ogr.GetDriverByName(driver_type)
             out_datasource = out_driver.CreateDataSource(outfile)
 
-            out_layer = out_datasource.CreateLayer(os.path.basename(outfile).split('.')[0],
+            out_layer = out_datasource.CreateLayer(self.name,
                                                    srs=self.spref,
                                                    geom_type=self.type)
 
@@ -901,12 +903,13 @@ class Vector(object):
             geoms = list(ogr.CreateGeometryFromWkt(geom_string) for geom_string in geom_strings)
 
         elif geom_string_type == 'json':
+            vector.wktlist = geom_strings
             geoms = list(ogr.CreateGeometryFromJson(geom_string) for geom_string in geom_strings)
-            vector.wktlist = list(geom.ExportToWkt() for geom in geoms)
 
         elif geom_string_type == 'wkb':
+            vector.wktlist = geom_strings
             geoms = list(ogr.CreateGeometryFromWkb(geom_string) for geom_string in geom_strings)
-            vector.wktlist = list(geom.ExportToWkt() for geom in geoms)
+
         else:
             raise TypeError("Unsupported geometry type")
 
