@@ -1,4 +1,5 @@
 import pickle
+import warnings
 import numpy as np
 from scipy import stats
 from math import sqrt
@@ -70,6 +71,14 @@ class _Regressor(object):
         self.label = data['label_name']
         self.fit = True
 
+        if hasattr(self, 'intercept'):
+            if hasattr(self.regressor, 'intercept_'):
+                self.intercept = self.regressor.intercept_
+
+        if hasattr(self, 'coefficient'):
+            if hasattr(self.regressor, 'coef_'):
+                self.coefficient = self.regressor.coef_
+
     def predict(self, *args, **kwargs):
         """Placeholder function"""
         return
@@ -105,17 +114,17 @@ class _Regressor(object):
                        output_type='median',
                        array_multiplier=1.0,
                        array_additive=0.0,
-                       out_data_type=gdal.GDT_Float32,
-                       nodatavalue=-32768.0,
+                       out_data_type=None,
+                       nodatavalue=None,
                        **kwargs):
 
         """Tree variance from the RF regressor
         :param regressor: _Regressor object
-        :param raster_obj: Initialized Raster object with a 3d array
+        :param raster_obj: Initialized Raster object
         :param outfile: name of output file
         :param array_multiplier: rescale data using this value
         :param array_additive: Rescale data using this value
-        :param out_data_type: output raster data type
+        :param out_data_type: output raster data type (GDAL data type)
         :param nodatavalue: No data value for output raster
         :param band_name: Name of the output raster band
         :param outdir: output folder
@@ -124,10 +133,24 @@ class _Regressor(object):
                             or 'conf' for confidence interval
         :returns: Output as raster object
         """
+        if not raster_obj.init:
+            raster_obj.initialize()
+
+        nbands = raster_obj.shape[0]
+        nrows = raster_obj.shape[1]
+        ncols = raster_obj.shape[2]
+
         if 'tile_size' in kwargs:
             tile_size = kwargs['tile_size']
         else:
-            tile_size = 128
+            tile_size = int(np.floor(float(min([nrows, ncols]))/2.0))
+
+        if 'internal_tile_size' in kwargs:
+            internal_tile_size = kwargs['internal_tile_size']
+        elif (tile_size*tile_size) < 102400:
+            internal_tile_size = tile_size*tile_size
+        else:
+            internal_tile_size = 102400
 
         if 'z_val' in kwargs:
             z_val = kwargs['z_val']
@@ -135,9 +158,16 @@ class _Regressor(object):
             z_val = 1.96
 
         if 'band_multipliers' in kwargs:
-            band_multipliers = kwargs['band_multipliers']
+            band_multipliers = np.array([kwargs['band_multipliers'][elem] if elem in kwargs['band_multipliers']
+                                         else array_multiplier for elem in raster_obj.bnames])
         else:
-            band_multipliers = zip(list((elem, 1.0) for elem in raster_obj.bnames))
+            band_multipliers = np.array([array_multiplier for _ in raster_obj.bnames])
+
+        if 'band_additives' in kwargs:
+            band_additives = np.array([kwargs['band_additives'][elem] if elem in kwargs['band_additives']
+                                      else array_additive for elem in raster_obj.bnames])
+        else:
+            band_additives = np.array([array_additive for _ in raster_obj.bnames])
 
         if 'out_nodatavalue' in kwargs:
             out_nodatavalue = kwargs['out_nodatavalue']
@@ -148,6 +178,28 @@ class _Regressor(object):
             verbose = kwargs['verbose']
         else:
             verbose = False
+
+        if 'mask_band' in kwargs:
+            mask_band = kwargs['mask_band']
+            if mask_band is not None:
+                if type(mask_band) == str:
+                    try:
+                        mask_band = raster_obj.bnames.index(mask_band)
+                    except ValueError:
+                        warnings.warn('Mask band ignored: Unrecognized band name.')
+                        mask_band = None
+                elif type(mask_band) in (int, float):
+                    if mask_band > raster_obj.shape[0]:
+                        warnings.warn('Mask band ignored: Mask band index greater than number of bands. ' +
+                                      'Indices start at 0.')
+                else:
+                    warnings.warn('Mask band ignored: Unrecognized data type.')
+                    mask_band = None
+        else:
+            mask_band = None
+
+        if out_data_type is None:
+            out_data_type = gdal_array.NumericTypeCodeToGDALTypeCode(regressor.data['labels'].dtype)
 
         # file handler object
         handler = Handler(raster_obj.name)
@@ -162,57 +214,67 @@ class _Regressor(object):
         else:
             outfile = Handler(outfile).file_remove_check()
 
-        out_ras = Raster(outfile)
-
-        # classify by line
-        nbands = raster_obj.shape[0]
-        nrows = raster_obj.shape[1]
-        ncols = raster_obj.shape[2]
-
         if regressor.feature_index is None:
             regressor.feature_index = list(raster_obj.bnames.index(feat) for feat in regressor.features)
 
-        # reshape into a long 2d array (nband, nrow * ncol) for classification,
-        new_shape = [nbands, nrows * ncols]
+        out_ras_arr = np.zeros([nrows, ncols],
+                               dtype=gdal_array.GDALTypeCodeToNumericTypeCode(out_data_type))
 
-        multiplier = np.array([band_multipliers[elem] if elem in band_multipliers else 1.0
-                               for elem in raster_obj.bnames])
+        raster_obj.make_tile_grid(tile_size, tile_size)
 
-        def _with_data(pixel_vec):
-            pixel_vec[np.where(pixel_vec != nodatavalue)] = \
-                pixel_vec[np.where(pixel_vec != nodatavalue)] * multiplier[np.where(pixel_vec != nodatavalue)]
-            return pixel_vec
+        if verbose:
+            Opt.cprint('\nProcessing {} raster tiles...\n'.format(str(raster_obj.ntiles)))
 
-        Opt.cprint('Applying multipliers...')
+        count = 0
+        for _, tile_arr in raster_obj.get_next_tile():
 
-        temp_arr = np.apply_along_axis(_with_data,
-                                       0,
-                                       raster_obj.array.astype(gdal_array.GDALTypeCodeToNumericTypeCode(out_data_type)))
+            _x, _y, _cols, _rows = raster_obj.tile_grid[count]['block_coords']
 
-        temp_arr = temp_arr.reshape(new_shape) * array_multiplier + array_additive
-        temp_arr = temp_arr.swapaxes(0, 1)
+            if verbose:
+                Opt.cprint("Processing tile {} of {}: x {}, y {}, cols {}, rows {}".format(str(count + 1),
+                                                                                           str(raster_obj.ntiles),
+                                                                                           str(_x),
+                                                                                           str(_y),
+                                                                                           str(_cols),
+                                                                                           str(_rows)))
 
-        # apply the variance calculating function on the array
-        Opt.cprint("Processing tiles...\n")
-        out_arr = regressor.predict(temp_arr,
-                                    tile_size=tile_size,
-                                    output_type=output_type,
-                                    z_val=z_val,
-                                    nodatavalue=nodatavalue,
-                                    out_nodatavalue=out_nodatavalue,
-                                    verbose=verbose)
+            new_shape = [nbands, _rows * _cols]
 
-        Opt.cprint("\n\nTile processing completed")
+            temp_arr = tile_arr.reshape(new_shape)
+            temp_arr = temp_arr.swapaxes(0, 1)
 
-        # output raster and metadata
-        if out_data_type != gdal_array.NumericTypeCodeToGDALTypeCode(out_arr.dtype):
-            out_arr = out_arr.astype(gdal_array.GDALTypeCodeToNumericTypeCode(out_data_type))
+            out_arr = regressor.predict(temp_arr,
+                                        tile_size=internal_tile_size,
+                                        output_type=output_type,
+                                        z_val=z_val,
+                                        nodatavalue=nodatavalue,
+                                        out_nodatavalue=out_nodatavalue,
+                                        verbose=verbose,
+                                        band_additives=band_additives,
+                                        band_multipliers=band_multipliers)
 
+            if out_arr.dtype != out_ras_arr.dtype:
+                out_arr = out_arr.astype(out_ras_arr.dtype)
+
+            # update output array with tile classification output
+
+            if mask_band is not None:
+                out_ras_arr[_y: (_y + _rows), _x: (_x + _cols)] = out_arr.reshape([_rows, _cols]) * \
+                                                                  tile_arr[mask_band, :, :]
+            else:
+                out_ras_arr[_y: (_y + _rows), _x: (_x + _cols)] = out_arr.reshape([_rows, _cols])
+
+            count += 1
+
+        if verbose:
+            Opt.cprint("\nInternal tile processing completed\n")
+
+        out_ras = Raster(outfile)
         out_ras.dtype = out_data_type
         out_ras.transform = raster_obj.transform
         out_ras.crs_string = raster_obj.crs_string
 
-        out_ras.array = out_arr.reshape([nrows, ncols])
+        out_ras.array = out_ras_arr
         out_ras.shape = [1, nrows, ncols]
         out_ras.bnames = [band_name]
         out_ras.nodatavalue = out_nodatavalue
@@ -294,8 +356,8 @@ class MRegressor(_Regressor):
 
     def __repr__(self):
         # gather which attributes exist
-        attr_truth = [hasattr(self.regressor, 'coef_'),
-                      hasattr(self.regressor, 'intercept_')]
+        attr_truth = [self.coefficient is not None,
+                      self.intercept is not None]
 
         if any(attr_truth):
 
@@ -303,10 +365,11 @@ class MRegressor(_Regressor):
 
             # strings to be printed for each attribute
             if attr_truth[0]:
-                print_str_list.append("Coefficients: {}\n".format(len(self.regressor.coef_)))
+                print_str_list.append("Coefficients: {}\n".format(', '.join([str(elem) for elem in
+                                                                             self.coefficient.tolist()])))
 
             if attr_truth[1]:
-                print_str_list.append("Intercept: {}\n".format(self.regressor.intercept_))
+                print_str_list.append("Intercept: {}\n".format(self.intercept))
 
             # combine all strings into one print string
             print_str = ''.join(print_str_list)
@@ -453,7 +516,7 @@ class MRegressor(_Regressor):
         elif outfile is not None:
             # write y, y_hat_bar, var_y to file (<- rows in this order)
             out_list = ['obs_y,' + ', '.join([str(elem) for elem in data['labels'].tolist()]),
-                        'mean_y,' + ', '.join([str(elem) for elem in y.tolist()]),
+                        'pred_y,' + ', '.join([str(elem) for elem in y.tolist()]),
                         'rmse,' + str(rmse),
                         'rsq,' + str(lm['rsq']),
                         'slope,' + str(lm['slope']),
@@ -466,12 +529,13 @@ class MRegressor(_Regressor):
         # if outfile and pickle file are not provided,
         # then only return values
         return {
-            'mean_y': y,
+            'pred_y': y,
             'obs_y': data['labels'],
             'rmse': rmse,
             'rsq': lm['rsq'],
             'slope': lm['slope'],
-            'intercept': lm['intercept']
+            'intercept': lm['intercept'],
+            'model': {'intercept': self.intercept, 'coefficient': self.coefficient}
         }
 
     def get_training_fit(self,
@@ -594,7 +658,8 @@ class RFRegressor(_Regressor):
                 print_str_list.append("Estimators: {}\n".format(len(self.regressor.estimators_)))
 
             if attr_truth[1]:
-                print_str_list.append("Features: {}\n".format(self.regressor.n_features_))
+                print_str_list.append("Features: {} : {} \n".format(self.regressor.n_features_,
+                                                                    ', '.join(self.features)))
 
             if attr_truth[2]:
                 print_str_list.append("Output: {}\n".format(self.regressor.n_outputs_))
@@ -618,11 +683,11 @@ class RFRegressor(_Regressor):
                      tile_end,
                      regressor,
                      feature_index,
-                     npx_tile=128*128,
                      nodatavalue=None,
                      output_type='median',
                      intvl=95.0,
-                     min_variance=0.01):
+                     min_variance=0.01,
+                     **kwargs):
 
         """
         Method to preprocess each tile of the image internally
@@ -632,7 +697,6 @@ class RFRegressor(_Regressor):
         :param regressor: RFRegressor
         :param feature_index: List of list of feature indices corresponding to input array
                               i.e. index of bands to be used for regression
-        :param npx_tile: number of pixels in each tile
         :param nodatavalue: No data value
         :param output_type: Type of output to produce,
                        choices: ['sd', 'var', 'pred', 'full', 'conf']
@@ -648,10 +712,36 @@ class RFRegressor(_Regressor):
         if min_variance is None:
             min_variance = 0.05 * np.min(arr.astype(np.float32))
 
-        temp_arr = arr[tile_start:tile_end, feature_index]
+        if 'band_multipliers' in kwargs:
+            band_multipliers = kwargs['band_multipliers']
+        else:
+            band_multipliers = np.array([1.0 for _ in range(arr.shape[1])])
 
-        out_tile = np.zeros([tile_end - tile_start])
-        tile_arr = np.zeros([regressor.trees, (tile_end - tile_start)], dtype=float)
+        if 'band_additives' in kwargs:
+            band_additives = kwargs['band_additives']
+        else:
+            band_additives = np.array([0.0 for _ in range(arr.shape[1])])
+
+        temp_arr = arr[tile_start:tile_end, feature_index] * band_multipliers[feature_index] + \
+            band_additives[feature_index]
+
+        if 'out_nodatavalue' in kwargs:
+            out_nodatavalue = kwargs['out_nodatavalue']
+        else:
+            out_nodatavalue = nodatavalue
+
+        if nodatavalue is not None:
+            mask_arr = np.apply_along_axis(lambda x: 0
+                                           if np.any(x == nodatavalue) else 1,
+                                           0,
+                                           temp_arr)
+        else:
+            mask_arr = np.zeros([temp_arr.shape[1]]) + 1
+
+        out_tile = np.zeros([tile_end - tile_start],
+                            dtype=regressor.data['labels'].dtype)
+        tile_arr = np.zeros([regressor.trees, (tile_end - tile_start)],
+                            dtype=regressor.data['labels'].dtype)
 
         if output_type in ('mean', 'median', 'full'):
 
@@ -703,7 +793,7 @@ class RFRegressor(_Regressor):
                 out_tile[out_tile < regressor.adjustment['lower_limit']] = regressor.adjustment['lower_limit']
 
         if nodatavalue is not None:
-            out_tile[np.unique(np.where(temp_arr == nodatavalue)[0])] = nodatavalue
+            out_tile[np.where(mask_arr == 0)] = out_nodatavalue
 
         return out_tile
 
@@ -747,7 +837,10 @@ class RFRegressor(_Regressor):
         :return: 1d image array (that will need reshaping if image output)
         """
         nodatavalue = None
+        out_nodatavalue = None
         verbose = False
+        band_multipliers = np.array(list(1.0 for _ in range(arr.shape[1])))
+        band_additives = np.array(list(0.0 for _ in range(arr.shape[1])))
 
         if kwargs is not None:
             for key, value in kwargs.items():
@@ -755,17 +848,25 @@ class RFRegressor(_Regressor):
                     self.adjustment[key] = value
                 if key == 'nodatavalue':
                     nodatavalue = value
+                if key == 'out_nodatavalue':
+                    out_nodatavalue = value
                 if key == 'verbose':
                     verbose = value
+                if key == 'band_multipliers':
+                    band_multipliers = value
+                if key == 'band_additives':
+                    band_additives = value
 
         if type(arr).__name__ != 'ndarray':
             arr = np.array(arr)
 
         # define output array
         if output_type == 'full':
-            out_arr = np.zeros([self.trees, arr.shape[0]])
+            out_arr = np.zeros([self.trees, arr.shape[0]],
+                               dtype=self.data['labels'].dtype)
         else:
-            out_arr = np.zeros(arr.shape[0])
+            out_arr = np.zeros(arr.shape[0],
+                               dtype=self.data['labels'].dtype)
 
         # input image size
         npx_inp = long(arr.shape[0])  # number of pixels in input image
@@ -782,7 +883,7 @@ class RFRegressor(_Regressor):
 
             for i in range(0, ntiles - 1):
                 if verbose:
-                    Opt.cprint('Processing tile {} of {}'.format(str(i+1), ntiles))
+                    Opt.cprint('Processing internal tile {} of {}'.format(str(i+1), ntiles))
 
                 if output_type == 'full':
                     out_arr[:, i * npx_tile:(i + 1) * npx_tile] = self.regress_tile(arr,
@@ -790,20 +891,24 @@ class RFRegressor(_Regressor):
                                                                                     (i + 1) * npx_tile,
                                                                                     self,
                                                                                     self.feature_index,
-                                                                                    npx_tile=npx_tile,
                                                                                     nodatavalue=nodatavalue,
+                                                                                    out_nodatavalue=out_nodatavalue,
                                                                                     output_type=output_type,
-                                                                                    intvl=intvl)
+                                                                                    intvl=intvl,
+                                                                                    band_multipliers=band_multipliers,
+                                                                                    band_additives=band_additives)
                 else:
                     out_arr[i * npx_tile:(i + 1) * npx_tile] = self.regress_tile(arr,
                                                                                  i * npx_tile,
                                                                                  (i + 1) * npx_tile,
                                                                                  self,
                                                                                  self.feature_index,
-                                                                                 npx_tile=npx_tile,
                                                                                  nodatavalue=nodatavalue,
+                                                                                 out_nodatavalue=out_nodatavalue,
                                                                                  output_type=output_type,
-                                                                                 intvl=intvl)
+                                                                                 intvl=intvl,
+                                                                                 band_multipliers=band_multipliers,
+                                                                                 band_additives=band_additives)
 
             if npx_last > 0:  # number of total pixels for the last tile
 
@@ -817,20 +922,24 @@ class RFRegressor(_Regressor):
                                                                                            i * npx_tile + npx_last,
                                                                                            self,
                                                                                            self.feature_index,
-                                                                                           npx_tile=npx_last,
                                                                                            nodatavalue=nodatavalue,
+                                                                                           out_nodatavalue=out_nodatavalue,
                                                                                            output_type=output_type,
-                                                                                           intvl=intvl)
+                                                                                           intvl=intvl,
+                                                                                           band_multipliers=band_multipliers,
+                                                                                           band_additives=band_additives)
                 else:
                     out_arr[i * npx_tile:(i * npx_tile + npx_last)] = self.regress_tile(arr,
                                                                                         i * npx_tile,
                                                                                         i * npx_tile + npx_last,
                                                                                         self,
                                                                                         self.feature_index,
-                                                                                        npx_tile=npx_last,
                                                                                         nodatavalue=nodatavalue,
+                                                                                        out_nodatavalue=out_nodatavalue,
                                                                                         output_type=output_type,
-                                                                                        intvl=intvl)
+                                                                                        intvl=intvl,
+                                                                                        band_multipliers=band_multipliers,
+                                                                                        band_additives=band_additives)
 
         else:
 
@@ -839,10 +948,12 @@ class RFRegressor(_Regressor):
                                         npx_inp,
                                         self,
                                         self.feature_index,
-                                        npx_tile=npx_inp,
                                         nodatavalue=nodatavalue,
+                                        out_nodatavalue=out_nodatavalue,
                                         output_type=output_type,
-                                        intvl=intvl)
+                                        intvl=intvl,
+                                        band_multipliers=band_multipliers,
+                                        band_additives=band_additives)
 
         return out_arr
 
@@ -864,7 +975,7 @@ class RFRegressor(_Regressor):
                'upper_limit': Limit of maximum value of prediction
                'lower_limit': Limit of minimum value of prediction
                'regress_limit': 2 element list of Minimum and Maximum limits of the label array [min, max]
-               'all_y': Boolean (if all lef outputs should be calculated)
+               'all_y': Boolean (if all leaf outputs should be calculated)
                'var_y': Boolean (if variance of leaf nodes should be calculated)
         """
         for key, value in kwargs.items():
@@ -888,7 +999,7 @@ class RFRegressor(_Regressor):
         if 'var_y' in kwargs:
             if kwargs['var_y']:
                 var_y = self.predict(data['features'],
-                                     output='var',
+                                     output_type='var',
                                      verbose=verbose)
 
         # calculate mean of tree predictions
@@ -896,7 +1007,7 @@ class RFRegressor(_Regressor):
         if 'all_y' in kwargs:
             if kwargs['all_y']:
                 all_y = self.predict(data['features'],
-                                     output='full',
+                                     output_type='full',
                                      verbose=verbose)
 
         # calculate sd of tree predictions
@@ -904,7 +1015,7 @@ class RFRegressor(_Regressor):
         if 'sd_y' in kwargs:
             if kwargs['sd_y']:
                 sd_y = self.predict(data['features'],
-                                    output='sd',
+                                    output_type='sd',
                                     verbose=verbose)
 
         # calculate sd of tree predictions
@@ -912,12 +1023,12 @@ class RFRegressor(_Regressor):
         if 'mean' in kwargs:
             if kwargs['se_y']:
                 mean = self.predict(data['features'],
-                                    output='mean',
+                                    output_type='mean',
                                     verbose=verbose)
 
         # calculate median tree predictions
         pred_y = self.predict(data['features'],
-                              output=output,
+                              output_type=output,
                               verbose=verbose)
 
         # rms error of the predicted versus actual
@@ -1024,7 +1135,7 @@ class RFRegressor(_Regressor):
                              over_adjust=1.0):
         """
         get the model adjustment parameters based on training fit
-        :param output: Metric to be omputed from the random forest (options: 'mean','median','sd')
+        :param output: Metric to be computed from the random forest (options: 'mean','median','sd')
         :param clip: Ratio of samples not to be used at each tail end
         :param data_limits: tuple of (min, max) limits of output data
         :param over_adjust: Amount of over adjustment needed to adjust slope of the output data
