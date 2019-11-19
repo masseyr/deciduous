@@ -1,4 +1,4 @@
-from modules import *
+from geosoupML import RFRegressor, HRFRegressor
 import multiprocessing
 from sys import argv
 import sys
