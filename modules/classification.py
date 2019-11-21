@@ -5,6 +5,7 @@ from scipy import stats
 from math import sqrt
 from osgeo import gdal, gdal_array
 from common import *
+from exceptions import *
 from raster import Raster
 from timer import Timer
 from sklearn import linear_model
@@ -528,7 +529,7 @@ class MRegressor(_Regressor):
         # if either one of outfile or pickle file are available
         # then raise error
         if (outfile is not None) != (picklefile is not None):
-            raise ValueError("Missing outfile or picklefile")
+            raise FileNotFound("Missing outfile or picklefile")
 
         # if outfile and pickle file are both available
         # then write to file and proceed to return
@@ -575,7 +576,7 @@ class MRegressor(_Regressor):
             self.training_results['intercept'] = pred['intercept']
             self.training_results['rmse'] = pred['rmse']
         else:
-            raise ValueError("Model not initialized with samples")
+            raise ObjectNotFound("Model not initialized with samples")
 
     def get_adjustment_param(self,
                              clip=0.025,
@@ -1086,7 +1087,7 @@ class RFRegressor(_Regressor):
         # if either one of outfile or pickle file are available
         # then raise error
         if (outfile is not None) != (picklefile is not None):
-            raise ValueError("Missing outfile or picklefile")
+            raise FileNotFound("Missing outfile or picklefile")
 
         # if outfile and pickle file are both available
         # then write to file and proceed to return
@@ -1166,7 +1167,7 @@ class RFRegressor(_Regressor):
             self.training_results['intercept'] = pred['intercept']
             self.training_results['rmse'] = pred['rmse']
         else:
-            raise ValueError("Model not initialized with samples")
+            raise ObjectNotFound("Model not initialized with samples")
 
     def get_adjustment_param(self,
                              clip=0.025,
@@ -1325,7 +1326,7 @@ class HRFRegressor(RFRegressor):
         """
 
         if output_type == 'full':
-            raise RuntimeError('Output type "full" is not supported for this class')
+            raise UninitializedError('Output type "full" is not supported for this class')
 
         return super(HRFRegressor, self).predict(arr,
                                                  ntile_max=ntile_max,
