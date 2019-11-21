@@ -1,6 +1,7 @@
 import numpy as np
 from common import *
 from osgeo import gdal, gdal_array, ogr, osr, gdalconst
+import warnings
 np.set_printoptions(suppress=True)
 
 # Tell GDAL to throw Python exceptions, and register all drivers
@@ -41,6 +42,7 @@ class Raster(object):
         self.ntiles = None
         self.bounds = None
         self.init = False
+        self.stats = dict()
 
     def __repr__(self):
 
@@ -56,13 +58,20 @@ class Raster(object):
 
     def write_to_file(self,
                       outfile=None,
-                      driver='GTiff'):
+                      driver='GTiff',
+                      **kwargs):
         """
         Write raster to file, given all the properties
         :param self: Raster object
         :param driver: raster driver
         :param outfile: Name of output file
+        :param kwargs: keyword arguments for creation options
         """
+        creation_options = []
+        if len(kwargs) > 0:
+            for key, value in kwargs.items():
+                creation_options.append('{}={}'.format(key.upper(),
+                                                       value.upper()))
         if outfile is None:
 
             if driver == 'MEM':
@@ -76,7 +85,7 @@ class Raster(object):
         Opt.cprint('')
         gtiffdriver = gdal.GetDriverByName(driver)
         fileptr = gtiffdriver.Create(outfile, self.shape[2], self.shape[1],
-                                     self.shape[0], self.dtype)
+                                     self.shape[0], self.dtype, creation_options)
         nbands = self.shape[0]
         fileptr.SetGeoTransform(self.transform)
         fileptr.SetProjection(self.crs_string)
@@ -738,7 +747,7 @@ class Raster(object):
         Generator to extract raster tile by tile
         :param tile_xsize: Number of columns in the tile block
         :param tile_ysize: Number of rows in the tile block
-        :param bands: Band to extract (default: None, gets all bands)
+        :param bands: List of bands to extract (default: None, gets all bands; Index starts at 0)
         :param get_array: If raster array should be retrieved as well
         :param finite_only: If only finite values should be returned
         :param nan_replacement: replacement for NAN values
@@ -758,17 +767,23 @@ class Raster(object):
                 nan_replacement = self.nodatavalue
 
         if bands is None:
-            bands = list(range(1, self.shape[0] + 1))
+            bands = [int(ib) for ib in range(1, self.shape[0] + 1)]
+        elif type(bands) in (int, float):
+            bands = [int(bands)]
+        elif type(bands) in (list, tuple):
+            bands = [int(ib + 1) for ib in bands]
+        else:
+            raise ValueError('Unknown/unsupported data type for "bands" keyword')
 
         ii = 0
         while ii < self.ntiles:
+            if get_array:
 
-            if len(bands) == 1:
-                temp_band = self.datasource.GetRasterBand(bands[0])
-                tile_arr = temp_band.ReadAsArray(*self.tile_grid[ii]['block_coords'])
+                if len(bands) == 1:
+                    temp_band = self.datasource.GetRasterBand(bands[0])
+                    tile_arr = temp_band.ReadAsArray(*self.tile_grid[ii]['block_coords'])
 
-            else:
-                if get_array:
+                else:
                     tile_arr = np.zeros((len(bands),
                                          self.tile_grid[ii]['block_coords'][3],
                                          self.tile_grid[ii]['block_coords'][2]),
@@ -778,13 +793,15 @@ class Raster(object):
                         temp_band = self.datasource.GetRasterBand(band)
                         tile_arr[jj, :, :] = temp_band.ReadAsArray(*self.tile_grid[ii]['block_coords'])
 
-                    if finite_only:
-                        if np.isnan(tile_arr).any() or np.isinf(tile_arr).any():
-                            tile_arr[np.isnan(tile_arr)] = nan_replacement
-                            tile_arr[np.isinf(tile_arr)] = nan_replacement
+                if finite_only:
+                    if np.isnan(tile_arr).any() or np.isinf(tile_arr).any():
+                        Opt.cprint('Non-finite values present in tile')
 
-                else:
-                    tile_arr = None
+                        tile_arr[np.where(np.isnan(tile_arr))] = nan_replacement
+                        tile_arr[np.where(np.isinf(tile_arr))] = nan_replacement
+
+            else:
+                tile_arr = None
 
             yield self.tile_grid[ii]['tie_point'], tile_arr
 
@@ -880,6 +897,28 @@ class Raster(object):
                     tile_samp_output[idx] = samp_values[j]
 
             return tile_samp_output
+
+    def get_stats(self,
+                  print_stats=False,
+                  approx=False):
+
+        """
+        Method to compute statistics of the raster object, and store as raster property
+        :param print_stats: If the statistics should be printed to console
+        :param approx: If approx statistics should be calculated instead to gain speed
+        :return: None
+        """
+
+        for ib in range(self.shape[0]):
+            band = self.datasource.GetRasterBand(ib+1)
+            band.ComputeStatistics(approx)
+            band_stats = dict(zip(['min', 'max', 'mean', 'stddev'], band.GetStatistics(int(approx), 0)))
+
+            if print_stats:
+                Opt.cprint('Band {} : {}'.format(self.bnames[ib],
+                                                 str(band_stats)))
+
+            self.stats[self.bnames[ib]] = band_stats
 
 
 class MultiRaster:
