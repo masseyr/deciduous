@@ -6,6 +6,11 @@ from raster import Raster, MultiRaster
 from resources import *
 from timer import Timer
 from distance import Mahalanobis, Distance, Euclidean
-from exceptions import ObjectNotFound, UninitializedError
+from exceptions import ObjectNotFound, UninitializedError, FieldError, FileNotFound, TileNotFound, ImageProcessingError
 from vector import Vector
 from logger import Logger
+from plots import Plot
+
+
+__author__ = 'richard_massey'
+
