@@ -231,27 +231,45 @@ class _Regressor(object):
             _x, _y, _cols, _rows = raster_obj.tile_grid[count]['block_coords']
 
             if verbose:
-                Opt.cprint("Processing tile {} of {}: x {}, y {}, cols {}, rows {}".format(str(count + 1),
-                                                                                           str(raster_obj.ntiles),
-                                                                                           str(_x),
-                                                                                           str(_y),
-                                                                                           str(_cols),
-                                                                                           str(_rows)))
+                Opt.cprint("\nProcessing tile {} of {}: x {}, y {}, cols {}, rows {}".format(str(count + 1),
+                                                                                             str(raster_obj.ntiles),
+                                                                                             str(_x),
+                                                                                             str(_y),
+                                                                                             str(_cols),
+                                                                                             str(_rows)),
+                           newline='\n')
 
             new_shape = [nbands, _rows * _cols]
 
             temp_arr = tile_arr.reshape(new_shape)
             temp_arr = temp_arr.swapaxes(0, 1)
 
-            out_arr = regressor.predict(temp_arr,
-                                        tile_size=internal_tile_size,
-                                        output_type=output_type,
-                                        z_val=z_val,
-                                        nodatavalue=nodatavalue,
-                                        out_nodatavalue=out_nodatavalue,
-                                        verbose=verbose,
-                                        band_additives=band_additives,
-                                        band_multipliers=band_multipliers)
+            minmax = np.zeros([nbands, 2])
+            bad_tile_flag = False
+
+            for ii in range(temp_arr.shape[1]):
+                minmax[ii, :] = np.array([np.min(temp_arr[:, ii]), np.max(temp_arr[:, ii])])
+                if verbose:
+                    Opt.cprint('Band {} : '.format(str(ii + 1)) +
+                               'min {} max {}'.format(str(minmax[ii, 0]),
+                                                      str(minmax[ii, 1])))
+
+                if nodatavalue is not None:
+                    if (minmax[ii, 0] == minmax[ii, 1] == nodatavalue) and (ii in regressor.feature_index):
+                        bad_tile_flag = True
+
+            if not bad_tile_flag:
+                out_arr = regressor.predict(temp_arr,
+                                            tile_size=internal_tile_size,
+                                            output_type=output_type,
+                                            z_val=z_val,
+                                            nodatavalue=nodatavalue,
+                                            out_nodatavalue=out_nodatavalue,
+                                            verbose=verbose,
+                                            band_additives=band_additives,
+                                            band_multipliers=band_multipliers)
+            else:
+                out_arr = np.zeros([_rows * _cols]) + out_nodatavalue
 
             if out_arr.dtype != out_ras_arr.dtype:
                 out_arr = out_arr.astype(out_ras_arr.dtype)
@@ -259,10 +277,11 @@ class _Regressor(object):
             # update output array with tile classification output
 
             if mask_band is not None:
-                out_ras_arr[_y: (_y + _rows), _x: (_x + _cols)] = out_arr.reshape([_rows, _cols]) * \
-                                                                  tile_arr[mask_band, :, :]
+                out_arr_ = out_arr.reshape([_rows, _cols]) * tile_arr[mask_band, :, :]
             else:
-                out_ras_arr[_y: (_y + _rows), _x: (_x + _cols)] = out_arr.reshape([_rows, _cols])
+                out_arr_ = out_arr.reshape([_rows, _cols])
+
+            out_ras_arr[_y: (_y + _rows), _x: (_x + _cols)] = out_arr_
 
             count += 1
 
@@ -686,7 +705,7 @@ class RFRegressor(_Regressor):
                      nodatavalue=None,
                      output_type='median',
                      intvl=95.0,
-                     min_variance=0.01,
+                     min_variance=None,
                      **kwargs):
 
         """
@@ -738,10 +757,8 @@ class RFRegressor(_Regressor):
         else:
             mask_arr = np.zeros([temp_arr.shape[1]]) + 1
 
-        out_tile = np.zeros([tile_end - tile_start],
-                            dtype=regressor.data['labels'].dtype)
-        tile_arr = np.zeros([regressor.trees, (tile_end - tile_start)],
-                            dtype=regressor.data['labels'].dtype)
+        out_tile = np.zeros([tile_end - tile_start])
+        tile_arr = np.zeros([regressor.trees, (tile_end - tile_start)])
 
         if output_type in ('mean', 'median', 'full'):
 
@@ -818,11 +835,11 @@ class RFRegressor(_Regressor):
         :param tile_size: Size of each square tile (default = 128)
 
         :param output_type: which output to produce,
-                       choices: ['sd', 'var', 'pred', 'full', 'conf']
+                       choices: ['sd', 'var', 'median', 'mean', 'full', 'conf']
                        where 'sd' is for standard deviation,
                        'var' is for variance
                        'median' is for median of tree outputs
-                       'mean' is for mean of tree coutputs
+                       'mean' is for mean of tree outputs
                        'full' is for the full spectrum of the leaf nodes' prediction
                        'conf' stands for confidence interval
 
@@ -836,6 +853,9 @@ class RFRegressor(_Regressor):
 
         :return: 1d image array (that will need reshaping if image output)
         """
+        if not type(arr) == np.ndarray:
+            arr = np.array(arr)
+
         nodatavalue = None
         out_nodatavalue = None
         verbose = False
@@ -857,16 +877,11 @@ class RFRegressor(_Regressor):
                 if key == 'band_additives':
                     band_additives = value
 
-        if type(arr).__name__ != 'ndarray':
-            arr = np.array(arr)
-
         # define output array
         if output_type == 'full':
-            out_arr = np.zeros([self.trees, arr.shape[0]],
-                               dtype=self.data['labels'].dtype)
+            out_arr = np.zeros([self.trees, arr.shape[0]])
         else:
-            out_arr = np.zeros(arr.shape[0],
-                               dtype=self.data['labels'].dtype)
+            out_arr = np.zeros(arr.shape[0])
 
         # input image size
         npx_inp = long(arr.shape[0])  # number of pixels in input image
@@ -883,65 +898,88 @@ class RFRegressor(_Regressor):
 
             for i in range(0, ntiles - 1):
                 if verbose:
-                    Opt.cprint('Processing internal tile {} of {}'.format(str(i+1), ntiles))
+                    Opt.cprint('Processing internal tile {} of {}'.format(str(i+1), ntiles),
+                               newline='')
 
                 if output_type == 'full':
-                    out_arr[:, i * npx_tile:(i + 1) * npx_tile] = self.regress_tile(arr,
-                                                                                    i * npx_tile,
-                                                                                    (i + 1) * npx_tile,
-                                                                                    self,
-                                                                                    self.feature_index,
-                                                                                    nodatavalue=nodatavalue,
-                                                                                    out_nodatavalue=out_nodatavalue,
-                                                                                    output_type=output_type,
-                                                                                    intvl=intvl,
-                                                                                    band_multipliers=band_multipliers,
-                                                                                    band_additives=band_additives)
+                    temp_tile_ = self.regress_tile(arr,
+                                                   i * npx_tile,
+                                                   (i + 1) * npx_tile,
+                                                   self,
+                                                   self.feature_index,
+                                                   nodatavalue=nodatavalue,
+                                                   out_nodatavalue=out_nodatavalue,
+                                                   output_type=output_type,
+                                                   intvl=intvl,
+                                                   band_multipliers=band_multipliers,
+                                                   band_additives=band_additives)
+
+                    out_arr[:, i * npx_tile:(i + 1) * npx_tile] = temp_tile_
+                    if verbose:
+                        Opt.cprint(' min {} max {}'.format(np.min(temp_tile_), np.max(temp_tile_)))
+
                 else:
-                    out_arr[i * npx_tile:(i + 1) * npx_tile] = self.regress_tile(arr,
-                                                                                 i * npx_tile,
-                                                                                 (i + 1) * npx_tile,
-                                                                                 self,
-                                                                                 self.feature_index,
-                                                                                 nodatavalue=nodatavalue,
-                                                                                 out_nodatavalue=out_nodatavalue,
-                                                                                 output_type=output_type,
-                                                                                 intvl=intvl,
-                                                                                 band_multipliers=band_multipliers,
-                                                                                 band_additives=band_additives)
+                    temp_tile_ = self.regress_tile(arr,
+                                                   i * npx_tile,
+                                                   (i + 1) * npx_tile,
+                                                   self,
+                                                   self.feature_index,
+                                                   nodatavalue=nodatavalue,
+                                                   out_nodatavalue=out_nodatavalue,
+                                                   output_type=output_type,
+                                                   intvl=intvl,
+                                                   band_multipliers=band_multipliers,
+                                                   band_additives=band_additives)
+
+                    out_arr[i * npx_tile:(i + 1) * npx_tile] = temp_tile_
+                    if verbose:
+                        Opt.cprint(' min {} max {}'.format(np.min(temp_tile_), np.max(temp_tile_)))
 
             if npx_last > 0:  # number of total pixels for the last tile
 
                 i = ntiles - 1
                 if verbose:
-                    Opt.cprint('Processing tile {} of {}'.format(str(i+1), ntiles))
+                    Opt.cprint('Processing internal tile {} of {}'.format(str(i+1), ntiles),
+                               newline='')
 
                 if output_type == 'full':
-                    out_arr[:, i * npx_tile:(i * npx_tile + npx_last)] = self.regress_tile(arr,
-                                                                                           i * npx_tile,
-                                                                                           i * npx_tile + npx_last,
-                                                                                           self,
-                                                                                           self.feature_index,
-                                                                                           nodatavalue=nodatavalue,
-                                                                                           out_nodatavalue=out_nodatavalue,
-                                                                                           output_type=output_type,
-                                                                                           intvl=intvl,
-                                                                                           band_multipliers=band_multipliers,
-                                                                                           band_additives=band_additives)
+                    temp_tile_ = self.regress_tile(arr,
+                                                   i * npx_tile,
+                                                   i * npx_tile + npx_last,
+                                                   self,
+                                                   self.feature_index,
+                                                   nodatavalue=nodatavalue,
+                                                   out_nodatavalue=out_nodatavalue,
+                                                   output_type=output_type,
+                                                   intvl=intvl,
+                                                   band_multipliers=band_multipliers,
+                                                   band_additives=band_additives)
+
+                    out_arr[:, i * npx_tile:(i * npx_tile + npx_last)] = temp_tile_
+                    if verbose:
+                        Opt.cprint(' min {} max {}'.format(np.min(temp_tile_), np.max(temp_tile_)))
+
                 else:
-                    out_arr[i * npx_tile:(i * npx_tile + npx_last)] = self.regress_tile(arr,
-                                                                                        i * npx_tile,
-                                                                                        i * npx_tile + npx_last,
-                                                                                        self,
-                                                                                        self.feature_index,
-                                                                                        nodatavalue=nodatavalue,
-                                                                                        out_nodatavalue=out_nodatavalue,
-                                                                                        output_type=output_type,
-                                                                                        intvl=intvl,
-                                                                                        band_multipliers=band_multipliers,
-                                                                                        band_additives=band_additives)
+                    temp_tile_ = self.regress_tile(arr,
+                                                   i * npx_tile,
+                                                   i * npx_tile + npx_last,
+                                                   self,
+                                                   self.feature_index,
+                                                   nodatavalue=nodatavalue,
+                                                   out_nodatavalue=out_nodatavalue,
+                                                   output_type=output_type,
+                                                   intvl=intvl,
+                                                   band_multipliers=band_multipliers,
+                                                   band_additives=band_additives)
+
+                    out_arr[i * npx_tile:(i * npx_tile + npx_last)] = temp_tile_
+                    if verbose:
+                        Opt.cprint(' min {} max {}'.format(np.min(temp_tile_), np.max(temp_tile_)))
 
         else:
+            if verbose:
+                Opt.cprint('Processing internal tile 1 of 1',
+                           newline='')
 
             out_arr = self.regress_tile(arr,
                                         0,
@@ -954,6 +992,8 @@ class RFRegressor(_Regressor):
                                         intvl=intvl,
                                         band_multipliers=band_multipliers,
                                         band_additives=band_additives)
+            if verbose:
+                Opt.cprint(' min {} max {}'.format(np.min(out_arr), np.max(out_arr)))
 
         return out_arr
 
@@ -1217,13 +1257,17 @@ class HRFRegressor(RFRegressor):
                        outdir=None,
                        band_name='prediction',
                        output_type='median',
+                       array_multiplier=1.0,
+                       array_additive=0.0,
                        out_data_type=gdal.GDT_Float32,
-                       nodatavalue=-32768.0,
+                       nodatavalue=None,
                        **kwargs):
 
         """Tree variance from the RF regressor
         :param raster_obj: Initialized Raster object with a 3d array
         :param outfile: name of output file
+        :param array_multiplier: rescale data using this value
+        :param array_additive: Rescale data using this value
         :param out_data_type: output raster data type
         :param nodatavalue: No data value for output raster
         :param band_name: Name of the output raster band
@@ -1245,7 +1289,50 @@ class HRFRegressor(RFRegressor):
                                          output_type=output_type,
                                          out_data_type=out_data_type,
                                          nodatavalue=nodatavalue,
+                                         array_multiplier=array_multiplier,
+                                         array_additive=array_additive,
                                          **kwargs)
+
+    def predict(self,
+                arr,
+                ntile_max=5,
+                tile_size=1024,
+                output_type='median',
+                intvl=95.0,
+                **kwargs):
+        """
+        Calculate random forest model prediction, variance, or standard deviation.
+        Variance or standard deviation is calculated across all trees.
+        Tiling is necessary in this step because large numpy arrays can cause
+        memory issues during creation.
+
+        :param arr: input 2d array (axis 0: features (pixels), axis 1: bands)
+        :param ntile_max: Maximum number of tiles up to which the
+                          input image or array is processed without tiling (default = 9).
+                          You can choose any (small) number that suits the available memory.
+        :param tile_size: Size of each square tile (default = 128)
+
+        :param output_type: which output to produce,
+                       choices: ['sd', 'var', 'median', 'mean', 'conf']
+                       where 'sd' is for standard deviation,
+                       'var' is for variance
+                       'median' is for median of tree outputs
+                       'mean' is for mean of tree outputs
+                       'conf' stands for confidence interval
+
+        :param intvl: Prediction interval width (default: 95 percentile)
+        :return: 1d image array (that will need reshaping if image output)
+        """
+
+        if output_type == 'full':
+            raise RuntimeError('Output type "full" is not supported for this class')
+
+        return super(HRFRegressor, self).predict(arr,
+                                                 ntile_max=ntile_max,
+                                                 tile_size=tile_size,
+                                                 output_type=output_type,
+                                                 intvl=intvl,
+                                                 **kwargs)
 
     @staticmethod
     def regress_tile(arr,
@@ -1253,11 +1340,11 @@ class HRFRegressor(RFRegressor):
                      tile_end,
                      regressors,
                      feature_index,
-                     npx_tile=1024,
                      nodatavalue=None,
                      output_type='median',
                      intvl=95.0,
-                     min_variance=None):
+                     min_variance=None,
+                     **kwargs):
 
         """
         Method to preocess each tile of the image internally
@@ -1267,7 +1354,6 @@ class HRFRegressor(RFRegressor):
         :param regressors: RFRegressor
         :param feature_index: List of list of feature indices corresponding to input array
                               i.e. index of bands to be used for regression
-        :param npx_tile: numper to pixels in each tile
         :param nodatavalue: No data value
         :param output_type: Type of output to produce,
                        choices: ['sd', 'var', 'pred', 'full', 'conf']
@@ -1280,16 +1366,35 @@ class HRFRegressor(RFRegressor):
         :param min_variance: Minimum variance after which to cutoff
         :return: numpy 1-D array
         """
+
         if min_variance is None:
             min_variance = 0.05 * np.min(arr.astype(np.float32))
 
+        if 'band_multipliers' in kwargs:
+            band_multipliers = kwargs['band_multipliers']
+        else:
+            band_multipliers = np.array([1.0 for _ in range(arr.shape[1])])
+
+        if 'band_additives' in kwargs:
+            band_additives = kwargs['band_additives']
+        else:
+            band_additives = np.array([0.0 for _ in range(arr.shape[1])])
+
+        if 'out_nodatavalue' in kwargs:
+            out_nodatavalue = kwargs['out_nodatavalue']
+        else:
+            out_nodatavalue = nodatavalue
+
         out_tile = np.zeros([tile_end - tile_start])
-        if nodatavalue is not None:
+
+        if out_nodatavalue is not None:
+            out_tile += out_nodatavalue
+        else:
             out_tile += nodatavalue
 
         tile_index = list()
 
-        for ii, _ in enumerate(regressors):
+        for ii, _ in enumerate(regressors.regressor):
             reg_index = np.where(np.apply_along_axis(lambda x: np.all(x[feature_index[ii]] != nodatavalue),
                                                      1,
                                                      arr[tile_start:tile_end, :]))[0]
@@ -1309,17 +1414,20 @@ class HRFRegressor(RFRegressor):
 
                 tile_index.append(reg_index)
 
-        for ii, regressor in enumerate(regressors):
+        for ii, regressor in enumerate(regressors.regressor):
             Opt.cprint(' . {}'.format(str(ii + 1)), newline='')
 
             temp_tile = np.zeros([tile_index[ii].shape[0]]) * 0.0
 
             if temp_tile.shape[0] > 0:
 
-                temp_arr = arr[tile_index[ii][:, np.newaxis] + tile_start, feature_index[ii]]
+                temp_arr = (arr[tile_index[ii][:, np.newaxis] + tile_start, feature_index[ii]] *
+                            band_multipliers[feature_index[ii]]) + \
+                    band_additives[feature_index[ii]]
+
                 tile_arr = np.zeros([regressor.trees, tile_index[ii].shape[0]], dtype=float)
 
-                if output_type in ('mean', 'median', 'full'):
+                if output_type in ('mean', 'median'):
 
                     # calculate tree predictions for each pixel in a 2d array
                     for jj, tree_ in enumerate(regressor.regressor.estimators_):
@@ -1329,8 +1437,6 @@ class HRFRegressor(RFRegressor):
                         temp_tile = np.median(tile_arr, axis=0)
                     elif output_type == 'mean':
                         temp_tile = np.mean(tile_arr, axis=0)
-                    elif output_type == 'full':
-                        return tile_arr
 
                 elif output_type in ('sd', 'var'):
 
@@ -1352,7 +1458,7 @@ class HRFRegressor(RFRegressor):
                     if output_type == 'sd':
                         temp_tile = temp_tile ** 0.5
                 else:
-                    raise RuntimeError("Unknown output type or no output type specified")
+                    raise RuntimeError("Unsupported output type or no output type specified")
 
                 if len(regressor.adjustment) > 0:
 
@@ -1375,109 +1481,3 @@ class HRFRegressor(RFRegressor):
                 out_tile[tile_index[ii]] = temp_tile
 
         return out_tile
-
-    def predict(self,
-                arr,
-                ntile_max=5,
-                tile_size=1024,
-                output_type='median',
-                intvl=95.0,
-                **kwargs):
-        """
-        Calculate random forest model prediction, variance, or standard deviation.
-        Variance or standard deviation is calculated across all trees.
-        Tiling is necessary in this step because large numpy arrays can cause
-        memory issues during creation.
-
-        :param arr: input 2d array (axis 0: features (pixels), axis 1: bands)
-        :param ntile_max: Maximum number of tiles up to which the
-                          input image or array is processed without tiling (default = 9).
-                          You can choose any (small) number that suits the available memory.
-        :param tile_size: Size of each square tile (default = 128)
-
-        :param output_type: which output to produce,
-                       choices: ['sd', 'var', 'pred', 'full', 'conf']
-                       where 'sd' is for standard deviation,
-                       'var' is for variance
-                       'median' is for median of tree outputs
-                       'mean' is for mean of tree coutputs
-                       'conf' stands for confidence interval
-
-        :param intvl: Prediction interval width (default: 95 percentile)
-        :return: 1d image array (that will need reshaping if image output)
-        """
-
-        nodatavalue = None
-        verbose = False
-
-        if kwargs is not None:
-            for key, value in kwargs.items():
-                if key == 'nodatavalue':
-                    nodatavalue = value
-                if key == 'verbose':
-                    verbose = value
-
-        if type(arr).__name__ != 'ndarray':
-            arr = np.array(arr)
-
-        # define output array
-        out_arr = np.zeros(arr.shape[0])
-        if nodatavalue is not None:
-            out_arr += nodatavalue
-
-        # input image size
-        npx_inp = long(arr.shape[0])  # number of pixels in input image
-        nb_inp = long(arr.shape[1])  # number of bands in input image
-
-        # size of tiles
-        npx_tile = long(tile_size)  # pixels in each tile
-        npx_last = npx_inp % npx_tile  # pixels in last tile
-        ntiles = long(npx_inp) / long(npx_tile) + 1  # total tiles
-
-        if ntiles > ntile_max:
-
-            for i in range(0, ntiles - 1):
-
-                if verbose:
-                    Opt.cprint('\nProcessing tile {} of {}'.format(str(i + 1), ntiles), newline='')
-
-                out_arr[i * npx_tile:(i + 1) * npx_tile] = self.regress_tile(arr,
-                                                                             i * npx_tile,
-                                                                             (i + 1) * npx_tile,
-                                                                             self.regressor,
-                                                                             self.feature_index,
-                                                                             npx_tile=npx_tile,
-                                                                             nodatavalue=nodatavalue,
-                                                                             output_type=output_type,
-                                                                             intvl=intvl)
-
-            if npx_last > 0:
-
-                i = ntiles - 1
-                if verbose:
-                    Opt.cprint('\nProcessing tile {} of {}\n'.format(str(i + 1), ntiles), newline='')
-
-                out_arr[i * npx_tile:(i * npx_tile + npx_last)] = self.regress_tile(arr,
-                                                                                    i * npx_tile,
-                                                                                    i * npx_tile + npx_last,
-                                                                                    self.regressor,
-                                                                                    self.feature_index,
-                                                                                    npx_tile=npx_last,
-                                                                                    nodatavalue=nodatavalue,
-                                                                                    output_type=output_type,
-                                                                                    intvl=intvl)
-        else:
-            if verbose:
-                Opt.cprint('\nProcessing image as one tile\n', newline='')
-
-            out_arr = self.regress_tile(arr,
-                                        0,
-                                        npx_inp - 1,
-                                        self.regressor,
-                                        self.feature_index,
-                                        npx_tile=npx_last,
-                                        nodatavalue=nodatavalue,
-                                        output_type=output_type,
-                                        intvl=intvl)
-
-        return out_arr
