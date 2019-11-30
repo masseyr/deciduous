@@ -1,4 +1,4 @@
-from modules import *
+from geosoup import *
 from osgeo import osr, gdal, ogr
 import numpy as np
 from sys import argv
@@ -89,7 +89,7 @@ if __name__ == '__main__':
 
         for j, year in enumerate(range(start_year, end_year + 1)):
 
-            if type(attr[fire_year_col]) in (int, float, long):
+            if type(attr[fire_year_col]) in (int, float):
 
                 layer = vec.datasource.ExecuteSQL("SELECT * from {} WHERE {}={}".format(vec.name,
                                                                                         fire_year_col,
