@@ -1,4 +1,4 @@
-from modules import Vector, Handler
+from geosoup import Vector, Handler
 import numpy as np
 import sys
 
