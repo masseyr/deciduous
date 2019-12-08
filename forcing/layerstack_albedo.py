@@ -1,3 +1,11 @@
+import sys
+import os
+import multiprocessing as mp
+from osgeo import gdal_array
+import numpy as np
+from geosoup import MultiRaster, Raster, Handler, Opt
+
+
 def _tile_process_(args):
     _filelist, _outfile, _band_order, _tile_dict, _composite_type = args
     _tile_coords = _tile_dict['block_coords']
@@ -26,13 +34,13 @@ def _tile_process_(args):
                                         else _lras.nodatavalue, 0, _tile_arr)
     elif _composite_type == 'max':
         _temp_arr = np.apply_along_axis(lambda x: np.max(x[x != _lras.nodatavalue])
-        if (x[x != _lras.nodatavalue]).shape[0] > 0
-        else _lras.nodatavalue, 0, _tile_arr)
+                                        if (x[x != _lras.nodatavalue]).shape[0] > 0
+                                        else _lras.nodatavalue, 0, _tile_arr)
 
     elif _composite_type == 'min':
         _temp_arr = np.apply_along_axis(lambda x: np.min(x[x != _lras.nodatavalue])
-        if (x[x != _lras.nodatavalue]).shape[0] > 0
-        else _lras.nodatavalue, 0, _tile_arr)
+                                        if (x[x != _lras.nodatavalue]).shape[0] > 0
+                                        else _lras.nodatavalue, 0, _tile_arr)
 
     elif 'pctl' in _composite_type:
         pctl = int(_composite_type.split('_')[1])
@@ -67,15 +75,7 @@ def _get_tile_data_(_filelist, _outfile, _band_order, _tile_specs, _composite_ty
 
 
 if __name__ == '__main__':
-    import sys
-    import os
 
-    module_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    sys.path.append(module_path)
-    from modules import *
-    import multiprocessing as mp
-    from osgeo import gdal_array
-    import numpy as np
 
     '''
     nthreads = 4
