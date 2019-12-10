@@ -18,8 +18,7 @@ if __name__ == '__main__':
 
     print(outfile)
 
-    Handler(outfile).write_to_csv(out_list,
-                                  outfile)
+    Handler(outfile).write_to_csv(out_list,outfile)
 
     print('Done!')
 
