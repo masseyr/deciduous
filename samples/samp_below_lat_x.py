@@ -27,8 +27,7 @@ if __name__ == '__main__':
     print(len(lonlat))
 
 
-    uniq, indices, inverse, count = np.unique(ar=lonlat,
-                                              axis=0,
+    uniq, indices, inverse, count = np.unique(ar=lonlat,axis=0,
                                               return_index=True,
                                               return_counts=True,
                                               return_inverse=True)
