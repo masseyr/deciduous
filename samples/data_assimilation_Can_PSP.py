@@ -71,7 +71,8 @@ if __name__ == '__main__':
     psp_vec.layer.CreateField(year_attr)
     psp_vec.layer.CreateField(decid_attr)
 
-    psp_vec.fields = psp_vec.fields + [site_attr, year_attr, decid_attr]
+    psp_vec.fields = psp_vec.fields + [site_attr,
+                                       year_attr, decid_attr]
 
     log = Logger('SAMP',
                  filename=log_file)
