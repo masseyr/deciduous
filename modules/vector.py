@@ -210,17 +210,29 @@ class Vector(object):
                                                                 str(len(self.fields)))
 
     @staticmethod
-    def ogr_data_type(x):
+    def ogr_data_type(x,
+                      _return='code'):
         """
         Method to get OGR data type, for use in creating OGR geometry fields
         :param x: Any data input
+        :param _return: Type of response to return ('code' or 'name')
         :return: OGR data type
         """
         val = type(x).__name__.lower()
         try:
-            return OGR_FIELD_DEF[val]
+            if _return == 'code':
+                return OGR_FIELD_DEF[val]
+            elif _return == 'name':
+                return val
+            else:
+                raise ValueError('Unknown response type asked')
         except (KeyError, NameError):
-            return OGR_FIELD_DEF['none']
+            if _return == 'code':
+                return OGR_FIELD_DEF['none']
+            elif _return == 'name':
+                return
+            else:
+                raise ValueError('Unknown response type asked')
 
     @staticmethod
     def ogr_geom_type(x):
@@ -247,14 +259,16 @@ class Vector(object):
             raise(ValueError('Invalid format'))
 
     @staticmethod
-    def string_to_ogr_type(x):
+    def string_to_ogr_type(x,
+                           _return='code'):
         """
         Method to return name of the data type
         :param x: input item
+        :param _return: Type of response to return ('code' or 'name')
         :return: string
         """
         if type(x).__name__ != 'str':
-            return Vector.ogr_data_type(x)
+            return Vector.ogr_data_type(x, _return)
         else:
             try:
                 val = int(x)
@@ -267,7 +281,7 @@ class Vector(object):
                     except:
                         val = None
 
-            return Vector.ogr_data_type(val)
+            return Vector.ogr_data_type(val, _return)
 
     @staticmethod
     def wkt_from_coords(coords,
