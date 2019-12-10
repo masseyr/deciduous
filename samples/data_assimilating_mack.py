@@ -24,7 +24,7 @@ def convert_usable(elem):
 
 if __name__ == '__main__':
 
-    age_file = "D:/Shared/Dropbox/projects/NAU/landsat_deciduous/data/SAMPLES/BNZ_LTER/raw/" \
+    age_file = "D:/Shared/Dropbox/projects/NAU/landsat_deciduous/data/SAMPLES/BNZ_LTER/raw/" +\
                "All_Stands_Transect_age.csv"
 
     samp_file = "D:/Shared/Dropbox/projects/NAU/landsat_deciduous/data/SAMPLES/BNZ_LTER/raw/" + \
