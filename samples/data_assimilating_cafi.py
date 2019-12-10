@@ -15,6 +15,7 @@ if __name__ == '__main__':
     out_file = "c:/users/rm885/Dropbox/projects/NAU/landsat_deciduous/data/SAMPLES/CAFI/CAFI_PSP.shp"
     log_file = "c:/users/rm885/Dropbox/projects/NAU/landsat_deciduous/data/SAMPLES/CAFI/CAFI_PSP.log"
 
+
     cafi_vec = Vector(in_memory=True,
                       primary_key=None,
                       epsg=4326,  # geographic projection
@@ -97,7 +98,8 @@ if __name__ == '__main__':
 
                 # get all specie IDs measured in that year
                 specie_IDs = list(remove_nan(row[col_name + '_{}'.format(time_id)])
-                                  for col_name in specie_headers)
+                                  for col_name in
+                                  specie_headers)
 
                 # classify the IDs
                 specie_classes = list(specie_id_cafi[int(specie_ID)] if specie_ID is not None else 0
