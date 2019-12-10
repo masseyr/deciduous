@@ -80,7 +80,8 @@ if __name__ == '__main__':
 
     # define lists for column names
     geom_headers = ['Lat_start', 'Long_start']
-    time_headers = ['date', 'burn.year', 'age']
+    time_headers = ['date', 'burn.year',
+                    'age']
 
     # define lists for output data
     out_header = ['site', 'year', 'decid_frac', 'age', 'burn_yr']
