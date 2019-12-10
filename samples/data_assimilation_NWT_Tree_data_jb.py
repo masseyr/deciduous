@@ -49,7 +49,8 @@ if __name__ == '__main__':
     out_vec.layer.CreateField(decid_attr)
     out_vec.layer.CreateField(age_attr)
 
-    out_vec.fields = out_vec.fields + [site_attr, year_attr, decid_attr, age_attr]
+    out_vec.fields = out_vec.fields + [site_attr, year_attr, decid_attr,
+                                       age_attr]
 
     log = Logger('SAMP',
                  filename=log_file)
