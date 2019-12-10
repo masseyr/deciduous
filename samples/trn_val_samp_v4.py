@@ -7,7 +7,8 @@ trn_data = list()
 print('Total {} sites'.format(str(len(out_decid_frac_samp))))
 
 ntrn = int((trn_perc * len(out_decid_frac_samp)) / 100.0)
-nval = len(out_decid_frac_samp) - ntrn
+nval = len(out_decid_frac_samp) - \
+       ntrn
 
 # randomly select training samples based on number
 trn_sites = Sublist(range(len(out_decid_frac_samp))).random_selection(ntrn)
