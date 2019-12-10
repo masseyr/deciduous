@@ -1158,10 +1158,14 @@ class Handler(object):
                     f.write(line + '\n')
 
     def find_all(self,
-                 pattern='*'):
+                 pattern='*',
+                 find_dirs=False,
+                 verbose=False):
         """
         Find all the names that match pattern
         :param pattern: pattern to look for in the folder
+        :param find_dirs: If folder names should be searched instead of files
+        :param verbose: Should the files be displayed
         """
         result = []
         # search for a given pattern in a folder path
@@ -1174,11 +1178,30 @@ class Handler(object):
             self.dirname += self.sep
 
         for root, dirs, files in os.walk(self.dirname):
-            for name in files:
-                if fnmatch.fnmatch(name, search_str):
-                    if str(root) in str(self.dirname) or str(self.dirname) in str(root):
-                        result.append(os.path.join(root, name))
+            if find_dirs:
+                for dirname in dirs:
+                    if verbose:
+                        Opt.cprint(os.path.join(root, dirname))
 
+                    if fnmatch.fnmatch(dirname, search_str):
+                        if str(root) in str(self.dirname) or str(self.dirname) in str(root):
+                            result.append(os.path.join(root, dirname))
+
+            else:
+                for name in files:
+                    if verbose:
+                        Opt.cprint(os.path.join(root, name))
+
+                    if fnmatch.fnmatch(name, search_str):
+                        if str(root) in str(self.dirname) or str(self.dirname) in str(root):
+                            result.append(os.path.join(root, name))
+        if verbose:
+            Opt.cprint('======================\nFound {} results for {} in {}:'.format(str(len(result)),
+                                                                                       pattern,
+                                                                                       self.dirname))
+            for filename in result:
+                Opt.cprint(filename)
+            Opt.cprint('======================')
         return result  # list
 
     def find_files(self,
