@@ -40,7 +40,8 @@ def md_clean(sample_dicts,
         md_vec = [md_vec[x] for x in num_list]
 
         # find all MD values that as less than cutoff percentile
-        loc = list(ii for ii, x in enumerate(md_vec) if (x <= np.percentile(md_vec, md_cutoff) and x != np.nan))
+        loc = list(ii for ii, x in enumerate(md_vec) if
+                   (x <= np.percentile(md_vec, md_cutoff) and x != np.nan))
 
         out_samples = list(sample_dicts[ii] for ii in loc)
 
