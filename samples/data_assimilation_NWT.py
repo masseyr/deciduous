@@ -39,7 +39,8 @@ specie_headers = ['sp1_ID_SW_t0', 'sp2_ID_SW_t0', 'sp3_ID_SW_t0', 'sp4_ID_SW_t0'
 
 sw_headers = ['sp1_FracSW_t0', 'sp2_FracSW_t0', 'sp3_FracSW_t0', 'sp4_FracSW_t0',
               'sp1_FracSW_t1', 'sp2_FracSW_t1', 'sp3_FracSW_t1', 'sp4_FracSW_t1',
-              'sp1_FracSW_t2', 'sp2_FracSW_t2', 'sp3_FracSW_t2', 'sp4_FracSW_t2']
+              'sp1_FracSW_t2', 'sp2_FracSW_t2', 'sp3_FracSW_t2',
+              'sp4_FracSW_t2']
 
 cols = meta_headers + time_headers + specie_headers + sw_headers
 
