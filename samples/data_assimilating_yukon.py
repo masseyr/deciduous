@@ -42,7 +42,8 @@ ba_headers = ['sp1_FracBA_t0', 'sp2_FracBA_t0', 'sp3_FracBA_t0', 'sp4_FracBA_t0'
               'sp1_FracBA_t2', 'sp2_FracBA_t2', 'sp3_FracBA_t2', 'sp4_FracBA_t2',
               'sp1_FracBA_t3', 'sp2_FracBA_t3', 'sp3_FracBA_t3', 'sp4_FracBA_t3',
               'sp1_FracBA_t4', 'sp2_FracBA_t4', 'sp3_FracBA_t4', 'sp4_FracBA_t4',
-              'sp1_FracBA_t5', 'sp2_FracBA_t5', 'sp3_FracBA_t5', 'sp4_FracBA_t5']
+              'sp1_FracBA_t5', 'sp2_FracBA_t5', 'sp3_FracBA_t5',
+              'sp4_FracBA_t5']
 
 cols = meta_headers + time_headers + specie_headers + ba_headers
 
