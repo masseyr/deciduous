@@ -4,7 +4,7 @@ import multiprocessing as mp
 from sys import argv
 
 """
-This script extracts stratified random samples from single band rasters, 
+This script extracts stratified random samples from single band rasters,  
 sample location at pixel centers. The attribute name in the shapefile 
 that represents the class value is 'value'. this script only extracts
 sample locations with the class attribute. Boundary is specified separately in
