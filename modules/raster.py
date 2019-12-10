@@ -59,12 +59,20 @@ class Raster(object):
     def write_to_file(self,
                       outfile=None,
                       driver='GTiff',
+                      add_overview=False,
+                      resampling='nearest',
+                      overviews=None,
+                      verbose=False,
                       **kwargs):
         """
         Write raster to file, given all the properties
         :param self: Raster object
         :param driver: raster driver
         :param outfile: Name of output file
+        :param add_overview: If an external overview should be added to the file (useful for display)
+        :param resampling: resampling type for overview (nearest, cubic, average, mode, etc.)
+        :param overviews: list of overviews to compute( default: [2, 4, 8, 16, 32, 64, 128, 256])
+        :param verbose: If the steps should be displayed
         :param kwargs: keyword arguments for creation options
         """
         creation_options = []
@@ -80,9 +88,9 @@ class Raster(object):
                 outfile = self.name
                 outfile = Handler(filename=outfile).file_remove_check()
 
-        Opt.cprint('')
-        Opt.cprint('Writing ' + outfile)
-        Opt.cprint('')
+        if verbose:
+            Opt.cprint('\nWriting {}\n'.format(outfile))
+
         gtiffdriver = gdal.GetDriverByName(driver)
         fileptr = gtiffdriver.Create(outfile, self.shape[2], self.shape[1],
                                      self.shape[0], self.dtype, creation_options)
@@ -90,14 +98,25 @@ class Raster(object):
         fileptr.SetGeoTransform(self.transform)
         fileptr.SetProjection(self.crs_string)
 
+        if len(self.bnames) > 0:
+            for i, bname in enumerate(self.bnames):
+                if len(bname) == 0:
+                    self.bnames[i] = 'band_{}'.format(str(i + 1))
+        else:
+            for i in range(self.shape[0]):
+                self.bnames[i] = 'band_{}'.format(str(i + 1))
+
+        if self.array is None:
+            self.read_array()
+
         if nbands == 1:
             fileptr.GetRasterBand(1).WriteArray(self.array, 0, 0)
             fileptr.GetRasterBand(1).SetDescription(self.bnames[0])
 
             if self.nodatavalue is not None:
                 fileptr.GetRasterBand(1).SetNoDataValue(self.nodatavalue)
-
-            Opt.cprint('Writing band: ' + self.bnames[0])
+            if verbose:
+                Opt.cprint('Writing band: ' + self.bnames[0])
         else:
             for i in range(0, nbands):
                 fileptr.GetRasterBand(i + 1).WriteArray(self.array[i, :, :], 0, 0)
@@ -105,12 +124,53 @@ class Raster(object):
 
                 if self.nodatavalue is not None:
                     fileptr.GetRasterBand(i + 1).SetNoDataValue(self.nodatavalue)
-
-                Opt.cprint('Writing band: ' + self.bnames[i])
+                if verbose:
+                    Opt.cprint('Writing band: ' + self.bnames[i])
 
         fileptr.FlushCache()
-        Opt.cprint('File written to disk!')
         fileptr = None
+
+        if verbose:
+            Opt.cprint('File written to disk!')
+
+        if add_overview:
+            if verbose:
+                Opt.cprint('\nWriting overview')
+
+            fileptr = gdal.Open(outfile, 0)
+
+            if overviews is None:
+                overviews = [2, 4, 8, 16, 32, 64, 128, 256]
+
+            if type(overviews) not in (list, tuple):
+                if type(overviews) in (str, float):
+                    try:
+                        overviews = [int(overviews)]
+                    except Exception as e:
+                        raise ValueError(e.message)
+                elif type(overviews) == int:
+                    overviews = [overviews]
+                else:
+                    raise ValueError('Unsupported data type for overviews list')
+            else:
+                if any(list(type(elem) != int for elem in overviews)):
+                    overviews_ = list()
+                    for elem in overviews:
+                        try:
+                            overviews_.append(int(elem))
+                        except Exception as e:
+                            Opt.cprint('Conversion error: {} -for- {}'.format(e.message, elem))
+
+                    overviews = overviews_
+
+            for k, v in kwargs.items():
+                gdal.SetConfigOption('{}_OVERVIEW'.format(k.upper()), v.upper())
+
+            fileptr.BuildOverviews(resampling.upper(), overviews)
+            fileptr = None
+
+            if verbose:
+                Opt.cprint('Overview written to disk!')
 
     def read_array(self,
                    offsets=None,
@@ -155,7 +215,11 @@ class Raster(object):
                 array3d[i, :, :] = fileptr.GetRasterBand(b + 1).ReadAsArray(*self.array_offsets,
                                                                             resample_alg=gdalconst.GRA_NearestNeighbour)
 
-        self.array = array3d
+        if (self.shape[0] == 1) and (len(array3d.shape) > 2):
+            self.array = array3d.reshape([self.shape[1], self.shape[2]])
+        else:
+            self.array = array3d
+
         self.array_offsets = offsets
 
     def initialize(self,
