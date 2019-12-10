@@ -23,7 +23,7 @@ if __name__ == '__main__':
     '''
     bounds_vec = Vector(bounds_file)
 
-    extracted_file = "D:/Shared/Dropbox/projects/NAU/landsat_deciduous/data/samples/gee_extract/" \
+    extracted_file = "D:/Shared/Dropbox/projects/NAU/landsat_deciduous/data/samples/gee_extract/" + \
                      "gee_samp_extract_postbin_v30_all_2019_08_28T23_59_02_formatted_md.csv"
 
     outfilename = "D:/Shared/Dropbox/projects/NAU/landsat_deciduous/data/samples/gee_extract/" \
