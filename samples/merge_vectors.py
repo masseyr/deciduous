@@ -34,8 +34,7 @@ if __name__ == '__main__':
         print('Writing part {}'.format(str(i+1)))
         outfile = folder + out_name + '_part_{}.shp'.format(str(i+1))
 
-        out_vec = Vector(name=out_name + '_part_{}'.format(str(i+1)),
-                         in_memory=True,
+        out_vec = Vector(name=out_name + '_part_{}'.format(str(i+1)),in_memory=True,
                          epsg=4326,
                          attr_def={'tc_value': 'int'},
                          primary_key=None,
