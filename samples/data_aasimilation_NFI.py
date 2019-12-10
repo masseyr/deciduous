@@ -40,7 +40,8 @@ if __name__ == '__main__':
     site_bio_data = list(dict(row_obj.items()) for _, row_obj in pd.read_csv(site_bio_file).iterrows())
 
     genus_list = sorted(list(set(list(elem['smtree_genus'] for elem in small_tree_data) +
-                                 list(elem['lgtree_genus'] for elem in large_tree_data))))
+                                 list(elem['lgtree_genus'] for
+                                      elem in large_tree_data))))
 
     species_dict = dict()
 
