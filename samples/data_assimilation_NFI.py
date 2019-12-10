@@ -19,7 +19,8 @@ if __name__ == '__main__':
 
     print(headers)
 
-    meta_headers = ['plot', 'date', 'Lat_start', 'Long_start']
+    meta_headers = ['plot', 'date',
+                    'Lat_start', 'Long_start']
 
     site_list = csv_data.transpose().to_dict().values()
 
