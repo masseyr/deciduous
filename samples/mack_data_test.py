@@ -7,7 +7,8 @@ if __name__ == '__main__':
 
     list_dicts = Handler(file1).read_from_csv(return_dicts=True)
 
-    print('Number of dictionaries: {}'.format(str(len(list_dicts))))
+    print('Number of dictionaries: {}'.format(str(
+        len(list_dicts))))
 
     count = dict()
 
