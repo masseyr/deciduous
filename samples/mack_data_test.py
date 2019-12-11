@@ -14,9 +14,13 @@ if __name__ == '__main__':
 
     for dict_ in list_dicts:
         fire_count = 0
+
         for k, v in dict_.items():
+
             if 'burn_year' in k:
+
                 if 0 < int(v) < 2000:
+
                     fire_count += 1
 
         if fire_count in count:
