@@ -20,7 +20,8 @@ def tile_process(args):
             xlocs, ylocs = np.where(tile_arr == level)
 
             if len(xlocs) > 0 and len(ylocs) > 0:
-                locs = Raster.get_coords(zip(list(ylocs), list(xlocs)),
+                locs = Raster.get_coords(zip(list(ylocs),
+                                             list(xlocs)),
                                          pixel_size=pixel_size,
                                          tie_point=tie_pt,
                                          pixel_center=True)
