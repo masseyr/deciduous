@@ -69,6 +69,7 @@ if __name__ == '__main__':
 
     psp_vec.layer.CreateField(site_attr)
     psp_vec.layer.CreateField(year_attr)
+
     psp_vec.layer.CreateField(decid_attr)
 
     psp_vec.fields = psp_vec.fields + [site_attr,
