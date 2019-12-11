@@ -74,8 +74,10 @@ for index, row in samp_data.iterrows():
                     #  val_dict[specie_mini_headers[i]] = row[specie_id]
                     #  specie_list.append(row[specie_id])
                     #  val_dict[specie_ba_mini_headers[i]] = row[specie_ba_header_list[i]]
+
                     frac = frac + float(row[specie_ba_header_list[i]])*float(specie_id_nwt[row[specie_header]])
                 else:
+
                     #  val_dict[specie_mini_headers[i]] = None
                     #  val_dict[specie_ba_mini_headers[i]] = None
                     pass
