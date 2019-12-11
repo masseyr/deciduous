@@ -31,6 +31,7 @@ val_attr_list = list()
 
 for i, row in enumerate(out_decid_frac_samp):
     elem = dict()
+
     for header in list(attribute_types):
         elem[header] = row[header]
 
