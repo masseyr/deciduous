@@ -39,8 +39,11 @@ if __name__ == '__main__':
 
     age_dict = dict()
     for temp_dict in age_dicts:
+
         site = temp_dict['Site'].strip()
+
         if site not in ('MATDEC', 'UBHW') and 'TKN' not in site:
+
             out_site = site[:2] + str(temp_dict['Tran'])
 
         elif 'TKN' in site:
