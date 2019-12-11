@@ -9,6 +9,7 @@ if __name__ == '__main__':
 
     infilename = "D:/Shared/Dropbox/projects/NAU/landsat_deciduous/data/samples/CAN_PSP/" \
         "CAN_PSPs_Hember-20180207T213138Z-001/CAN_PSPs_Hember/NAFP_L4_SL_ByJur_R16d_ForBrendanRogers1.csv"
+
     outfilename = "D:/Shared/Dropbox/projects/NAU/landsat_deciduous/data/samples/CAN_PSP/" \
         "CAN_PSPs_Hember-20180207T213138Z-001/CAN_PSPs_Hember/NAFP_L4_SL_ByJur_R16d_ForBrendanRogers1_lat52_ABoVE.shp"
 
