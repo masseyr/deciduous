@@ -61,6 +61,7 @@ if __name__ == '__main__':
                                                            ee.FeatureCollection([])))
 
     epa_ras = epa_l3.reduceToImage(['NA_L3CODE'], ee.Reducer.first()).rename('EPA_DESIG')
+
     epa_bounds = epa_l3.union()
 
     bounds = ee.Feature(ak_interior.first()).geometry().intersection(epa_bounds)
@@ -73,6 +74,7 @@ if __name__ == '__main__':
     nlcd_mask = nlcd.remap(mask_classes, remap_nlcd)
 
     nlcd_mask = nlcd_mask.updateMask(nlcd_mask.eq(0)).unmask(1)
+
     nlcd_mask = nlcd_mask.updateMask(nlcd_mask.eq(1))
 
     decid_layer = decid_layer.multiply(nlcd_mask).rename('decid_frac').clip(bounds)
