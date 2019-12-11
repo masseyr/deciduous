@@ -36,6 +36,7 @@ if __name__ == '__main__':
 
     site_data = list(dict(row_obj.items()) for _, row_obj in pd.read_csv(site_metadata_file).iterrows())
     large_tree_data = list(dict(row_obj.items()) for _, row_obj in pd.read_csv(large_tree_file).iterrows())
+
     small_tree_data = list(dict(row_obj.items()) for _, row_obj in pd.read_csv(small_tree_file).iterrows())
     site_bio_data = list(dict(row_obj.items()) for _, row_obj in pd.read_csv(site_bio_file).iterrows())
 
@@ -53,6 +54,7 @@ if __name__ == '__main__':
                 specie_list.append(large_tree['lgtree_species'])
 
         for small_tree in small_tree_data:
+
             if small_tree['smtree_genus'] == genus:
                 specie_list.append(small_tree['smtree_species'])
 
