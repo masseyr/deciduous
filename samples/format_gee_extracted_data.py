@@ -496,7 +496,8 @@ if __name__ == '__main__':
     main_attr = ['geom', 'decid_frac', 'site', 'site_year']
     composite_attr = ['img_jday', 'img_year', 'sensor']
     topo_attr = ['elevation', 'slope', 'aspect']
-    band_attr = ['blue', 'green', 'red', 'nir', 'swir1', 'swir2', 'ndvi', 'ndwi', 'nbr', 'vari', 'savi']
+    band_attr = ['blue', 'green', 'red', 'nir', 'swir1',
+                 'swir2', 'ndvi', 'ndwi', 'nbr', 'vari', 'savi']
 
     fid = 0
     max_len = 0
