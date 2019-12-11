@@ -32,7 +32,9 @@ if __name__ == '__main__':
     out_list = list()
 
     for attr_dict in Handler(extracted_file).read_from_csv(return_dicts=True):
+
         attr_geom = ogr.CreateGeometryFromWkt(attr_dict['geom'])
+
         bounds_geom = ogr.CreateGeometryFromWkt(bounds_vec.wktlist[0])
 
         if bounds_geom.Intersects(attr_geom):
