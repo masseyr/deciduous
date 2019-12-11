@@ -30,9 +30,11 @@ if __name__ == "__main__":
         fs = h5py.File(hdf5_file, 'r')
 
         file_keys = []
+
         fs.visit(file_keys.append)
 
         lat_arr = np.array(fs['GLAT'])
+
         lon_arr = np.array(fs['GLON']) - 360.0
 
         lat_limits = [lat_arr.min(), lat_arr.max()]
