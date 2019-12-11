@@ -46,6 +46,7 @@ if __name__ == '__main__':
 
     out_vec.layer.CreateField(site_attr)
     out_vec.layer.CreateField(year_attr)
+
     out_vec.layer.CreateField(decid_attr)
     out_vec.layer.CreateField(age_attr)
 
