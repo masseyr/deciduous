@@ -41,7 +41,9 @@ if __name__ == '__main__':
                          geom_type='point')
 
         for feat_index in division:
+
             geom_wkt = vec1.wktlist[feat_index]
+
             attr = vec1.attributes[feat_index]
 
             out_vec.add_feat(out_vec.get_osgeo_geom(geom_wkt),
