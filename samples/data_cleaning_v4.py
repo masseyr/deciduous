@@ -26,6 +26,7 @@ if __name__ == '__main__':
     # static vars--------------------------------------------------------------------------------------------
     version = 9  # version number
     nbins = 100  # number of bins
+    
     cutoff = 66  # percentile at which to cutoff the samples in each bin
 
     east_west_bounds = "/home/richard/Dropbox/projects/NAU/landsat_deciduous/data/STUDY_AREA/" \
