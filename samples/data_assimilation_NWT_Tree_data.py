@@ -100,7 +100,8 @@ if __name__ == '__main__':
         burn_year = int(row[time_headers[1]]) if type(row[time_headers[1]]).__name__ != 'str' and \
             not math.isnan(row[time_headers[1]]) else 0
 
-        age = int(row[time_headers[2]]) if not math.isnan(row[time_headers[2]]) else 75
+        age = int(row[time_headers[2]]) \
+            if not math.isnan(row[time_headers[2]]) else 75
 
         site_meas_date = datetime.datetime.strptime(row[time_headers[0]], '%m/%d/%Y')
         site_meas_year = site_meas_date.date().year
