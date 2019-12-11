@@ -37,7 +37,11 @@ if __name__ == '__main__':
     startJulian = 1  # start
     endJulian = 365  # end
 
-    year_bins = [(1984, 1997), (1998, 2002), (2003, 2007), (2008, 2012), (2013, 2018)]
+    year_bins = [(1984, 1997),
+                 (1998, 2002),
+                 (2003, 2007),
+                 (2008, 2012),
+                 (2013, 2018)]
 
     # parts to divide into if 'too many values' error
     n = 5
