@@ -19,7 +19,8 @@ if __name__ == '__main__':
 
     # top left and bottom right pixel longitude latitude
     if int(use_limit) == 1:
-        limits = [(-151.5391818876974, 67.1375627875029), (-142.9478732939474, 64.23698454727263)]
+        limits = [(-151.5391818876974, 67.1375627875029), (
+            -142.9478732939474, 64.23698454727263)]
         OUTFILE = filename.split('.')[0] + '_{}_{}_lim.csv'.format(str(res), str(version))
     else:
         limits = None
