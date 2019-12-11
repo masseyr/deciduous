@@ -27,6 +27,7 @@ if __name__ == '__main__':
     nsites = len(site_list)
 
     print('\nSubmitting all sites for processing...\n')
+
     t0 = time.time()
 
 
