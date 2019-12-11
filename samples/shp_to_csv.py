@@ -14,6 +14,7 @@ if __name__ == '__main__':
     for i, wkt in enumerate(vec.wktlist):
 
         out_list[i]['Longitude'] = wkt.split(' ')[1].replace('(', '')
+
         out_list[i]['Latitude'] = wkt.split(' ')[2].replace(')', '')
 
     print(outfile)
