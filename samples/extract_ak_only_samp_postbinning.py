@@ -65,7 +65,8 @@ def ls8_sr_corr(img):
         .addBands(img.select(['pixel_qa'], ['PIXEL_QA']).int16())\
         .addBands(img.select(['radsat_qa'], ['RADSAT_QA']).int16())\
         .copyProperties(img)\
-        .copyProperties(img, ['system:time_start', 'system:time_end', 'system:index', 'system:footprint'])
+        .copyProperties(img, ['system:time_start', 'system:time_end',
+                              'system:index', 'system:footprint'])
 
 
 # method to correct Landsat 5 based on Landsat 7 reflectance.
