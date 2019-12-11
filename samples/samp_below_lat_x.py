@@ -11,6 +11,7 @@ if __name__ == '__main__':
     lat_x = 52.0
 
     vec = Vector(file1)
+
     vec2 = Vector(file2)
 
     geom2 = vec2.features[0].GetGeometryRef()
@@ -18,6 +19,7 @@ if __name__ == '__main__':
     lonlat = []
 
     for i in range(vec.nfeat):
+
         geom = vec.features[i].GetGeometryRef()
 
         pt = geom.GetPoint()
@@ -47,6 +49,7 @@ if __name__ == '__main__':
 
     outlist = []
     for geom in geoms:
+
         if geom.Intersects(geom2):
             outlist.append(geom)
 
