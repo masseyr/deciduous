@@ -35,12 +35,12 @@ if __name__ == '__main__':
 
         elem = {'latitude': row[1], 'longitude': row[0], 'site_id': i}
 
-        wkt_list.append(Vector.wkt_from_coords([row[0], row[1]]))
+        wkt_list.append(Vector.wkt_from_coords([row[0],
+                                                row[1]]))
 
         attr_list.append(elem)
 
-    vector = Vector.vector_from_string(wkt_list,
-                                       spref_string=spref_str,
+    vector = Vector.vector_from_string(wkt_list,spref_string=spref_str,
                                        spref_string_type='proj4',
                                        vector_type='point',
                                        attributes=attr_list,
