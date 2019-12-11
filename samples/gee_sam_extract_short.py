@@ -11,10 +11,13 @@ from modules import Vector, Logger, Handler
 
 # function to identify year bins
 def get_year_limits(year):
+
     if year < year_bins[0][0]:
         return 1975, year_bins[0][0]
+
     elif year > year_bins[-1][1]:
         return year_bins[-1][1], 2020
+
     else:
         for bins in year_bins:
             if bins[0] <= year <= bins[1]:
