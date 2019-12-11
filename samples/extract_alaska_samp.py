@@ -60,7 +60,8 @@ LS_COLL = ee.ImageCollection(ls5_1
                                     .merge(ls5_2
                                            .merge(ls7_2)))) \
                 .filterBounds(boundary) \
-                .select(['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'pixel_qa', 'radsat_qa']) \
+                .select(['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7',
+                         'pixel_qa', 'radsat_qa']) \
                 .map(lambda image: image.float())
 
 
