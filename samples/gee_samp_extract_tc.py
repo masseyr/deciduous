@@ -29,6 +29,7 @@ if __name__ == '__main__':
                  stream=True)
 
     log.lprint('Outfile: {}'.format(OUTFILE))
+
     log.lprint('Logfile: {}'.format(logfile))
 
     # SPECIFY SEVERAL VARIABLES
@@ -37,6 +38,7 @@ if __name__ == '__main__':
     SCALE = 30
     NULL_VALUE = 0
     MASK_VALUE = 0  # used for ADDON image
+
     startJulian = 1  # start
     endJulian = 365  # end
 
