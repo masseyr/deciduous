@@ -116,6 +116,7 @@ if __name__ == '__main__':
 
                 # create geometry
                 geom_str = Vector.wkt_from_coords(row[elem] for elem in geom_headers)
+
                 geom = ogr.CreateGeometryFromWkt(geom_str)
 
                 samp_dict = dict(zip(out_header, [site_name, year, decid_frac]))
