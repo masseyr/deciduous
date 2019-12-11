@@ -19,7 +19,8 @@ font.set_name('Times New Roman')
 
 file1 = "C:/Users/rm885/Dropbox/projects/NAU/landsat_deciduous/data/TEST_RUNS/samp_runs_100k_jsons.txt"
 with open(file1, 'r') as f:
-    lines = list(ast.literal_eval(line) for line in f.readlines())
+    lines = list(ast.literal_eval(line)
+                 for line in f.readlines())
 
 rsq_list = list()
 for line in lines:
