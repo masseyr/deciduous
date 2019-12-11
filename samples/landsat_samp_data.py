@@ -10,7 +10,8 @@ if __name__ == '__main__':
 
     print(len(samp_data))
     print(samp_data[0])
-    sites = list(set(list(samp['site'] for samp in samp_data)))
+    sites = list(set(list(samp['site']
+                          for samp in samp_data)))
 
     print(len(sites))
 
