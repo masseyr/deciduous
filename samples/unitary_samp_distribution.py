@@ -29,11 +29,14 @@ def md_clean(sample_dicts,
                               names=bandnames)
 
         md_data.sample_matrix()
+
         md_data.cluster_center(method='median')
         md_vec = md_data.calc_distance()
 
         # eliminate NaNs in Mahalanobis dist vector
+
         num_list = list(ii for ii, x in enumerate(list(np.isnan(md_vec))) if not x)
+
         if len(num_list) < 1:
             return sample_dicts
 
