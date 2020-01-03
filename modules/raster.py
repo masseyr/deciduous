@@ -137,40 +137,56 @@ class Raster(object):
             if verbose:
                 Opt.cprint('\nWriting overview')
 
-            fileptr = gdal.Open(outfile, 0)
-
-            if overviews is None:
-                overviews = [2, 4, 8, 16, 32, 64, 128, 256]
-
-            if type(overviews) not in (list, tuple):
-                if type(overviews) in (str, float):
-                    try:
-                        overviews = [int(overviews)]
-                    except Exception as e:
-                        raise ValueError(e.message)
-                elif type(overviews) == int:
-                    overviews = [overviews]
-                else:
-                    raise ValueError('Unsupported data type for overviews list')
-            else:
-                if any(list(type(elem) != int for elem in overviews)):
-                    overviews_ = list()
-                    for elem in overviews:
-                        try:
-                            overviews_.append(int(elem))
-                        except Exception as e:
-                            Opt.cprint('Conversion error: {} -for- {}'.format(e.message, elem))
-
-                    overviews = overviews_
-
-            for k, v in kwargs.items():
-                gdal.SetConfigOption('{}_OVERVIEW'.format(k.upper()), v.upper())
-
-            fileptr.BuildOverviews(resampling.upper(), overviews)
-            fileptr = None
+            self.add_overviews(resampling,
+                               overviews,
+                               **kwargs)
 
             if verbose:
                 Opt.cprint('Overview written to disk!')
+
+    def add_overviews(self,
+                      resampling='nearest',
+                      overviews=None,
+                      **kwargs):
+        """
+        Method to create raster overviews
+        :param resampling:
+        :param overviews:
+        :param kwargs:
+        :return:
+        """
+
+        fileptr = gdal.Open(self.name, 0)
+
+        if overviews is None:
+            overviews = [2, 4, 8, 16, 32, 64, 128, 256]
+
+        if type(overviews) not in (list, tuple):
+            if type(overviews) in (str, float):
+                try:
+                    overviews = [int(overviews)]
+                except Exception as e:
+                    raise ValueError(e.message)
+            elif type(overviews) == int:
+                overviews = [overviews]
+            else:
+                raise ValueError('Unsupported data type for overviews list')
+        else:
+            if any(list(type(elem) != int for elem in overviews)):
+                overviews_ = list()
+                for elem in overviews:
+                    try:
+                        overviews_.append(int(elem))
+                    except Exception as e:
+                        Opt.cprint('Conversion error: {} -for- {}'.format(e.message, elem))
+
+                overviews = overviews_
+
+        for k, v in kwargs.items():
+            gdal.SetConfigOption('{}_OVERVIEW'.format(k.upper()), v.upper())
+
+        fileptr.BuildOverviews(resampling.upper(), overviews)
+        fileptr = None
 
     def read_array(self,
                    offsets=None,
@@ -637,21 +653,27 @@ class Raster(object):
                      (coord[1] - tie_point[1])//pixel_size[1])
                     for coord in coords_list)
 
-    def get_bounds(self):
+    def get_bounds(self,
+                   xy_coordinates=True):
         """
         Method to return a list of raster coordinates
+        :param xy_coordinates: return a list of xy coordinates if true, else return [xmin, xmax, ymin, ymax]
         :return: List of lists
         """
         if not self.init:
             self.initialize()
         tie_pt = [self.transform[0], self.transform[3]]
-        rast_coords = [tie_pt,
-                       [tie_pt[0] + self.metadict['xpixel'] * self.shape[2], tie_pt[1]],
-                       [tie_pt[0] + self.metadict['xpixel'] * self.shape[2],
-                        tie_pt[1] - self.metadict['ypixel'] * self.shape[1]],
-                       [tie_pt[0], tie_pt[1] - self.metadict['ypixel'] * self.shape[1]],
-                       tie_pt]
-        return rast_coords
+
+        if xy_coordinates:
+            return [tie_pt,
+                    [tie_pt[0] + self.metadict['xpixel'] * self.shape[2], tie_pt[1]],
+                    [tie_pt[0] + self.metadict['xpixel'] * self.shape[2],
+                     tie_pt[1] - self.metadict['ypixel'] * self.shape[1]],
+                    [tie_pt[0], tie_pt[1] - self.metadict['ypixel'] * self.shape[1]],
+                    tie_pt]
+        else:
+            return [tie_pt[0], tie_pt[0] + self.metadict['xpixel'] * self.shape[2],
+                    tie_pt[1] - self.metadict['ypixel'] * self.shape[1], tie_pt[1]]
 
     def get_pixel_bounds(self,
                          bound_coords=None,
@@ -831,7 +853,7 @@ class Raster(object):
                 nan_replacement = self.nodatavalue
 
         if bands is None:
-            bands = [int(ib) for ib in range(1, self.shape[0] + 1)]
+            bands = range(1, int(self.shape[0]) + 1)
         elif type(bands) in (int, float):
             bands = [int(bands)]
         elif type(bands) in (list, tuple):
@@ -983,6 +1005,141 @@ class Raster(object):
                                                  str(band_stats)))
 
             self.stats[self.bnames[ib]] = band_stats
+
+    def reproject(self,
+                  outfile=None,
+                  out_epsg=None,
+                  out_wkt=None,
+                  out_proj4=None,
+                  out_spref=None,
+                  output_res=None,
+                  out_datatype=gdal.GDT_Float32,
+                  resampling='near',
+                  output_bounds=None,
+                  out_format='GTiff',
+                  out_nodatavalue=None,
+                  verbose=False,
+                  **creation_options):
+        """
+        Method to reproject raster object
+        :param outfile:
+        :param out_epsg:
+        :param out_wkt:
+        :param out_proj4:
+        :param out_spref:
+        :param output_res:
+        :param out_datatype: output type (gdal.GDT_Byte, etc...)
+        :param resampling:
+        :param out_nodatavalue:
+        :param output_bounds: output bounds as (minX, minY, maxX, maxY) in target SRS
+        :param out_format: output format ("GTiff", etc...)
+        :param verbose:
+        :param creation_options:
+        :return:
+
+        valid warp options in kwargs
+        (from https://gdal.org/python/osgeo.gdal-module.html#WarpOptions):
+
+          options --- can be be an array of strings, a string or let empty and filled from other keywords.
+          format --- output format ("GTiff", etc...)
+          outputBounds --- output bounds as (minX, minY, maxX, maxY) in target SRS
+          outputBoundsSRS --- SRS in which output bounds are expressed, in the case they are not expressed in dstSRS
+          xRes, yRes --- output resolution in target SRS
+          targetAlignedPixels --- whether to force output bounds to be multiple of output resolution
+          width --- width of the output raster in pixel
+          height --- height of the output raster in pixel
+          srcSRS --- source SRS
+          dstSRS --- output SRS
+          srcAlpha --- whether to force the last band of the input dataset to be considered as an alpha band
+          dstAlpha --- whether to force the creation of an output alpha band
+          outputType --- output type (gdal.GDT_Byte, etc...)
+          workingType --- working type (gdal.GDT_Byte, etc...)
+          warpOptions --- list of warping options
+          errorThreshold --- error threshold for approximation transformer (in pixels)
+          warpMemoryLimit --- size of working buffer in bytes
+          resampleAlg --- resampling mode
+          creationOptions --- list of creation options
+          srcNodata --- source nodata value(s)
+          dstNodata --- output nodata value(s)
+          multithread --- whether to multithread computation and I/O operations
+          tps --- whether to use Thin Plate Spline GCP transformer
+          rpc --- whether to use RPC transformer
+          geoloc --- whether to use GeoLocation array transformer
+          polynomialOrder --- order of polynomial GCP interpolation
+          transformerOptions --- list of transformer options
+          cutlineDSName --- cutline dataset name
+          cutlineLayer --- cutline layer name
+          cutlineWhere --- cutline WHERE clause
+          cutlineSQL --- cutline SQL statement
+          cutlineBlend --- cutline blend distance in pixels
+          cropToCutline --- whether to use cutline extent for output bounds
+          copyMetadata --- whether to copy source metadata
+          metadataConflictValue --- metadata data conflict value
+          setColorInterpretation --- whether to force color interpretation of input bands to output bands
+          callback --- callback method
+          callback_data --- user data for callback
+        """
+
+        vrt_dict = dict()
+
+        if output_bounds is not None:
+            vrt_dict['outputBounds'] = output_bounds
+
+        if output_res is not None:
+            vrt_dict['xRes'] = output_res[0]
+            vrt_dict['yRes'] = output_res[1]
+
+        if out_nodatavalue is not None:
+            vrt_dict['dstNodata'] = out_nodatavalue
+        else:
+            vrt_dict['dstNodata'] = self.nodatavalue
+
+        vrt_dict['srcNodata'] = self.nodatavalue
+
+        if resampling is not None:
+            vrt_dict['resampleAlg'] = resampling
+        else:
+            vrt_dict['resampleAlg'] = 'near'
+
+        if verbose:
+            Opt.cprint('Outfile: {}'.format(outfile))
+
+        if out_spref is not None:
+            sp = out_spref
+        else:
+            sp = osr.SpatialReference()
+
+            if out_epsg is not None:
+                res = sp.ImportFromEPSG(out_epsg)
+            elif out_wkt is not None:
+                res = sp.ImportFromWkt(out_wkt)
+            elif out_proj4 is not None:
+                res = sp.ImportFromProj4(out_proj4)
+            else:
+                raise ValueError("Output Spatial reference not provided")
+
+        vrt_dict['srcSRS'] = self.crs_string
+        vrt_dict['dstSRS'] = sp.ExportToWkt()
+
+        vrt_dict['outputType'] = out_datatype
+
+        vrt_dict['format'] = out_format
+
+        co = []
+        if len(creation_options) > 0:
+            for key, value in creation_options.items():
+                co.append('{}={}'.format(key.upper(),
+                                         value.upper()))
+
+        vrt_dict['creationOptions'] = co
+
+        vrt_opt = gdal.WarpOptions(**vrt_dict)
+
+        if outfile is None:
+            outfile = Handler(self.name).dirname + Handler().sep + '_reproject.tif'
+
+        vrt_ds = gdal.Warp(outfile, self.name, options=vrt_opt)
+        vrt_ds = None
 
 
 class MultiRaster:
