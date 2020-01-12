@@ -200,21 +200,19 @@ class Raster(object):
         if not self.init:
             self.initialize()
 
+        fileptr = self.datasource
+
         nbands, nrows, ncols = self.shape
 
-        fileptr = self.datasource
-        self.array_offsets = offsets
-
-        if self.array_offsets is None:
-            array3d = np.zeros((nbands,
-                                nrows,
-                                ncols),
-                               gdal_array.GDALTypeCodeToNumericTypeCode(fileptr.GetRasterBand(1).DataType))
+        if offsets is None:
+            self.array_offsets = (0, 0, ncols, nrows)
         else:
-            array3d = np.zeros((nbands,
-                                self.array_offsets[3],
-                                self.array_offsets[2]),
-                               gdal_array.GDALTypeCodeToNumericTypeCode(fileptr.GetRasterBand(1).DataType))
+            self.array_offsets = offsets
+
+        array3d = np.zeros((nbands,
+                            self.array_offsets[3],
+                            self.array_offsets[2]),
+                           gdal_array.GDALTypeCodeToNumericTypeCode(fileptr.GetRasterBand(1).DataType))
 
         # read array and store the band values and name in array
         if band_order is not None:
@@ -232,11 +230,10 @@ class Raster(object):
                                                                             resample_alg=gdalconst.GRA_NearestNeighbour)
 
         if (self.shape[0] == 1) and (len(array3d.shape) > 2):
-            self.array = array3d.reshape([self.shape[1], self.shape[2]])
+            self.array = array3d.reshape([self.array_offsets[3],
+                                          self.array_offsets[2]])
         else:
             self.array = array3d
-
-        self.array_offsets = offsets
 
     def initialize(self,
                    get_array=False,
@@ -651,6 +648,7 @@ class Raster(object):
 
         return list(((coord[0] - tie_point[0])//pixel_size[0],
                      (coord[1] - tie_point[1])//pixel_size[1])
+                    if coord is not None else [None, None]
                     for coord in coords_list)
 
     def get_bounds(self,
@@ -895,92 +893,100 @@ class Raster(object):
 
     def extract_geom(self,
                      wkt_strings,
+                     geom_id=None,
+                     band_order=None,
                      **kwargs):
         """
         Extract all pixels that intersect a feature in a Raster.
         The raster object should be initialized before using this method.
         Currently this method only supports single geometries per query.
-        :param wkt_strings: Vector geometries (e.g. point) in WKT string format
+        :param wkt_strings: List or Tuple of Vector geometries (e.g. point) in WKT string format
                            this geometry should be in the same CRS as the raster
                            Currently only 'Point' or 'MultiPoint' geometry is supported.
-                           Accepted wkt_strings: List of POINT wkts or one MULTIPOINT wkt
+                           Accepted wkt_strings: List of POINT or MULTIPOINT wkt(s)
+        :param geom_id: List of geometry IDs
+                        If for a MultiGeom only one ID is presented, it will be suffixed with a number
+        :param band_order: Order of bands to be extracted (list)
+
         :param kwargs: List of additional arguments
                         tile_size : (256, 256) default
-                        band_order: None default
 
-        :return: List of pixel band values as tuples for each pixel
+        :return: List of pixel band values as tuples for each pixel : [ (ID, [band vales] ), ]
         """
 
         # define tile size
         if 'tile_size' in kwargs:
             tile_size = kwargs['tile_size']
         else:
-            tile_size = (256, 256)
+            tile_size = (self.shape[1], self.shape[2])
 
-        if 'band_order' in kwargs:
-            band_order = np.array(kwargs['band_order'])
-        else:
+        # define band order
+        if band_order is None:
             band_order = np.array(range(0, self.shape[0]))
+        else:
+            band_order = np.array(band_order)
 
         # initialize raster
         if not self.init or self.array is None:
             self.initialize()
 
-        if type(wkt_strings) == list:
-            geom_list = list()
-            for wkt_string in wkt_strings:
-                if 'POINT' in wkt_string:
-                    geom_list.append(wkt_string)
-                else:
-                    geom_list.append(None)
+        if type(wkt_strings) not in (list, tuple):
+            wkt_strings = [wkt_strings]
 
-        elif 'MULTIPOINT' in wkt_strings:
-            multi_geom = ogr.CreateGeometryFromWkt(wkt_strings)
-            geom_list = list(multi_geom.GetGeometryRef(j) for j in range(multi_geom.GetGeometryCount()))
-        elif 'POINT' in wkt_strings:
-            geom_list = [ogr.CreateGeometryFromWkt(wkt_strings)]
-        else:
-            raise RuntimeError("This geometry type is unsupported or unknown")
+        id_geom_list = list()
+        if geom_id is None:
+            geom_id = range(1, len(wkt_strings) + 1)
+
+        for ii, wkt_string in enumerate(wkt_strings):
+            if 'MULTI' in wkt_string:
+                multi_geom = ogr.CreateGeometryFromWkt(wkt_strings)
+                id_geom_list += list(('{}_{}'.format(geom_id[ii], str(jj+1)), multi_geom.GetGeometryRef(jj))
+                                     for jj in range(multi_geom.GetGeometryCount()))
+            else:
+                id_geom_list.append(('{}_{}'.format(geom_id[ii], str(1)), ogr.CreateGeometryFromWkt(wkt_string)))
 
         self.make_tile_grid(*tile_size)
 
-        tile_samp_output = list([] for _ in range(len(geom_list)))
+        tile_samp_output = list([] for _ in range(len(id_geom_list)))
 
         for tile in self.tile_grid:
             tile_wkt = 'POLYGON(({}))'.format(', '.join(list(' '.join([str(x), str(y)])
                                                              for (x, y) in tile['bound_coords'])))
             tile_geom = ogr.CreateGeometryFromWkt(tile_wkt)
 
-            tile_samp_list = list(elem for elem in enumerate(geom_list) if (elem[1] is not None) and
-                                  (tile_geom.Intersects(elem[1])))
+            tile_samp_list = list(elem if tile_geom.Intersects(elem[1]) else [elem[0], None] for elem in id_geom_list)
 
             if len(tile_samp_list) > 0:
-                samp_index = list(idx for idx, _ in tile_samp_list)
+                samp_ids = list(idx for idx, _ in tile_samp_list)
 
                 self.read_array(tile['block_coords'])
 
-                samp_coords = list(list(float(elem) for elem in samp_geom[1].ExportToWkt()
-                                                                            .replace('POINT', '')
-                                                                            .replace('(', '')
-                                                                            .replace(')', '')
-                                                                            .strip()
-                                                                            .split(' '))
-                                   for samp_geom in tile_samp_list)
+                samp_coords = list(list(float(elem)
+                                        for elem in samp_geom.ExportToWkt()
+                                        .replace('POINT', '')
+                                        .replace('(', '')
+                                        .replace(')', '')
+                                        .strip()
+                                        .split(' '))
+                                   if samp_geom is not None else None
+                                   for _, samp_geom in tile_samp_list)
 
                 if self.shape[0] == 1:
-                    samp_values = list(self.array[y, x] for x, y in self.get_locations(samp_coords,
-                                                                                       (self.transform[1],
-                                                                                        self.transform[5]),
-                                                                                       tile['tie_point']))
+                    samp_values = list([self.array[int(y), int(x)]] if None not in (x, y) else [None]
+                                       for x, y in self.get_locations(samp_coords,
+                                                                      (self.transform[1],
+                                                                       self.transform[5]),
+                                                                      tile['tie_point']))
                 else:
-                    samp_values = list(self.array[band_order, y, x].tolist()
+                    samp_values = list(self.array[band_order, int(y), int(x)].tolist() if None not in (x, y) else
+                                       [None for _ in range(self.shape[0])]
                                        for x, y in self.get_locations(samp_coords,
                                                                       (self.transform[1],
                                                                        self.transform[5]),
                                                                       tile['tie_point']))
 
-                for j, idx in enumerate(samp_index):
-                    tile_samp_output[idx] = samp_values[j]
+                for j, samp_id in enumerate(samp_ids):
+                    tile_samp_output[j] = (samp_id, samp_values[j])
 
             return tile_samp_output
 
@@ -1014,11 +1020,12 @@ class Raster(object):
                   out_spref=None,
                   output_res=None,
                   out_datatype=gdal.GDT_Float32,
-                  resampling='near',
+                  resampling=None,
                   output_bounds=None,
                   out_format='GTiff',
                   out_nodatavalue=None,
                   verbose=False,
+                  return_vrt=False,
                   **creation_options):
         """
         Method to reproject raster object
@@ -1034,6 +1041,7 @@ class Raster(object):
         :param output_bounds: output bounds as (minX, minY, maxX, maxY) in target SRS
         :param out_format: output format ("GTiff", etc...)
         :param verbose:
+        :param return_vrt:
         :param creation_options:
         :return:
 
@@ -1125,13 +1133,13 @@ class Raster(object):
 
         vrt_dict['format'] = out_format
 
-        co = []
+        creation_options_list = []
         if len(creation_options) > 0:
             for key, value in creation_options.items():
-                co.append('{}={}'.format(key.upper(),
-                                         value.upper()))
+                creation_options_list.append('{}={}'.format(key.upper(),
+                                             value.upper()))
 
-        vrt_dict['creationOptions'] = co
+        vrt_dict['creationOptions'] = creation_options_list
 
         vrt_opt = gdal.WarpOptions(**vrt_dict)
 
@@ -1139,7 +1147,11 @@ class Raster(object):
             outfile = Handler(self.name).dirname + Handler().sep + '_reproject.tif'
 
         vrt_ds = gdal.Warp(outfile, self.name, options=vrt_opt)
-        vrt_ds = None
+
+        if return_vrt:
+            return vrt_ds
+        else:
+            vrt_ds = None
 
 
 class MultiRaster:
@@ -1463,10 +1475,11 @@ class MultiRaster:
                order=None,
                verbose=False,
                outfile=None,
-               vectorize_values=None,
-               blend_layers=None,
+               nodata_values=None,
+               band_index=None,
+               blend_images=True,
                blend_pixels=10,
-               blend_ratio=1.0,
+               blend_cutline=None,
                **kwargs):
         """
         Under construction
@@ -1475,13 +1488,13 @@ class MultiRaster:
         :param order: order of raster layerstack
         :param verbose: If some of the steps should be printed to console
         :param outfile: Name of the output file (.tif)
-        :param vectorize_values: Value or tuple of values used to vectorize bands for blending
-        :param blend_layers: band or tuple of bands (index starts at 1)
-        :param blend_pixels: width of pixels to blend around the cutline for multiple rasters
-        :param blend_ratio: Ratio of outside versus inside buffer blend.
-                            1.0 is blend surface completely outside (default)
-                            0.0 is blend surface completely inside the upper layers
-                            The actual ratio is closest to the integer ratios based on blend pixels
+        :param nodata_values: Value or tuple (or list) of values used as nodata bands for each image to be mosaicked
+        :param band_index: list of bands to be used in mosaic (default: all)
+        :param blend_images: If blending should be used in mosaicking (default True)
+        :param blend_cutline: OSGEO SWIG geometry of cutline
+        :param blend_pixels: width of pixels to blend around the cutline or
+                             raster boundary for multiple rasters (default: 10)
+
         :return: None
 
         valid warp options in kwargs
@@ -1532,7 +1545,7 @@ class MultiRaster:
         steps:
         1) vectorize each layer in blend_layers according to vectorize_values
         2) calculate buffer in 1 pixel step from vectorized shapes
-        3) Apply the weighting function surface based on band order to buffered surfaces
+        3) Only two images at a time, the one on top and the once below it, are weighted, and weighted function calculated
         4) calculate weighting function output using vrt via tiling
 
 
