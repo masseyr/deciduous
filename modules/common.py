@@ -632,8 +632,25 @@ class Handler(object):
         else:
             pass  # print('Path already exists: ' + self.dirname)
 
-    def add_to_filename(self, string):
+    def add_to_filename(self,
+                        string=None,
+                        timestamp=False):
+        """
+        Method to append a string to a filename, before the .xxx extension
+        :param string: String to append
+        :param timestamp: If timestamp (upto seconds) should be added to a filename, before the .xxx extension
+                          This can be used in addition to the string
+        :return:
+        """
         components = self.basename.split('.')
+        if timestamp:
+            timestamp = datetime.datetime.now().isoformat().replace('-', '').replace(':', '').split('.')[0]
+
+        if string is not None:
+            string += timestamp
+        else:
+            string = timestamp
+
         if len(components) >= 2:
             return self.dirname + self.sep + '.'.join(components[0:-1]) + \
                       string + '.' + components[-1]
