@@ -1034,6 +1034,7 @@ class Handler(object):
                       line_limit=None,
                       read_random=False,
                       percent_random=50.0,
+                      verbose=False,
                       systematic=False):
         """
         Read csv as list of lists with header.
@@ -1042,6 +1043,7 @@ class Handler(object):
         :param line_limit: Limits on the number of lines returned (default: None)
         :param read_random: If lines to be read should be randomly selected
         :param percent_random: What percentage of lines should be randomly selected (default: 50%)
+        :param verbose: Display steps
         :param systematic: If the samples should be systematic instead of random (used only if read_random is True)
         :returns: dictionary of data
         """
@@ -1049,17 +1051,18 @@ class Handler(object):
         index_list = list()
 
         n_lines = self.file_lines(nlines=True)
-
-        sys.stdout.write('Lines in file: {}\n'.format(str(n_lines)))
+        if verbose:
+            sys.stdout.write('Lines in file: {}\n'.format(str(n_lines)))
 
         if read_random:
             if 0.0 < percent_random <= 100.0:
-                sys.stdout.write('Randomizing index ... \n')
-                n_rand_lines = int((float(percent_random)/100.0)*float(n_lines))
+                if verbose:
+                    sys.stdout.write('Randomizing index ... \n')
+                n_rand_lines = int((float(percent_random) / 100.0) * float(n_lines))
                 index_list = sorted([0] + Sublist(range(1, n_lines)).random_selection(num=n_rand_lines,
                                                                                       systematic=systematic))
-
-        sys.stdout.write('Reading file : ')
+        if verbose:
+            sys.stdout.write('Reading file : ')
 
         counter = 0
         perc_ = 0
@@ -1069,7 +1072,7 @@ class Handler(object):
                     if 0 < len(index_list) <= line_limit:
                         pass
                     elif len(index_list) > line_limit:
-                        index_list = index_list[:(line_limit+1)]
+                        index_list = index_list[:(line_limit + 1)]
 
                     for i, line in enumerate(f):
                         if counter > line_limit:
@@ -1079,10 +1082,11 @@ class Handler(object):
                             counter += 1
 
                             if counter > int((float(perc_) / 100.0) * float(len(index_list))):
-                                sys.stdout.write('{}..'.format(str(perc_)))
+                                if verbose:
+                                    sys.stdout.write('{}..'.format(str(perc_)))
                                 perc_ += 10
-
-                    sys.stdout.write('!\n')
+                    if verbose:
+                        sys.stdout.write('!\n')
 
                 else:
                     for line in f:
@@ -1092,10 +1096,11 @@ class Handler(object):
                         counter += 1
 
                         if counter > int((float(perc_) / 100.0) * float(line_limit)):
-                            sys.stdout.write('{}..'.format(str(perc_)))
+                            if verbose:
+                                sys.stdout.write('{}..'.format(str(perc_)))
                             perc_ += 10
-
-                    sys.stdout.write('!\n')
+                    if verbose:
+                        sys.stdout.write('!\n')
 
             else:
                 if len(index_list) > 0:
@@ -1109,21 +1114,23 @@ class Handler(object):
                             counter += 1
 
                             if counter > int((float(perc_) / 100.0) * float(len(index_list))):
-                                sys.stdout.write('{}..'.format(str(perc_)))
+                                if verbose:
+                                    sys.stdout.write('{}..'.format(str(perc_)))
                                 perc_ += 10
-
-                    sys.stdout.write('!\n')
+                    if verbose:
+                        sys.stdout.write('!\n')
 
                 else:
                     for line in f:
                         lines.append(list(elem.strip() for elem in line.split(',')))
                         counter += 1
 
-                        if counter > int((float(perc_)/100.0) * float(n_lines)):
-                            sys.stdout.write('{}..'.format(str(perc_)))
+                        if counter > int((float(perc_) / 100.0) * float(n_lines)):
+                            if verbose:
+                                sys.stdout.write('{}..'.format(str(perc_)))
                             perc_ += 10
-
-                    sys.stdout.write('!\n')
+                    if verbose:
+                        sys.stdout.write('!\n')
 
         # convert col names to list of strings
         names = list(elem.strip() for elem in lines[0])
@@ -1131,7 +1138,8 @@ class Handler(object):
         if len(lines) > 0:
             # convert to list
             if return_dicts:
-                sys.stdout.write('Converting to Dictionaries...\n')
+                if verbose:
+                    sys.stdout.write('Converting to Dictionaries...\n')
                 return list(dict(zip(names, list(self.string_to_type(elem) for elem in feat)))
                             for feat in lines[1:])
             else:
