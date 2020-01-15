@@ -12,7 +12,6 @@ from sklearn import linear_model
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
 
-
 __all__ = ['HRFRegressor',
            'RFRegressor',
            'MRegressor',
