@@ -1,5 +1,4 @@
 from modules import *
-from sys import argv
 
 
 """
@@ -8,7 +7,11 @@ This script also generates the uncertainty raster.
 """
 
 
-def make_final_regressor(pickle_file):
+def make_final_regressor(pickle_file,
+                         llim_,
+                         ulim_,
+                         over_adjust=1.05,
+                         clip=0.01):
 
     # load classifier from file
     regressor = RFRegressor.load_from_pickle(pickle_file)
@@ -36,18 +39,15 @@ def make_final_regressor(pickle_file):
              'samp_leaf': regressor.samp_leaf,
              'max_feat': regressor.max_feat}
 
-    ulim = 1.0
-    llim = 0.0
-
     # initialize RF classifier
     model = RFRegressor(**param)
 
     # fit RF classifier using training data
     model.fit_data(all_data)
 
-    model.get_adjustment_param(clip=0.01,
-                               data_limits=[llim, ulim],
-                               over_adjust=1.05)
+    model.get_adjustment_param(clip=clip,
+                               data_limits=[llim_, ulim_],
+                               over_adjust=over_adjust)
 
     return model
 
@@ -58,14 +58,32 @@ if __name__ == '__main__':
     # read in the input files
     # script, infile, outdir, rf_picklefile1, rf_picklefile2 = argv
 
-    infile = "C:/temp/ABoVE_median_SR_NDVI_boreal_2010-0000063488-0000396800.tif"
-    outdir = "C:/temp/"
+    ulim = 1.0
+    llim = 0.0
 
-    rf_picklefile1 = "D:/Shared/Dropbox/" +  \
-        "projects/NAU/landsat_deciduous/data/SAMPLES/rf_test/gee_data_cleaning_v28_median2_RF_7.pickle"
-    rf_picklefile2 = "D:/Shared/Dropbox/" + \
-                     "projects/NAU/landsat_deciduous/data/SAMPLES/rf_test/" + \
-                     "gee_data_cleaning_v28_median2_summer_RF_3.pickle"
+    active_dir = "D:/shared/"
+
+    infile = active_dir + "Dropbox/projects/NAU/landsat_deciduous/data/temp/" + \
+        "ABoVE_median_SR_NDVI_boreal_2015-0000023808-0000134912_subset.tif"
+
+    outdir = active_dir + "Dropbox/projects/NAU/landsat_deciduous/data/temp/"
+
+    rf_picklefile1 = active_dir + "Dropbox/projects/NAU/landsat_deciduous/data/SAMPLES/rf_test/" + \
+        "gee_data_cleaning_v28_median2_RF_7.pickle"
+    rf_picklefile2 = active_dir + "Dropbox/projects/NAU/landsat_deciduous/data/SAMPLES/rf_test/" + \
+        "gee_data_cleaning_v28_median2_summer_RF_3.pickle"
+
+    # ------------------common parameters-----------------
+    over_adjust_ = 1.05
+    clip_ = 0.01
+    nodatavalue = -9999.0
+    tile_size_multiplier = 10
+
+    band_multipliers = {'slope': 0.0001, 'swir1_2': 0.0001, 'blue_3': 0.0001, 'swir1_1': 0.0001, 'ndvi_3': 0.0001,
+                        'nir_3': 0.0001, 'elevation': 1.0, 'nir_2': 0.0001, 'nir_1': 0.0001, 'vari_3': 0.0001,
+                        'vari_2': 0.0001, 'vari_1': 0.0001, 'nbr_2': 0.0001, 'nbr_3': 0.0001, 'aspect': 1.0,
+                        'nbr_1': 0.0001, 'red_1': 0.0001, 'red_3': 0.0001, 'red_2': 0.0001, 'swir1_3': 0.0001,
+                        'ndvi_2': 0.0001, 'blue_2': 0.0001, 'blue_1': 0.0001, 'ndvi_1': 0.0001}
 
     Opt.cprint('-----------------------------------------------------------------')
     # print('Script: ' + script)
@@ -77,8 +95,17 @@ if __name__ == '__main__':
     Opt.cprint('-----------------------------------------------------------------')
 
     # load classifier from file
-    rf_regressor1 = make_final_regressor(rf_picklefile1)
-    rf_regressor2 = make_final_regressor(rf_picklefile2)
+    rf_regressor1 = make_final_regressor(rf_picklefile1,
+                                         float(llim),
+                                         float(ulim),
+                                         over_adjust=over_adjust_,
+                                         clip=clip_)
+
+    rf_regressor2 = make_final_regressor(rf_picklefile2,
+                                         float(llim),
+                                         float(ulim),
+                                         over_adjust=over_adjust_,
+                                         clip=clip_)
     Opt.cprint(rf_regressor1)
     Opt.cprint(rf_regressor2)
 
@@ -90,9 +117,13 @@ if __name__ == '__main__':
     Opt.cprint('Bands 2 : ')
     Opt.cprint(bandnames2_)
 
+    bandnames_all = bandnames1_ + bandnames2_
+
     # get raster metadata
     ras = Raster(infile)
     ras.initialize()
+
+    tile_size = ras.shape[2] * tile_size_multiplier
 
     Opt.cprint(ras.shape)
     Opt.cprint(ras)
@@ -100,50 +131,51 @@ if __name__ == '__main__':
     bandnames = ras.bnames
     Opt.cprint('Raster bands: "' + '", "'.join(bandnames) + '"')
 
-    band_order = Sublist(bandnames).sublistfinder(bandnames1_)
+    band_order = Sublist(bandnames).sublistfinder(bandnames_all)
     Opt.cprint('Band order: ' + ', '.join([str(b) for b in band_order]))
 
     # re-initialize raster
     ras.initialize(get_array=True,
                    band_order=band_order)
 
-    multipliers = {'slope': 0.0001, 'swir1_2': 0.0001, 'blue_3': 0.0001, 'swir1_1': 0.0001, 'ndvi_3': 0.0001,
-                   'nir_3': 0.0001, 'elevation': 1.0, 'nir_2': 0.0001, 'nir_1': 0.0001, 'vari_3': 0.0001,
-                   'vari_2': 0.0001, 'vari_1': 0.0001, 'nbr_2': 0.0001, 'nbr_3': 0.0001, 'aspect': 1.0,
-                   'nbr_1': 0.0001, 'red_1': 0.0001, 'red_3': 0.0001, 'red_2': 0.0001, 'swir1_3': 0.0001,
-                   'ndvi_2': 0.0001, 'blue_2': 0.0001, 'blue_1': 0.0001, 'ndvi_1': 0.0001}
-
-    Opt.cprint('Multipliers: {}\n'.format(str(multipliers)))
-
     Opt.cprint(ras)
+    Opt.cprint(ras.bnames)
+
+    Opt.cprint('Multipliers: {}\n'.format(str(band_multipliers)))
 
     hierarchical_regressor = HRFRegressor(regressor=(rf_regressor1, rf_regressor2))
 
-    # classify raster and write to file
-    classif = hierarchical_regressor.regress_raster(ras,
-                                                    tile_size=128,
-                                                    output_type='median',
-                                                    band_name='prediction',
-                                                    outdir=outdir,
-                                                    nodatavalue=-9999.0,
-                                                    band_multipliers=multipliers)
-    Opt.cprint(classif)
+    print(hierarchical_regressor)
 
-    classif.write_to_file()
+    uncert_file = Handler(ras.name).add_to_filename('_uncertainty')
 
-    uncert = hierarchical_regressor.regress_raster(ras,
-                                                   tile_size=128,
-                                                   output_type='sd',
-                                                   band_name='uncertainty',
-                                                   outdir=outdir,
-                                                   nodatavalue=-9999.0,
-                                                   band_multipliers=multipliers)
+    if not Handler(uncert_file).file_exists():
 
-    Opt.cprint(uncert)
+        # classify raster and write to file
+        classif = hierarchical_regressor.regress_raster(ras,
+                                                        tile_size=tile_size,
+                                                        output_type='median',
+                                                        band_name='prediction',
+                                                        outdir=outdir,
+                                                        nodatavalue=nodatavalue,
+                                                        band_multipliers=band_multipliers)
+        Opt.cprint(classif)
 
-    uncert.write_to_file()
+        classif.write_to_file(compress='lzw', bigtiff='yes')
 
-    Opt.print_memory_usage()
+        uncert = hierarchical_regressor.regress_raster(ras,
+                                                       tile_size=tile_size,
+                                                       output_type='sd',
+                                                       band_name='uncertainty',
+                                                       outdir=outdir,
+                                                       nodatavalue=nodatavalue,
+                                                       band_multipliers=band_multipliers)
+
+        Opt.cprint(uncert)
+
+        uncert.write_to_file(compress='lzw', bigtiff='yes')
+
+        Opt.print_memory_usage()
 
     Opt.cprint('Done!')
 
