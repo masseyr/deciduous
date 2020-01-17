@@ -4,8 +4,14 @@ import numpy as np
 
 
 if __name__ == '__main__':
-
+    '''
     script, infile, outdir, picklefile, band_name = argv
+    '''
+    infile = "C:/temp/decid_tc_2000_layerstack-0000026880-0000161280.tif"
+    outdir = "C:/temp/"
+    picklefile = "d:/shared/Dropbox/projects/NAU/landsat_deciduous/data/albedo_data/" + \
+                 "RFalbedo_deciduous_fraction_treecover_50000_cutoff_5_deg1_20191115T174618_spring.pickle"
+    band_name = 'spr_albedo'
 
     outfile = outdir + Handler(infile).basename
 
@@ -15,7 +21,7 @@ if __name__ == '__main__':
     # all the bands are in integer format
     raster = Raster(infile)
     raster.initialize()
-    raster.bnames = ['decid', 'treecover']
+    raster.bnames = ['decid', 'treecover', 'land']
 
     raster.get_stats(True)
 
