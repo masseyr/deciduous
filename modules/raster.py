@@ -954,41 +954,37 @@ class Raster(object):
                                                              for (x, y) in tile['bound_coords'])))
             tile_geom = ogr.CreateGeometryFromWkt(tile_wkt)
 
-            tile_samp_list = list(elem if tile_geom.Intersects(elem[1]) else [elem[0], None] for elem in id_geom_list)
+            samp_ids = list(ii for ii, elem in enumerate(id_geom_list) if tile_geom.Intersects(elem[1]))
 
-            if len(tile_samp_list) > 0:
-                samp_ids = list(idx for idx, _ in tile_samp_list)
-
+            if len(samp_ids) > 0:
                 self.read_array(tile['block_coords'])
 
                 samp_coords = list(list(float(elem)
-                                        for elem in samp_geom.ExportToWkt()
+                                        for elem in id_geom_list[ii][1].ExportToWkt()
                                         .replace('POINT', '')
                                         .replace('(', '')
                                         .replace(')', '')
                                         .strip()
                                         .split(' '))
-                                   if samp_geom is not None else None
-                                   for _, samp_geom in tile_samp_list)
+                                   for ii in samp_ids)
 
                 if self.shape[0] == 1:
-                    samp_values = list([self.array[int(y), int(x)]] if None not in (x, y) else [None]
+                    samp_values = list([self.array[int(y), int(x)]]
                                        for x, y in self.get_locations(samp_coords,
                                                                       (self.transform[1],
                                                                        self.transform[5]),
                                                                       tile['tie_point']))
                 else:
-                    samp_values = list(self.array[band_order, int(y), int(x)].tolist() if None not in (x, y) else
-                                       [None for _ in range(self.shape[0])]
+                    samp_values = list(self.array[band_order, int(y), int(x)].tolist()
                                        for x, y in self.get_locations(samp_coords,
                                                                       (self.transform[1],
                                                                        self.transform[5]),
                                                                       tile['tie_point']))
 
-                for j, samp_id in enumerate(samp_ids):
-                    tile_samp_output[j] = (samp_id, samp_values[j])
+                for ii, samp_id in enumerate(samp_ids):
+                    tile_samp_output[samp_id] = (id_geom_list[samp_id][0], samp_values[ii])
 
-            return tile_samp_output
+        return tile_samp_output
 
     def get_stats(self,
                   print_stats=False,
