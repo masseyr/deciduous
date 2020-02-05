@@ -526,8 +526,10 @@ class Vector(object):
                                 index=False):
         """
         Gets tiles intersecting with the given geometry (any type).
-        This method returns an initialized Vector object. The first argument (or self) should be Polygon type.
+        This method returns an initialized Vector object.
         :param query_vector: Initialized vector object to query with (geometry could be any type)
+        :param filter_query: set as True if query vector is to be filtered or
+                            false for filtering self
         :param index: If the index of self vector where intersecting, should be returned
         :returns: Vector object of polygon features from self
         """
@@ -631,7 +633,7 @@ class Vector(object):
                 return out_vector
 
         else:
-            raise RuntimeError("Coordinate system or object type mismatch")
+            raise ValueError("Coordinate system or object type mismatch")
 
     def reproject(self,
                   epsg=None,
