@@ -628,7 +628,7 @@ class Handler(object):
         """
         if not os.path.exists(self.dirname):
             os.makedirs(self.dirname)
-            # print('Created path: ' + input_dir)
+            # print('Created path: ' + input_di
         else:
             pass  # print('Path already exists: ' + self.dirname)
 
@@ -645,6 +645,8 @@ class Handler(object):
         components = self.basename.split('.')
         if timestamp:
             timestamp = datetime.datetime.now().isoformat().replace('-', '').replace(':', '').split('.')[0]
+        else:
+            timestamp = ''
 
         if string is not None:
             string += timestamp
