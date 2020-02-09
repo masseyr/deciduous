@@ -69,7 +69,7 @@ class Timer:
                     seconds -= value * count
                     if value == 1:
                         name = name.rstrip('s')
-                    value = str(long(value))
+                    value = str(int(value))
                     result.append("{v} {n}".format(v=value,
                                                    n=name))
             else:
