@@ -123,7 +123,7 @@ if __name__ == '__main__':
     ras = Raster(infile)
     ras.initialize()
 
-    tile_size = ras.shape[2] * tile_size_multiplier
+    tile_size = min([ras.shape[1], ras.shape[2]])
 
     Opt.cprint(ras.shape)
     Opt.cprint(ras)
