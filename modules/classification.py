@@ -942,19 +942,17 @@ class RFRegressor(_Regressor):
 
         :param arr: input 2d array (axis 0: features (pixels), axis 1: bands)
 
-
         :param output_type: which output to produce,
-                       choices: ['sd', 'var', 'median', 'mean', 'full', 'conf']
+                       choices: ['sd', 'var', 'median', 'mean', 'full']
                        where 'sd' is for standard deviation,
                        'var' is for variance
                        'median' is for median of tree outputs
                        'mean' is for mean of tree outputs
                        'full' is for the full spectrum of the leaf nodes' prediction
-                       'conf' stands for confidence interval
 
         :param kwargs: Keyword arguments:
                         ntile_max: Maximum number of tiles up to which the
-                                   input image or array is processed without tiling (default = 9).
+                                   input image or array is processed without tiling (default = 5).
                                    You can choose any (small) number that suits the available memory.
                         tile_size: Number of pixels in each tile (default = 1024)
                         gain: Adjustment of the predicted output by linear adjustment of gain (slope)
@@ -977,6 +975,8 @@ class RFRegressor(_Regressor):
 
         uncert_dict = None
         tile_size = 1024
+        n_tile_max = 5
+
         if kwargs is not None:
             for key, value in kwargs.items():
                 if key in ('gain', 'bias', 'upper_limit', 'lower_limit'):
@@ -987,6 +987,9 @@ class RFRegressor(_Regressor):
 
             if 'tile_size' in kwargs:
                 tile_size = kwargs['tile_size']
+
+            if 'n_tile_max' in kwargs:
+                n_tile_max = kwargs['n_tile_max']
 
         # define output array
         if output_type == 'full':
@@ -1003,7 +1006,7 @@ class RFRegressor(_Regressor):
         npx_last = npx_inp % npx_tile  # pixels in last tile
         ntiles = int(npx_inp) / int(npx_tile) + 1  # total tiles
 
-        if ntiles > 1:
+        if ntiles > n_tile_max:
 
             for i in range(0, ntiles - 1):
                 if kwargs['verbose']:
@@ -1396,10 +1399,7 @@ class HRFRegressor(RFRegressor):
 
     def predict(self,
                 arr,
-                ntile_max=5,
-                tile_size=1024,
                 output_type='median',
-                intvl=95.0,
                 **kwargs):
         """
         Calculate random forest model prediction, variance, or standard deviation.
@@ -1408,20 +1408,33 @@ class HRFRegressor(RFRegressor):
         memory issues during creation.
 
         :param arr: input 2d array (axis 0: features (pixels), axis 1: bands)
-        :param ntile_max: Maximum number of tiles up to which the
-                          input image or array is processed without tiling (default = 9).
-                          You can choose any (small) number that suits the available memory.
-        :param tile_size: Size of each square tile (default = 128)
 
         :param output_type: which output to produce,
-                       choices: ['sd', 'var', 'median', 'mean', 'conf']
+                       choices: ['sd', 'var', 'median', 'mean', 'full']
                        where 'sd' is for standard deviation,
                        'var' is for variance
                        'median' is for median of tree outputs
                        'mean' is for mean of tree outputs
-                       'conf' stands for confidence interval
+                       'full' is for the full spectrum of the leaf nodes' prediction
 
-        :param intvl: Prediction interval width (default: 95 percentile)
+        :param kwargs: Keyword arguments:
+                        ntile_max: Maximum number of tiles up to which the
+                                   input image or array is processed without tiling (default = 5).
+                                   You can choose any (small) number that suits the available memory.
+                        tile_size: Number of pixels in each tile (default = 1024)
+                        gain: Adjustment of the predicted output by linear adjustment of gain (slope)
+                        bias: Adjustment of the predicted output by linear adjustment of bias (intercept)
+                        upper_limit: Limit of maximum value of prediction
+                        lower_limit: Limit of minimum value of prediction
+                        intvl: Prediction interval width (default: 95 percentile)
+                        uncert_dict: Dictionary specifying the indices of
+                                   feature bands (keys) and their corresponding
+                                   uncertainty bands (values)
+                        n_rand: Number of random values to generate in the uncertainty range (default: 5)
+                        half_range (Boolean): If the input and output uncertainty values are
+                                   False  - full range (x +/- a), or
+                                   True   - half range (x +/- a/2)
+
         :return: 1d image array (that will need reshaping if image output)
         """
 
@@ -1429,10 +1442,7 @@ class HRFRegressor(RFRegressor):
             raise UninitializedError('Output type "full" is not supported for this class')
 
         return super(HRFRegressor, self).predict(arr,
-                                                 ntile_max=ntile_max,
-                                                 tile_size=tile_size,
                                                  output_type=output_type,
-                                                 intvl=intvl,
                                                  **kwargs)
 
     def regress_tile(self,
