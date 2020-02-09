@@ -22,7 +22,8 @@ __all__ = ['Sublist',
            'OGR_GEOM_DEF',
            'OGR_TYPE_DEF',
            'GDAL_FIELD_DEF',
-           'GDAL_FIELD_DEF_INV']
+           'GDAL_FIELD_DEF_INV',
+           'EEFunc']
 
 
 OGR_FIELD_DEF = {
@@ -1413,3 +1414,82 @@ class FTPHandler(Handler):
                 except Exception:
                     Opt.cprint('File {} not found or already written'.format(self.basename))
 
+
+class EEFunc(object):
+
+    @staticmethod
+    def expand_image_meta(img_meta):
+        """
+        Function to expand the metadata associated with an ee.Image object
+        :param img_meta: Retrieved ee.Image metadata dictionary using getInfo() method
+        :return: String
+        """
+        if type(img_meta) != dict:
+            if type(img_meta).__name__ == 'Image':
+                img_meta = img_meta.getInfo()
+            else:
+                raise RuntimeError('Unsupported EE object')
+
+        out_str = ''
+        for k, y in img_meta.items():
+            if k == 'bands':
+                for _y in y:
+                    out_str += 'Band: {} : {}\n'.format(_y['id'], str(_y))
+            elif k == 'properties':
+                for _k, _y in y.items():
+                    out_str += 'Property: {} : {}\n'.format(_k, str(_y))
+            else:
+                out_str += '{} : {}\n'.format(str(k), str(y))
+        return out_str
+
+    @staticmethod
+    def expand_feature_meta(feat_meta):
+        """
+        Function to expand the metadata associated with an ee.Feature object
+        :param feat_meta: Retrieved ee.Feature metadata dictionary using getInfo() method
+        :return: String
+        """
+        if type(feat_meta) != dict:
+            if type(feat_meta).__name__ == 'Feature':
+                feat_meta = feat_meta.getInfo()
+            else:
+                raise RuntimeError('Unsupported EE object')
+
+        out_str = ''
+        for k, y in feat_meta.items():
+            if k == 'geometry':
+                for _k, _y in y.items():
+                    out_str += '{}: {}\n'.format(str(_k), str(_y))
+
+            elif k == 'properties':
+                for _k, _y in y.items():
+                    out_str += 'Property: {} : {}\n'.format(_k, str(_y))
+            else:
+                out_str += '{} : {}\n'.format(str(k), str(y))
+        return out_str
+
+    @staticmethod
+    def expand_feature_coll_meta(feat_coll_meta):
+        """
+        Function to expand the metadata associated with an ee.FeatureCollection object
+        :param feat_coll_meta: Retrieved ee.FeatureCollection metadata dictionary using getInfo() method
+        :return: String
+        """
+        if type(feat_coll_meta) != dict:
+            if type(feat_coll_meta).__name__ == 'FeatureCollection':
+                feat_coll_meta = feat_coll_meta.getInfo()
+            else:
+                raise RuntimeError('Unsupported EE object')
+
+        out_str = '---------------------\n'
+        for k, y in feat_coll_meta.items():
+            if k == 'features':
+                for feat in y:
+                    out_str += EEFunc.expand_feature_meta(feat) + '---------------------\n'
+
+            elif k == 'properties':
+                for _k, _y in y.items():
+                    out_str += 'Property: {} : {}\n'.format(_k, str(_y))
+            else:
+                out_str += '{} : {}\n'.format(str(k), str(y))
+        return out_str
