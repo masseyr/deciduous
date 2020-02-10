@@ -1,5 +1,4 @@
 from decimal import *
-from osgeo import ogr, gdal
 from itertools import takewhile, repeat
 import numpy as np
 import datetime
@@ -17,7 +16,6 @@ __all__ = ['Sublist',
            'Handler',
            'FTPHandler',
            'Opt']
-
 
 
 class Sublist(list):
@@ -1204,7 +1202,7 @@ class Handler(object):
 
 class Opt:
     """
-    Class to handle notices
+    Class sor optional miscellaneous methods
     """
     def __init__(self,
                  obj=None):
@@ -1240,11 +1238,7 @@ class Opt:
 
         print_str = 'MEMORY USAGE: {:{w}.{p}f}'.format(process.memory_info().rss / div, w=5, p=2) + suff
 
-        Opt.cprint('')
-        Opt.cprint('*******************************************')
         Opt.cprint(print_str)
-        Opt.cprint('*******************************************')
-        Opt.cprint('')
 
     @staticmethod
     def time_now():
@@ -1252,11 +1246,7 @@ class Opt:
         Prints current time
         :return: print to console/output
         """
-        Opt.cprint('')
-        Opt.cprint('*******************************************')
         Opt.cprint('CURRENT TIME: ' + str(datetime.datetime.now()))
-        Opt.cprint('*******************************************')
-        Opt.cprint('')
 
     @staticmethod
     def cprint(text,
