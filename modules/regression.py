@@ -982,7 +982,7 @@ class RFRegressor(_Regressor):
                             tile_end=None,
                             output_type='median',
                             uncert_dict=None,
-                            n_rand=10,
+                            n_rand=5,
                             half_range=True,
                             compare_uncert=False,
                             calculated_uncert_type='sd',
@@ -1002,7 +1002,7 @@ class RFRegressor(_Regressor):
         :param uncert_dict: Dictionary specifying the indices of
                             feature bands (keys) and their corresponding
                             uncertainty bands (values)
-        :param n_rand: Number of random values to generate in the uncertainty range
+        :param n_rand: Number of random values to generate in the uncertainty range (default: 5)
         :param half_range: If the input and output uncertainty values are
                              - full range (x +/- a), or
                              - half range (x +/- a/2)
