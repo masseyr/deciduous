@@ -813,7 +813,7 @@ class Handler(object):
         else:
             output = size
         if as_long:
-            return long(round(output, precision))
+            return int(round(output, precision))
         else:
             return round(output, precision)
 
