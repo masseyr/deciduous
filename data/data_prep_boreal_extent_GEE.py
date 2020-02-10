@@ -71,7 +71,6 @@ if __name__ == '__main__':
             .copyProperties(img)\
             .copyProperties(img, ['system:time_start', 'system:time_end', 'system:index', 'system:footprint'])
 
-    #
     def ls5_sr_corr(img):
         """ Method to correct Landsat 5 based on Landsat 7 reflectance.
             This method scales the SR reflectance values to match LS7 reflectance
@@ -321,10 +320,6 @@ if __name__ == '__main__':
           [-178.3430865436669, 50.38214994852445]]])
 
     # geometries end -------------------------------------------------------------------------------------------------
-
-    all_samp = ee.FeatureCollection("users/masseyr44/shapefiles/all_samp_postbin_v8")
-    boreal_h = ee.FeatureCollection("users/masseyr44/shapefiles/NABoreal_simple").first().geometry()
-    boreal_b = ee.FeatureCollection("users/masseyr44/shapefiles/NABoreal_boreal_10km_buffer").first().geometry()
 
     ls5 = ee.ImageCollection("LANDSAT/LT05/C01/T1_SR")
     ls7 = ee.ImageCollection("LANDSAT/LE07/C01/T1_SR")
