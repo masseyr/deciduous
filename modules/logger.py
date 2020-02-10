@@ -1,10 +1,6 @@
 import logging
 
 
-# client = google.cloud.logging.Client() #Connect Stackdriver logger to root python logger
-# handler = CloudLoggingHandler(client, name='agintel')
-# client.setup_logging()
-
 class Logger(object):
 
     def __init__(self,
