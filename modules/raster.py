@@ -1,7 +1,6 @@
 import numpy as np
 from common import *
 from osgeo import gdal, gdal_array, ogr, osr, gdalconst
-import warnings
 np.set_printoptions(suppress=True)
 
 # Tell GDAL to throw Python exceptions, and register all drivers
@@ -741,14 +740,14 @@ class Raster(object):
         xmin, xmax, ymin, ymax = self.get_pixel_bounds(bound_coords,
                                                        coords_type)
 
-        for y in xrange(ymin, ymax, tile_ysize):
+        for y in range(ymin, ymax, tile_ysize):
 
             if y + tile_ysize < ymax:
                 rows = tile_ysize
             else:
                 rows = ymax - y
 
-            for x in xrange(xmin, xmax, tile_xsize):
+            for x in range(xmin, xmax, tile_xsize):
                 if x + tile_xsize < xmax:
                     cols = tile_xsize
                 else:
