@@ -321,6 +321,10 @@ if __name__ == '__main__':
 
     # geometries end -------------------------------------------------------------------------------------------------
 
+    all_samp = ee.FeatureCollection("users/masseyr44/shapefiles/all_samp_postbin_v8")
+    boreal_h = ee.FeatureCollection("users/masseyr44/shapefiles/NABoreal_simple").first().geometry()
+    boreal_b = ee.FeatureCollection("users/masseyr44/shapefiles/NABoreal_boreal_10km_buffer").first().geometry()
+
     ls5 = ee.ImageCollection("LANDSAT/LT05/C01/T1_SR")
     ls7 = ee.ImageCollection("LANDSAT/LE07/C01/T1_SR")
     ls8 = ee.ImageCollection("LANDSAT/LC08/C01/T1_SR")
@@ -343,11 +347,11 @@ if __name__ == '__main__':
 
     # start year , end year , year
     years = {
-        '1992': (1987, 1997),
-        '2000': (1998, 2002),
-        '2005': (2003, 2007),
+        # '1992': (1987, 1997),
+        # '2000': (1998, 2002),
+        # '2005': (2003, 2007),
         '2010': (2008, 2012),
-        '2015': (2013, 2018)
+        # '2015': (2013, 2018)
     }
 
     # zone name, bounds
