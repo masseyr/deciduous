@@ -1,9 +1,9 @@
 from osgeo import ogr, osr, gdal
 import math
-import json
 import sys
 import os
-from common import *
+from common import Handler, Sublist, Opt
+from gdaldefs import *
 
 __all__ = ['Vector']
 
