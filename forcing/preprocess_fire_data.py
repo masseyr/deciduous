@@ -1,10 +1,12 @@
-from modules import Handler, Opt
-import numpy as np
-from sys import argv
-
 if __name__ == '__main__':
+    import sys
+    import os
 
-    # script, folder, filename, res, version, use_limit = argv
+    module_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    sys.path.append(module_path)
+    from modules import Handler, Opt
+    import numpy as np
+    # script, folder, filename, res, version, use_limit = sys.argv
 
     folder = 'D:/Shared/Dropbox/projects/NAU/landsat_deciduous/data/SAMPLES/fires/'
     filelist = [  #'can_fire_multi_s1_extract_v2019_08_27T22_26_24.csv',
