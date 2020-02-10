@@ -1,9 +1,16 @@
-from modules import *
-from sys import argv
-
+"""
+Script to resample a geotiff file to a specified spatial resolution in geographic coords
+"""
 
 if __name__ == '__main__':
-    script, infile, out_res = argv
+    import sys
+    import os
+
+    module_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    sys.path.append(module_path)
+    from modules import *
+
+    script, infile, out_res = sys.argv
 
     out_proj4 = '+proj=longlat +ellps=WGS84 +datum=WGS84'
 
