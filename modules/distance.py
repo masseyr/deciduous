@@ -45,8 +45,8 @@ class Distance(object):
         nvar = len(self.names)
 
         # copy data to matrix
-        samp_matrix = np.matrix([[self.samples[i][self.names[j]] for j in range(0, nvar)]
-                                 for i in range(0, nsamp)])
+        samp_matrix = np.array([[self.samples[i][self.names[j]] for j in range(0, nvar)]
+                                for i in range(0, nsamp)])
         self.matrix = samp_matrix
 
     def cluster_center(self,
@@ -119,7 +119,7 @@ class Mahalanobis(Distance):
             except ValueError:
                 return None
         else:
-            return np.matrix(cov_mat)
+            return np.array(cov_mat)
 
     def difference(self,
                    transpose=False):
@@ -129,9 +129,9 @@ class Mahalanobis(Distance):
         """
         center = self.center
 
-        diff_matrix = np.matrix(np.apply_along_axis(lambda row: np.array(row) - center,
-                                                    axis=1,
-                                                    arr=np.array(self.matrix)))
+        diff_matrix = np.apply_along_axis(lambda row: np.array(row) - center,
+                                          axis=1,
+                                          arr=np.array(self.matrix))
 
         if transpose:
             return diff_matrix.T
@@ -190,15 +190,8 @@ class Mahalanobis(Distance):
         Testing: Valentina Borghesani, valentinaborghesani@gmail.com
 
         Returns the sample linear partial correlation coefficients between pairs of variables in C, controlling
-        for the remaining variables in C.
-        Parameters
-        ----------
-        C : array-like, shape (n, p)
-            Array with the different variables. Each column of C is taken as a variable
-        Returns
-        -------
-        P : array-like, shape (p, p)
-            P[i, j] contains the partial correlation of C[:, i] and C[:, j] controlling
+        for the remaining variables in C :- Array with the different variables. Each column of C is taken as a variable.
+        P[i, j] contains the partial correlation of C[:, i] and C[:, j] controlling
             for the remaining variables in C.
         """
 
