@@ -1,10 +1,3 @@
-from modules import *
-import multiprocessing as mp
-from osgeo import gdal_array
-import numpy as np
-from sys import argv
-
-
 def _tile_process_(args):
     _filelist, _outfile, _band_order, _tile_dict, _composite_type = args
     _tile_coords = _tile_dict['block_coords']
@@ -74,6 +67,16 @@ def _get_tile_data_(_filelist, _outfile, _band_order, _tile_specs, _composite_ty
 
 
 if __name__ == '__main__':
+    import sys
+    import os
+
+    module_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    sys.path.append(module_path)
+    from modules import *
+    import multiprocessing as mp
+    from osgeo import gdal_array
+    import numpy as np
+
     '''
     nthreads = 4
     file_folder = 'C:/temp/albedo'
@@ -101,7 +104,7 @@ if __name__ == '__main__':
 
     image_bounds = (-130.999, -90.0, 40.0, 50.0)  # xmin, xmax, ymin, ymax
     '''
-    script, file_folder, outdir, startyear, endyear, startdate, enddate, reducer, ver, nthreads = argv
+    script, file_folder, outdir, startyear, endyear, startdate, enddate, reducer, ver, nthreads = sys.argv
 
     tile_size = (1024, 1024)
     image_bounds = (-179.999, -50.0, 30.0, 75.0)  # xmin, xmax, ymin, ymax
