@@ -1202,7 +1202,7 @@ class Handler(object):
 
 class Opt:
     """
-    Class sor optional miscellaneous methods
+    Class for optional miscellaneous methods
     """
     def __init__(self,
                  obj=None):
