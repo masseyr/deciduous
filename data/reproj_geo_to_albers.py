@@ -2,7 +2,7 @@ from modules import *
 
 
 if __name__ == '__main__':
-    '''
+
     folder = 'c:/temp/'
     filelist = ['decid_diff_incl_east_2000_2015.tif'
                 'decid_diff_2000_2015.tif',
@@ -34,33 +34,6 @@ if __name__ == '__main__':
         Raster(outfile).add_overviews(bigtiff='yes',
                                       compress='lzw')
         
-    '''
-    folder = 'c:/temp/'
-    filelist = ['y2018_sep__data_img.tif',
-                'y2019_aug__data_img.tif']
-
-    out_proj4 = '+proj=longlat +ellps=WGS84 +datum=WGS84'
-
-    for infile in filelist:
-
-        ras = Raster(folder + infile)
-        ras.initialize()
-
-        print(ras)
-
-        outfile = folder + Handler(infile).add_to_filename('_geo_10m')
-
-        ras.reproject(outfile=outfile,
-                      out_proj4=out_proj4,
-                      verbose=True,
-                      resampling='cubic',
-                      output_res=(0.00015, 0.00015),
-                      out_nodatavalue=0.0,
-                      bigtiff='yes',
-                      compress='lzw')
-
-        Raster(outfile).add_overviews(bigtiff='yes',
-                                      compress='lzw')
 
 
 
