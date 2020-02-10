@@ -344,6 +344,110 @@ class _Regressor(object):
 
         return out_dict
 
+    @staticmethod
+    @Timer.timing(True)
+    def fit_regressor(args_list,
+                      rank=None):
+        """
+        Method to train and validate classification models using MPI
+        and if the R-squared is > 0.5 then store the model and its
+        properties in a pickled file and csv file respectively
+
+        :param args_list: List of MPI scattered samples. Each element
+                        in the args_list includes a list in the given order of:
+                                name: Name of the model,
+                                train_samp: Samples object for training the classifier,
+                                valid_samp: Samples object for validating the classifier,
+                                in_file: input file containing the samples
+                                pickle_dir: folder to store the pickled classifier in)
+                                llim: lower limit
+                                ulim: upper limit
+                                param: RFRegressor initialization parameters
+
+        :param rank: rank of the MPI node/processor
+
+        :returns: tuple (r-squared*100 , model_name)
+        """
+        sep = Handler().sep
+
+        result_list = list()
+
+        Opt.cprint('Length of arguments at {} is {}'.format(str(rank), len(args_list)))
+
+        if args_list is None:
+            args_list = list()
+
+        for args in args_list:
+
+            name, train_samp, valid_samp, in_file, pickle_dir, llim, ulim, param = args
+
+            # initialize RF classifier
+            model = RFRegressor(**param)
+            model.time_it = True
+
+            regress_limit = [0.025 * ulim, 0.975 * ulim]
+            rsq_limit = 60.0
+
+            # fit RF classifier using training data
+            model.fit_data(train_samp.format_data())
+
+            # predict using held out samples and print to file
+            pred = model.sample_predictions(valid_samp.format_data(),
+                                            regress_limit=regress_limit)
+
+            out_dict = dict()
+            out_dict['name'] = Handler(in_file).basename.split('.')[0] + name
+            out_dict['rsq'] = pred['rsq'] * 100.0
+            out_dict['slope'] = pred['slope']
+            out_dict['intercept'] = pred['intercept']
+            out_dict['rmse'] = pred['rmse']
+
+            model.output = out_dict
+
+            rsq = pred['rsq'] * 100.0
+            slope = pred['slope']
+            intercept = pred['intercept']
+            rmse = pred['rmse']
+
+            if rsq >= rsq_limit:
+                if intercept > regress_limit[0]:
+                    model.adjustment['bias'] = -1.0 * (intercept / slope)
+
+                model.adjustment['gain'] = 1.0 / slope
+                model.adjustment['upper_limit'] = ulim
+                model.adjustment['lower_limit'] = llim
+
+                # file to write the model run output to
+                outfile = pickle_dir + sep + \
+                          Handler(in_file).basename.split('.')[0] + name + '.txt'
+                outfile = Handler(filename=outfile).file_remove_check()
+
+                # save RF classifier using pickle
+                picklefile = pickle_dir + sep + \
+                             Handler(in_file).basename.split('.')[0] + name + '.pickle'
+                picklefile = Handler(filename=picklefile).file_remove_check()
+
+                # predict using the model to store results in a file
+                pred = model.sample_predictions(valid_samp.format_data(),
+                                                outfile=outfile,
+                                                picklefile=picklefile,
+                                                regress_limit=regress_limit)
+
+                out_dict['rsq'] = pred['rsq'] * 100.0
+                out_dict['slope'] = pred['slope']
+                out_dict['intercept'] = pred['intercept']
+                out_dict['rmse'] = pred['rmse']
+
+                out_dict['regress_low_limit'] = regress_limit[0]
+                out_dict['regress_up_limit'] = regress_limit[1]
+
+                model.output.update(out_dict)
+                model.pickle_it(picklefile)
+
+            result_list.append(out_dict)
+
+        return result_list
+
 
 class MRegressor(_Regressor):
     """Multiple linear regressor
