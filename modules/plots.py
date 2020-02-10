@@ -1,5 +1,5 @@
 from common import Handler, Sublist
-from classification import _Regressor
+from regression import _Regressor
 from exceptions import ObjectNotFound
 import numpy as np
 # import pandas as pd
@@ -229,8 +229,6 @@ class Plot:
                 for j in range(0, len(temp)):
                     pdata.append(temp[j])
                     gname.append(group_names[i])
-
-
 
         # wideform list of lists with bins
         df = [gname, pdata]
