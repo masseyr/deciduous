@@ -1,13 +1,14 @@
-from modules import *
-import multiprocessing as mp
-from osgeo import gdal_array
-import numpy as np
-from sys import argv
-
-
 if __name__ == '__main__':
+    import sys
+    import os
 
-    script, file_folder, outdir, startyear, endyear, startdate, enddate, reducer, ver = argv
+    module_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    sys.path.append(module_path)
+    from modules import *
+    from osgeo import gdal_array
+    import numpy as np
+
+    script, file_folder, outdir, startyear, endyear, startdate, enddate, reducer, ver = sys.argv
 
     tile_size = (1024, 1024)
     image_bounds = (-179.999, -50.0, 30.0, 75.0)  # xmin, xmax, ymin, ymax
