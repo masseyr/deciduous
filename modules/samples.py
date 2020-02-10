@@ -2,7 +2,6 @@ import numpy as np
 from common import *
 import warnings
 from timer import Timer
-from resources import bname_dict
 from scipy.stats.stats import pearsonr
 
 
@@ -222,13 +221,10 @@ class Samples:
         }
 
     def correlation_matrix(self,
-                           sensor='ls57',
                            display_progress=True):
         """
         Method to return a dictionary with correlation data
         rows = columns = variables (or dimensions)
-        :param sensor: Sensor parameters to be used (current options: 'ls57' for Landsat 5 and 7,
-                        and 'ls8' for Landsat 8)
         :param display_progress: Should the elements of correlation matrix
         be displayed while being calculated? (default: True)
 
@@ -243,10 +239,7 @@ class Samples:
         var_names = list()
         for i, name in enumerate(self.x_name):
             print(str(i)+' '+name)
-            if name in bname_dict[sensor]:
-                var_names.append(bname_dict[sensor][name.upper()])
-            else:
-                var_names.append(name.upper())
+            var_names.append(name.upper())
 
         # initialize correlation matrix
         corr = np.zeros([nvar, nvar], dtype=float)
