@@ -1,7 +1,11 @@
-from modules import *
-import numpy as np
-
 if __name__ == '__main__':
+    import sys
+    import os
+
+    module_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    sys.path.append(module_path)
+    from modules import *
+    import numpy as np
 
     file1 = "D:/Shared/Dropbox/projects/NAU/landsat_deciduous/data/kernels/albedo_sw_clr_kernel.tif"
     outfile1 = "D:/Shared/Dropbox/projects/NAU/landsat_deciduous/data/kernels/albedo_sw_clr_kernel_reproj_NA.tif"
