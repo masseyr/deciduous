@@ -1024,23 +1024,25 @@ class Raster(object):
                   **creation_options):
         """
         Method to reproject raster object
-        :param outfile:
-        :param out_epsg:
-        :param out_wkt:
-        :param out_proj4:
-        :param out_spref:
-        :param output_res:
+        :param outfile: output file name
+        :param out_epsg: EPSG code for output spatial reference
+        :param out_wkt: WKT representation of output spatial reference
+        :param out_proj4: PROJ4 representation of output spatial reference
+        :param out_spref: Output spatial reference object
+        :param output_res: output spatial resolution (xRes, yRes)
         :param out_datatype: output type (gdal.GDT_Byte, etc...)
-        :param resampling:
-        :param out_nodatavalue:
+        :param resampling: near, bilinear, cubic, cubicspline,
+                           lanczos, average, mode, max, min, med, q1, q3
+        :param out_nodatavalue: output no-data value to replace input no-data value
         :param output_bounds: output bounds as (minX, minY, maxX, maxY) in target SRS
         :param out_format: output format ("GTiff", etc...)
-        :param verbose:
-        :param return_vrt:
-        :param creation_options:
-        :return:
+        :param verbose: If the steps should be displayed
+        :param return_vrt: If VRT object should be returned instead of raster
+        :param creation_options: Creation options to be used while writing the raster
+                                (example for geotiff: 'compress=lzw' , 'bigtiff=yes' )
+        :return: VRT object or None (if output file is also specified)
 
-        valid warp options in kwargs
+        For the sake of completeness here are all the valid warp options in kwargs
         (from https://gdal.org/python/osgeo.gdal-module.html#WarpOptions):
 
           options --- can be be an array of strings, a string or let empty and filled from other keywords.
