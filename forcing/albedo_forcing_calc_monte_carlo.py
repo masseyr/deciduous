@@ -1,11 +1,12 @@
-from modules import *
-from sys import argv
-import numpy as np
-
-
 if __name__ == '__main__':
+    import sys
+    import os
+
+    module_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    sys.path.append(module_path)
+    from modules import *
     '''
-    script, infile, outdir, picklefile, band_name = argv
+    script, infile, outdir, picklefile, band_name = sys.argv
     '''
     # ------------------------------------------------------------------------------------------
     infile = "C:/temp/decid_tc_2000_layerstack-0000026880-0000161280.tif"
