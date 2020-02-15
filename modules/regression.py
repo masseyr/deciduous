@@ -18,7 +18,7 @@ __all__ = ['HRFRegressor',
            '_Regressor']
 
 __defaults__ = {
-    'tile_size': 102400,
+    'tile_size': 512,
     'n_tile_max': 5,
     'uncert_dict': None,
     'array_additive': 0.,
@@ -166,27 +166,41 @@ class _Regressor(object):
         nrows = raster_obj.shape[1]
         ncols = raster_obj.shape[2]
 
+        if nbands < len(regressor.features):
+            raise ValueError('Regressor trained using more features than supplied raster')
+        elif any([feat not in raster_obj.bnames for feat in regressor.features]):
+            raise ValueError('Missing trained feature in Raster object')
+
         kwargs_computed = {
             'out_data_type': gdal_array.NumericTypeCodeToGDALTypeCode(regressor.data['labels'].dtype),
             'tile_size': min([nrows, ncols]) ** 2 if (min([nrows, ncols]) ** 2) <= defaults['tile_size']
             else defaults['tile_size'],
-            'band_multipliers': np.array([defaults['array_multipliers'] for _ in raster_obj.bnames]),
+            'band_multipliers': np.array([defaults['array_multiplier'] for _ in raster_obj.bnames]),
             'band_additives': np.array([defaults['array_additive'] for _ in raster_obj.bnames])
         }
 
-        defaults.update(kwargs_computed).update(kwargs)
+        defaults.update(kwargs_computed)
+        defaults.update(kwargs)
 
         if 'array_multiplier' in kwargs:
-            defaults['band_multipliers'] = np.array([defaults['band_multipliers'][elem]
-                                                    if elem in defaults['band_multipliers']
-                                                    else kwargs['array_multiplier']
-                                                    for elem in raster_obj.bnames])
+            if 'band_multipliers' in kwargs:
+                defaults['band_multipliers'] = np.array([defaults['band_multipliers'][elem]
+                                                        if elem in defaults['band_multipliers']
+                                                        else defaults['array_multiplier']
+                                                        for elem in raster_obj.bnames])
+            else:
+                defaults['band_multipliers'] = np.array([defaults['array_multiplier']
+                                                         for _ in raster_obj.bnames])
 
         if 'array_additive' in kwargs:
-            defaults['band_additives'] = np.array([defaults['band_additives'][elem]
-                                                  if elem in defaults['band_additives']
-                                                  else kwargs['array_additive']
-                                                  for elem in raster_obj.bnames])
+            if 'band_additives' in kwargs:
+                defaults['band_additives'] = np.array([defaults['band_additives'][elem]
+                                                      if elem in defaults['band_additives']
+                                                      else defaults['array_additive']
+                                                      for elem in raster_obj.bnames])
+            else:
+                defaults['band_additives'] = np.array([defaults['array_additive']
+                                                       for _ in raster_obj.bnames])
 
         if defaults['mask_band'] is not None:
             if type(defaults['mask_band']) == str:
@@ -1106,8 +1120,10 @@ class RFRegressor(_Regressor):
         defaults.update(kwargs)
 
         uncert_dict = defaults['uncert_dict']
-        tile_size = defaults['tile_size']
+        tile_size = defaults['tile_size'] ** 2
         n_tile_max = defaults['n_tile_max']
+
+        print('tile_size: -- {}'.format(tile_size))
 
         for key, value in defaults.items():
             if key in ('gain', 'bias', 'upper_limit', 'lower_limit'):
