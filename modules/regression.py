@@ -137,7 +137,7 @@ class _Regressor(object):
                         tile_size: Number of pixels in each raster tile
                         band_additives: Values to add to each band array
                         band_multipliers: Values to scale each band array with
-                        mask_band: Band to mask the pixels ot used in regression
+                        mask_band: Band to mask the pixels used in regression
                         verbose: If the steps std output should be displayed
                         uncert_dict: Dictionary with each key value pair specifying
                                      a feature band and its uncertainty band. Only
