@@ -17,6 +17,17 @@ __all__ = ['HRFRegressor',
            'MRegressor',
            '_Regressor']
 
+__defaults__ = {
+    'tile_size': 102400,
+    'n_tile_max': 5,
+    'uncert_dict': None,
+    'array_additive': 0.,
+    'array_multiplier': 1.,
+    'nodatavalue': None,
+    'out_nodatavalue': None,
+    'mask_band': None
+}
+
 
 sep = Handler().sep
 
@@ -149,62 +160,48 @@ class _Regressor(object):
         if not raster_obj.init:
             raster_obj.initialize()
 
+        defaults = Opt.__copy__(__defaults__)
+
         nbands = raster_obj.shape[0]
         nrows = raster_obj.shape[1]
         ncols = raster_obj.shape[2]
 
-        if 'verbose' in kwargs:
-            verbose = kwargs['verbose']
-        else:
-            verbose = False
-
-        kwargs_predict = {
-            'array_additive': 0.,
-            'array_multiplier': 1.,
+        kwargs_computed = {
             'out_data_type': gdal_array.NumericTypeCodeToGDALTypeCode(regressor.data['labels'].dtype),
-            'tile_size': min([nrows, ncols]) ** 2,
-            'nodatavalue': None,
-            'out_nodatavalue': None,
-            'mask_band': None
+            'tile_size': min([nrows, ncols]) ** 2 if (min([nrows, ncols]) ** 2) <= defaults['tile_size']
+            else defaults['tile_size'],
+            'band_multipliers': np.array([defaults['array_multipliers'] for _ in raster_obj.bnames]),
+            'band_additives': np.array([defaults['array_additive'] for _ in raster_obj.bnames])
         }
 
-        kwargs_predict.update(kwargs)
+        defaults.update(kwargs_computed).update(kwargs)
 
-        kwargs_predict['band_multipliers'] = np.array([kwargs_predict['array_multiplier'] for _ in raster_obj.bnames])
-        kwargs_predict['band_additives'] = np.array([kwargs_predict['array_additive'] for _ in raster_obj.bnames])
+        if 'array_multiplier' in kwargs:
+            defaults['band_multipliers'] = np.array([defaults['band_multipliers'][elem]
+                                                    if elem in defaults['band_multipliers']
+                                                    else kwargs['array_multiplier']
+                                                    for elem in raster_obj.bnames])
 
-        if 'band_multipliers' in kwargs:
-            kwargs_predict['band_multipliers'] = np.array([kwargs['band_multipliers'][elem]
-                                                           if elem in kwargs['band_multipliers']
-                                                           else kwargs_predict['array_multiplier']
-                                                           for elem in raster_obj.bnames])
-        else:
-            kwargs_predict['band_multipliers'] = np.array([kwargs_predict['array_multiplier']
-                                                           for _ in raster_obj.bnames])
+        if 'array_additive' in kwargs:
+            defaults['band_additives'] = np.array([defaults['band_additives'][elem]
+                                                  if elem in defaults['band_additives']
+                                                  else kwargs['array_additive']
+                                                  for elem in raster_obj.bnames])
 
-        if 'band_additives' in kwargs:
-            kwargs_predict['band_additives'] = np.array([kwargs['band_additives'][elem]
-                                                         if elem in kwargs['band_additives']
-                                                         else kwargs_predict['array_additive']
-                                                         for elem in raster_obj.bnames])
-        else:
-            kwargs_predict['band_additives'] = np.array([kwargs_predict['array_additive']
-                                                         for _ in raster_obj.bnames])
-
-        if kwargs_predict['mask_band'] is not None:
-            if type(kwargs_predict['mask_band']) == str:
+        if defaults['mask_band'] is not None:
+            if type(defaults['mask_band']) == str:
                 try:
-                    kwargs_predict['mask_band'] = raster_obj.bnames.index(kwargs_predict['mask_band'])
+                    defaults['mask_band'] = raster_obj.bnames.index(defaults['mask_band'])
                 except ValueError:
                     warnings.warn('Mask band ignored: Unrecognized band name.')
-                    kwargs_predict['mask_band'] = None
-            elif type(kwargs_predict['mask_band']) in (int, float):
-                if kwargs_predict['mask_band'] > raster_obj.shape[0]:
+                    defaults['mask_band'] = None
+            elif type(defaults['mask_band']) in (int, float):
+                if defaults['mask_band'] > raster_obj.shape[0]:
                     warnings.warn('Mask band ignored: Mask band index greater than number of bands. ' +
                                   'Indices start at 0.')
             else:
                 warnings.warn('Mask band ignored: Unrecognized data type.')
-                kwargs_predict['mask_band'] = None
+                defaults['mask_band'] = None
 
         # file handler object
         handler = Handler(raster_obj.name)
@@ -223,80 +220,84 @@ class _Regressor(object):
             regressor.feature_index = list(raster_obj.bnames.index(feat) for feat in regressor.features)
 
         out_ras_arr = np.zeros([nrows, ncols],
-                               dtype=gdal_array.GDALTypeCodeToNumericTypeCode(kwargs_predict['out_data_type']))
+                               dtype=gdal_array.GDALTypeCodeToNumericTypeCode(defaults['out_data_type']))
 
-        raster_obj.make_tile_grid(kwargs_predict['tile_size'],
-                                  kwargs_predict['tile_size'])
+        raster_obj.make_tile_grid(defaults['tile_size'],
+                                  defaults['tile_size'])
 
-        if verbose:
+        if defaults['verbose']:
             Opt.cprint('\nProcessing {} raster tiles...\n'.format(str(raster_obj.ntiles)))
 
         count = 0
         for _, tile_arr in raster_obj.get_next_tile():
-            _x, _y, _cols, _rows = raster_obj.tile_grid[count]['block_coords']
+            tiept_x, tiept_y, tile_cols, tile_rows = raster_obj.tile_grid[count]['block_coords']
 
-            if verbose:
+            if defaults['verbose']:
                 Opt.cprint("\nProcessing tile {} of {}: x {}, y {}, cols {}, rows {}".format(str(count + 1),
                                                                                              str(raster_obj.ntiles),
-                                                                                             str(_x),
-                                                                                             str(_y),
-                                                                                             str(_cols),
-                                                                                             str(_rows)),
+                                                                                             str(tiept_x),
+                                                                                             str(tiept_y),
+                                                                                             str(tile_cols),
+                                                                                             str(tile_rows)),
                            newline='\n')
 
-            new_shape = [nbands, _rows * _cols]
+            new_shape = [nbands, tile_rows * tile_cols]
 
-            temp_arr = tile_arr.reshape(new_shape)
-            temp_arr = temp_arr.swapaxes(0, 1)
+            tile_arr = tile_arr.reshape(new_shape)
+            tile_arr = tile_arr.swapaxes(0, 1)
 
             minmax = np.zeros([nbands, 2])
             bad_tile_flag = False
 
-            for ii in range(temp_arr.shape[1]):
-                minmax[ii, :] = np.array([np.min(temp_arr[:, ii]), np.max(temp_arr[:, ii])])
-                if verbose:
+            for ii in range(tile_arr.shape[1]):
+                minmax[ii, :] = np.array([np.min(tile_arr[:, ii]), np.max(tile_arr[:, ii])])
+                if defaults['verbose']:
                     Opt.cprint('Band {} : '.format(str(ii + 1)) +
                                'min {} max {}'.format(str(minmax[ii, 0]),
                                                       str(minmax[ii, 1])))
 
-                if kwargs_predict['nodatavalue'] is not None:
-                    if (minmax[ii, 0] == minmax[ii, 1] == kwargs_predict['nodatavalue']) \
+                if defaults['nodatavalue'] is not None:
+                    if (minmax[ii, 0] == minmax[ii, 1] == defaults['nodatavalue']) \
                             and (ii in regressor.feature_index):
 
                         bad_tile_flag = True
 
             if not bad_tile_flag:
-                out_arr = regressor.predict(temp_arr,
-                                            output_type=output_type,
-                                            verbose=verbose,
-                                            **kwargs_predict)
+                for k, v in defaults.items():
+                    print('{} : {}'.format(str(k), str(v)))
+                for elem in raster_obj.tile_grid:
+                    print(elem)
+                tile_arr_out = regressor.predict(tile_arr,
+                                                 output_type=output_type,
+                                                 **defaults)
             else:
-                out_arr = np.zeros([_rows * _cols]) + kwargs_predict['out_nodatavalue']
+                tile_arr_out = np.zeros([tile_rows * tile_cols]) + defaults['out_nodatavalue']
 
-            if out_arr.dtype != out_ras_arr.dtype:
-                out_arr = out_arr.astype(out_ras_arr.dtype)
+            if tile_arr_out.dtype != out_ras_arr.dtype:
+                tile_arr_out = tile_arr_out.astype(out_ras_arr.dtype)
 
-            if kwargs_predict['mask_band'] is not None:
-                out_arr_ = out_arr.reshape([_rows, _cols]) * tile_arr[kwargs_predict['mask_band'], :, :]
+            if defaults['mask_band'] is not None:
+                tile_arr_out_reshaped = tile_arr_out.reshape([tile_rows, tile_cols]) * \
+                                        tile_arr[defaults['mask_band'], :, :]
             else:
-                out_arr_ = out_arr.reshape([_rows, _cols])
+                tile_arr_out_reshaped = tile_arr_out.reshape([tile_rows, tile_cols])
 
-            out_ras_arr[_y: (_y + _rows), _x: (_x + _cols)] = out_arr_
+            out_ras_arr[tiept_y: (tiept_y + tile_rows), tiept_x: (tiept_x + tile_cols)] = tile_arr_out_reshaped
 
             count += 1
 
-        if verbose:
+        if defaults['verbose']:
             Opt.cprint("\nInternal tile processing completed\n")
 
         out_ras = Raster(outfile)
-        out_ras.dtype = kwargs_predict['out_data_type']
+        out_ras.dtype = defaults['out_data_type']
         out_ras.transform = raster_obj.transform
         out_ras.crs_string = raster_obj.crs_string
 
         out_ras.array = out_ras_arr
         out_ras.shape = [1, nrows, ncols]
         out_ras.bnames = [band_name]
-        out_ras.nodatavalue = kwargs_predict['out_nodatavalue']
+        out_ras.nodatavalue = defaults['out_nodatavalue']
 
         # return raster object
         return out_ras
@@ -1082,7 +1083,7 @@ class RFRegressor(_Regressor):
                         ntile_max: Maximum number of tiles up to which the
                                    input image or array is processed without tiling (default = 5).
                                    You can choose any (small) number that suits the available memory.
-                        tile_size: Number of pixels in each tile (default = 1024)
+                        tile_size: Number of pixels in each tile (default = 102400)
                         gain: Adjustment of the predicted output by linear adjustment of gain (slope)
                         bias: Adjustment of the predicted output by linear adjustment of bias (intercept)
                         upper_limit: Limit of maximum value of prediction
@@ -1101,23 +1102,17 @@ class RFRegressor(_Regressor):
         if not type(arr) == np.ndarray:
             arr = np.array(arr)
 
-        uncert_dict = None
-        tile_size = 1024
-        n_tile_max = 5
+        defaults = Opt.__copy__(__defaults__)
+        defaults.update(kwargs)
 
-        if kwargs is not None:
-            for key, value in kwargs.items():
-                if key in ('gain', 'bias', 'upper_limit', 'lower_limit'):
+        uncert_dict = defaults['uncert_dict']
+        tile_size = defaults['tile_size']
+        n_tile_max = defaults['n_tile_max']
+
+        for key, value in defaults.items():
+            if key in ('gain', 'bias', 'upper_limit', 'lower_limit'):
+                if defaults[key] is not None:
                     self.adjustment[key] = value
-
-            if 'uncert_dict' in kwargs:
-                uncert_dict = kwargs['uncert_dict']
-
-            if 'tile_size' in kwargs:
-                tile_size = kwargs['tile_size']
-
-            if 'n_tile_max' in kwargs:
-                n_tile_max = kwargs['n_tile_max']
 
         # define output array
         if output_type == 'full':
