@@ -9,9 +9,9 @@ if __name__ == '__main__':
     script, infile, outdir, picklefile, band_name = sys.argv
     '''
     # ------------------------------------------------------------------------------------------
-    infile = "C:/temp/decid_tc_2000_layerstack-0000026880-0000161280.tif"
-    outdir = "C:/temp/"
-    picklefile = "d:/shared/Dropbox/projects/NAU/landsat_deciduous/data/albedo_data/" + \
+    infile = "D:/temp/decid_tc_layerstack_2015_test250.tif"
+    outdir = "D:/temp/"
+    picklefile = "D:/shared/Dropbox/projects/NAU/landsat_deciduous/data/albedo_data/" + \
                  "RFalbedo_deciduous_fraction_treecover_50000_cutoff_5_deg1_20191115T174618_spring.pickle"
     band_name = 'spr_albedo'
     # ------------------------------------------------------------------------------------------
@@ -31,8 +31,9 @@ if __name__ == '__main__':
 
     raster = Raster(infile)
     raster.initialize()
+    Opt.cprint(raster.bnames)
     raster.bnames = ['decid', 'decidu', 'treecover', 'treecoveru', 'land']
-
+    Opt.cprint(raster.bnames)
     raster.get_stats(True)
 
     Opt.cprint(raster.shape)
@@ -43,10 +44,10 @@ if __name__ == '__main__':
 
     out_raster = RFRegressor.regress_raster(regressor,
                                             raster,
-                                            output_type='median',
-                                            mask_band='land',
                                             outfile=outfile,
                                             band_name=band_name,
+                                            output_type='median',
+                                            mask_band='land',
                                             array_multiplier=0.01,
                                             internal_tile_size=512000,
                                             nodatavalue=0,
