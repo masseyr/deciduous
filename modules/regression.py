@@ -132,7 +132,7 @@ class _Regressor(object):
                         array_multiplier: rescale all band arrays using this value
                         array_additive: add this value to all band arrays
                         out_data_type: output raster data type (GDAL data type)
-                        nodatavalue: No data value for output raster
+                        nodatavalue: No data value for input raster
                         out_nodatavalue: Value to replace the input no-data value in output
                         tile_size: Number of pixels in each raster tile
                         band_additives: Values to add to each band array
