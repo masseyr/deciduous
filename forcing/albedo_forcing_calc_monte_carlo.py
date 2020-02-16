@@ -16,7 +16,7 @@ if __name__ == '__main__':
     band_name = 'spr_albedo'
     # ------------------------------------------------------------------------------------------
 
-    outfile = outdir + Handler(infile).basename
+    outfile = Handler(infile).add_to_filename('_{}'.format(band_name))
     Handler(outfile).file_remove_check()
 
     # infile contains five bands: 1) decid
@@ -41,19 +41,23 @@ if __name__ == '__main__':
     regressor = RFRegressor.load_from_pickle(picklefile)
 
     Opt.cprint(regressor)
-
+    Opt.cprint(dir(regressor))
+    Opt.cprint(regressor.data)
+    exit()
     out_raster = RFRegressor.regress_raster(regressor,
                                             raster,
                                             outfile=outfile,
                                             band_name=band_name,
                                             output_type='median',
                                             mask_band='land',
+                                            tile_size=min(raster.shape[1], raster.shape[2]),
                                             array_multiplier=0.01,
-                                            internal_tile_size=512000,
                                             nodatavalue=0,
                                             verbose=True)
 
     Opt.cprint(out_raster)
+
+    exit()
 
     out_raster.write_to_file(compress='lzw', bigtiff='yes')
 
