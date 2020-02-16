@@ -41,9 +41,19 @@ if __name__ == '__main__':
     regressor = RFRegressor.load_from_pickle(picklefile)
 
     Opt.cprint(regressor)
-    Opt.cprint(dir(regressor))
-    Opt.cprint(regressor.data)
-    exit()
+
+    data = regressor.data
+
+    labels = data['labels']
+    features = data['features']
+    label_name = data['label_name']
+    feature_names = data['feature_names']
+
+    print(labels.shape)
+    print(features.shape)
+
+    exit(0)
+
     out_raster = RFRegressor.regress_raster(regressor,
                                             raster,
                                             outfile=outfile,
