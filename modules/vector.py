@@ -684,13 +684,14 @@ class Vector(object):
                   dest_spatial_ref_str=None,
                   dest_spatial_ref_str_type=None,
                   destination_spatial_ref=None,
-                  _return=False):
+                  return_vector=False):
         """
         Transfrom a geometry using OSR library (which is based on PROJ4)
         :param dest_spatial_ref_str: Destination spatial reference string
         :param dest_spatial_ref_str_type: Destination spatial reference string type
         :param destination_spatial_ref: OSR spatial reference object for destination feature
         :param epsg: Destination EPSG SRID code
+        :param return_vector: If a vector object should be returned (default: False)
         :return: Reprojected vector object
         """
 
@@ -779,7 +780,7 @@ class Vector(object):
             vector.features.append(temp_feature)
             vector.epsg = epsg
 
-        if _return:
+        if return_vector:
             return vector
         else:
             self.layer = vector.layer
