@@ -1022,7 +1022,7 @@ class Raster(object):
              cutline_blend=0,
              outfile=None,
              return_vrt=False,
-             return_vrt_opts=False,
+             return_vrt_dict=False,
              **creation_options):
         """
         Method to clip a raster to a given geometry/vector
@@ -1031,7 +1031,7 @@ class Raster(object):
         :param cutline_blend: blend distance in pixels
         :param outfile: Output filename
         :param return_vrt: If a VRT object should be returned instead of raster
-        :param return_vrt_opts: if a VRT options dictionary should be returned instead
+        :param return_vrt_dict: if a VRT options dictionary should be returned instead
         :param creation_options: Other creation options to input
         :return: Raster object
 
@@ -1065,8 +1065,8 @@ class Raster(object):
 
         vrt_opt = gdal.WarpOptions(**vrt_dict)
 
-        if return_vrt_opts:
-            return vrt_opt
+        if return_vrt_dict:
+            return vrt_dict
         else:
             if outfile is None:
                 outfile = Handler(self.name).add_to_filename('_clipped')
@@ -1164,13 +1164,13 @@ class Raster(object):
         vrt_dict['dstSRS'] = sp.ExportToWkt()
 
         vrt_dict['outputType'] = out_datatype
-
+        vrt_dict['copyMetadata'] = True
         vrt_dict['format'] = out_format
 
         if cutline_file is not None:
             clip_opts = self.clip(cutline_file,
                                   cutline_blend,
-                                  return_vrt_opts=True)
+                                  return_vrt_dict=True)
 
             vrt_dict.update(clip_opts)
 
