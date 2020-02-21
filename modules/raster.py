@@ -1048,11 +1048,6 @@ class Raster(object):
 
         cutline_ds = cutline_layer = None
 
-        creation_options_list = []
-        if len(creation_options) > 0:
-            for key, value in creation_options.items():
-                creation_options_list.append('{}={}'.format(key.upper(),
-                                                            value.upper()))
         vrt_dict = dict()
 
         vrt_dict['cutlineDSName'] = cutline
@@ -1060,7 +1055,13 @@ class Raster(object):
         vrt_dict['cutlineBlend'] = cutline_blend
         vrt_dict['cropToCutline'] = True
         vrt_dict['copyMetadata'] = True
-        vrt_dict['creationOptions'] = creation_options_list
+
+        creation_options_list = []
+        if len(creation_options) > 0:
+            for key, value in creation_options.items():
+                creation_options_list.append('{}={}'.format(key.upper(),
+                                                            value.upper()))
+            vrt_dict['creationOptions'] = creation_options_list
 
         vrt_opt = gdal.WarpOptions(**vrt_dict)
 
@@ -1117,47 +1118,8 @@ class Raster(object):
                                 (example for geotiff: 'compress=lzw' , 'bigtiff=yes' )
         :return: VRT object or None (if output file is also specified)
 
-        For the sake of completeness here are all the valid warp options in kwargs
-        (from https://gdal.org/python/osgeo.gdal-module.html#WarpOptions):
-
-          options --- can be be an array of strings, a string or let empty and filled from other keywords.
-          format --- output format ("GTiff", etc...)
-          outputBounds --- output bounds as (minX, minY, maxX, maxY) in target SRS
-          outputBoundsSRS --- SRS in which output bounds are expressed, in the case they are not expressed in dstSRS
-          xRes, yRes --- output resolution in target SRS
-          targetAlignedPixels --- whether to force output bounds to be multiple of output resolution
-          width --- width of the output raster in pixel
-          height --- height of the output raster in pixel
-          srcSRS --- source SRS
-          dstSRS --- output SRS
-          srcAlpha --- whether to force the last band of the input dataset to be considered as an alpha band
-          dstAlpha --- whether to force the creation of an output alpha band
-          outputType --- output type (gdal.GDT_Byte, etc...)
-          workingType --- working type (gdal.GDT_Byte, etc...)
-          warpOptions --- list of warping options
-          errorThreshold --- error threshold for approximation transformer (in pixels)
-          warpMemoryLimit --- size of working buffer in bytes
-          resampleAlg --- resampling mode
-          creationOptions --- list of creation options
-          srcNodata --- source nodata value(s)
-          dstNodata --- output nodata value(s)
-          multithread --- whether to multithread computation and I/O operations
-          tps --- whether to use Thin Plate Spline GCP transformer
-          rpc --- whether to use RPC transformer
-          geoloc --- whether to use GeoLocation array transformer
-          polynomialOrder --- order of polynomial GCP interpolation
-          transformerOptions --- list of transformer options
-          cutlineDSName --- cutline dataset name
-          cutlineLayer --- cutline layer name
-          cutlineWhere --- cutline WHERE clause
-          cutlineSQL --- cutline SQL statement
-          cutlineBlend --- cutline blend distance in pixels
-          cropToCutline --- whether to use cutline extent for output bounds
-          copyMetadata --- whether to copy source metadata
-          metadataConflictValue --- metadata data conflict value
-          setColorInterpretation --- whether to force color interpretation of input bands to output bands
-          callback --- callback method
-          callback_data --- user data for callback
+        All the other valid warp options can be found at
+        https://gdal.org/python/osgeo.gdal-module.html#WarpOptions
         """
 
         vrt_dict = dict()
@@ -1205,7 +1167,12 @@ class Raster(object):
 
         vrt_dict['format'] = out_format
 
+        if cutline is not None:
+            clip_opts = self.clip(cutline,
+                                  cutline_blend,
+                                  return_vrt_opts=True)
 
+            vrt_dict.update(clip_opts)
 
         creation_options_list = []
         if len(creation_options) > 0:
@@ -1213,7 +1180,7 @@ class Raster(object):
                 creation_options_list.append('{}={}'.format(key.upper(),
                                              value.upper()))
 
-        vrt_dict['creationOptions'] = creation_options_list
+            vrt_dict['creationOptions'] = creation_options_list
 
         vrt_opt = gdal.WarpOptions(**vrt_dict)
 
