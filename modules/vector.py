@@ -256,20 +256,19 @@ class Vector(object):
                       in_memory=True)
 
     @staticmethod
-    def ogr_data_type(x,
+    def ogr_data_type(data_input,
                       _return='code'):
         """
         Method to get OGR data type, for use in creating OGR geometry fields
-        :param x: Any data input
+        :param data_input: Any data input
         :param _return: Type of response to return ('code' or 'name')
         :return: OGR data type
         """
-        val = type(x).__name__.lower()
         try:
             if _return == 'code':
-                return OGR_FIELD_DEF[val]
+                return OGR_FIELD_DEF[type(data_input).__name__.lower()]
             elif _return == 'name':
-                return val
+                return type(data_input).__name__.lower()
             else:
                 raise ValueError('Unknown response type asked')
         except (KeyError, NameError):
@@ -281,23 +280,22 @@ class Vector(object):
                 raise ValueError('Unknown response type asked')
 
     @staticmethod
-    def ogr_geom_type(x):
+    def ogr_geom_type(data_input):
         """
         Method to return OGR geometry type from input string
-        :param x: String to convert to OGR geometry type code
+        :param data_input: String to convert to OGR geometry type code
         :return: OGR geometry type code
         """
 
-        if type(x).__name__ == 'str':
-            comp_str = x.lower()
+        if type(data_input).__name__ == 'str':
             try:
-                return OGR_TYPE_DEF[comp_str]
+                return OGR_TYPE_DEF[data_input.lower()]
             except (KeyError, NameError):
                 return None
 
-        elif type(x).__name__ == 'int' or type(x).__name__ == 'float':
+        elif type(data_input).__name__ == 'int' or type(data_input).__name__ == 'float':
             try:
-                return OGR_GEOM_DEF[int(x)].upper()
+                return OGR_GEOM_DEF[int(data_input)].upper()
             except (KeyError, NameError):
                 return None
 
@@ -305,29 +303,29 @@ class Vector(object):
             raise(ValueError('Invalid format'))
 
     @staticmethod
-    def string_to_ogr_type(x,
+    def string_to_ogr_type(inp_str,
                            _return='code'):
         """
         Method to return name of the data type
-        :param x: input item
+        :param inp_str: input item
         :param _return: Type of response to return ('code' or 'name')
         :return: string
         """
-        if type(x).__name__ != 'str':
-            return Vector.ogr_data_type(x, _return)
+        if type(inp_str).__name__ != 'str':
+            return Vector.ogr_data_type(inp_str, _return)
         else:
             try:
-                val = int(x)
+                converted_inp = int(inp_str)
             except ValueError:
                 try:
-                    val = float(x)
+                    converted_inp = float(inp_str)
                 except ValueError:
                     try:
-                        val = str(x)
+                        converted_inp = str(inp_str)
                     except:
-                        val = None
+                        converted_inp = None
 
-            return Vector.ogr_data_type(val, _return)
+            return Vector.ogr_data_type(converted_inp, _return)
 
     @staticmethod
     def wkt_from_coords(coords,
