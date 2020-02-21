@@ -440,8 +440,8 @@ class Vector(object):
         feat.SetGeometry(geom)
 
         if attr is not None:
-            for k, v in attr.items():
-                feat.SetField(k, v)
+            for attr_name, attr_val in attr.items():
+                feat.SetField(attr_name, attr_val)
             if primary_key is not None:
                 if primary_key not in attr:
                     feat.SetField(primary_key, self.nfeat)
