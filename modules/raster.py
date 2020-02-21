@@ -1036,7 +1036,7 @@ class Raster(object):
         :return: Raster object
 
         valid warp options can be found at:
-        (from https://gdal.org/python/osgeo.gdal-module.html#WarpOptions):
+        https://gdal.org/python/osgeo.gdal-module.html#WarpOptions:
         """
         cutline_ds = ogr.Open(cutline_file)
         layer_count = cutline_ds.GetLayerCount()
