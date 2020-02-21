@@ -2,6 +2,7 @@ from osgeo import ogr, osr, gdal
 import math
 import sys
 import os
+import warnings
 from common import Handler, Sublist, Opt
 from gdaldefs import *
 
@@ -15,7 +16,7 @@ class Vector(object):
 
     def __init__(self,
                  filename=None,
-                 name='Empty',
+                 name=None,
                  spref=None,
                  spref_str=None,
                  epsg=None,
@@ -88,8 +89,15 @@ class Vector(object):
             self.spref_str = self.spref.ExportToWkt()
 
             # other layer metadata
-            self.type = self.layer.GetGeomType()
-            self.name = self.layer.GetName()
+            if geom_type is None:
+                self.type = self.layer.GetGeomType()
+            elif geom_type != self.layer.GetGeomType():
+                self.type = self.layer.GetGeomType()
+            else:
+                self.type = geom_type
+
+            if self.name is None:
+                self.name = self.layer.GetName()
 
             # number of features
             self.nfeat = self.layer.GetFeatureCount()
@@ -161,25 +169,47 @@ class Vector(object):
                                                                                    str(len(self.fields))))
         else:
             if in_memory:
+
                 out_driver = ogr.GetDriverByName('Memory')
                 out_datasource = out_driver.CreateDataSource('mem_source')
                 self.datasource = out_datasource
 
-                if self.spref_str is not None:
-                    self.spref = osr.SpatialReference()
-                    res = self.spref.ImportFromWkt(spref_str)
-                elif self.epsg is not None:
-                    self.spref = osr.SpatialReference()
-                    res = self.spref.ImportFromEPSG(self.epsg)
-                    self.spref_str = self.spref.ExportToWkt()
-                elif self.proj4 is not None:
-                    self.spref = osr.SpatialReference()
-                    res = self.spref.ImportFromEPSG(self.proj4)
-                    self.spref_str = self.spref.ExportToWkt()
-                else:
-                    raise ValueError("No spatial reference provided")
+                self.name = name if name is not None else 'empty'
 
-                self.layer = self.datasource.CreateLayer('mem_layer',
+                if geom_type is None:
+                    warnings.warn("\nGeometry type not specified, using Point geometry type" +
+                                  "\n{}".format(' '.join('{}={}'.format(geom_name, code) for
+                                                         code, geom_name in OGR_GEOM_DEF.items())),
+                                  UserWarning,
+                                  stacklevel=2)
+
+                    self.type = OGR_TYPE_DEF['point']
+                else:
+                    self.type = geom_type
+
+                if spref is None:
+                    if self.spref_str is not None:
+                        self.spref = osr.SpatialReference()
+                        res = self.spref.ImportFromWkt(spref_str)
+                    elif self.epsg is not None:
+                        self.spref = osr.SpatialReference()
+                        res = self.spref.ImportFromEPSG(self.epsg)
+                        self.spref_str = self.spref.ExportToWkt()
+                    elif self.proj4 is not None:
+                        self.spref = osr.SpatialReference()
+                        res = self.spref.ImportFromEPSG(self.proj4)
+                        self.spref_str = self.spref.ExportToWkt()
+                    else:
+                        warnings.warn("\nNo spatial reference provided, using geographic\nEPSG=4326",
+                                      UserWarning,
+                                      stacklevel=2)
+                        self.epsg = 4326
+                        self.spref = osr.SpatialReference()
+                        self.spref.ImportFromEPSG(self.epsg)
+                else:
+                    self.spref = spref
+
+                self.layer = self.datasource.CreateLayer(self.name,
                                                          srs=self.spref,
                                                          geom_type=self.type)
 
@@ -204,10 +234,26 @@ class Vector(object):
                 sys.stdout.write("\nInitialized empty Vector\n")
 
     def __repr__(self):
+        """
+        Method to return a string output with some objectproperties highlighted
+        :return: String
+        """
         return "<Vector {} of type {} ".format(self.name,
                                                str(self.type)) + \
                "with {} feature(s) and {} attribute(s)>".format(str(self.nfeat),
                                                                 str(len(self.fields)))
+
+    def copy_empty(self):
+        """
+        Method to initialize an empty Vector object with attribute labels,
+        fields, geom type, etc derived from the current Vector object
+        :return: Vector object
+        """
+        return Vector(name=self.name + '_copy',
+                      spref=self.spref,
+                      geom_type=self.type,
+                      attr_def=self.attr_def,
+                      in_memory=True)
 
     @staticmethod
     def ogr_data_type(x,
