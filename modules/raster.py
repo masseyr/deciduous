@@ -1,5 +1,6 @@
 import numpy as np
 from common import *
+import warnings
 from osgeo import gdal, gdal_array, ogr, osr, gdalconst
 np.set_printoptions(suppress=True)
 
@@ -724,7 +725,8 @@ class Raster(object):
                        tile_xsize=1024,
                        tile_ysize=1024,
                        bound_coords=None,
-                       coords_type='pixel'):
+                       coords_type='pixel',
+                       tile_buffer=None):
         """
         Returns the coordinates of the blocks to be extracted
         :param tile_xsize: Number of columns in the tile block
@@ -732,10 +734,18 @@ class Raster(object):
         :param bound_coords: (xmin, xmax, ymin, ymax)
         :param coords_type: type of coordinates specified in bound_coords: 'pixel' for pixel coordinates,
                                                                            'crs' for image reference system coordinates
+        :param tile_buffer: Buffer outside the tile boundary in image projection units
         :return: list of lists
         """
         if not self.init:
             self.initialize()
+
+        # convert to the number of pixels in the buffer region
+        if buffer is not None:
+            buf_size_x = np.ceil(float(tile_buffer)/abs(float(self.transform[1])))
+            buf_size_y = np.ceil(float(tile_buffer)/abs(float(self.transform[5])))
+        else:
+            buf_size_x = buf_size_y = None
 
         xmin, xmax, ymin, ymax = self.get_pixel_bounds(bound_coords,
                                                        coords_type)
@@ -1007,6 +1017,67 @@ class Raster(object):
 
             self.stats[self.bnames[ib]] = band_stats
 
+    def clip(self,
+             cutline=None,
+             cutline_blend=0,
+             outfile=None,
+             return_vrt=False,
+             return_vrt_opts=False,
+             **creation_options):
+        """
+        Method to clip a raster to a given geometry/vector
+        This method only supports clipping to the first layer in the datasource
+        :param cutline: Shapefile, etc. to clip raster
+        :param cutline_blend: blend distance in pixels
+        :param outfile: Output filename
+        :param return_vrt: If a VRT object should be returned instead of raster
+        :param return_vrt_opts: if a VRT options dictionary should be returned instead
+        :param creation_options: Other creation options to input
+        :return: Raster object
+
+        valid warp options can be found at:
+        (from https://gdal.org/python/osgeo.gdal-module.html#WarpOptions):
+        """
+        cutline_ds = ogr.Open(cutline)
+        layer_count = cutline_ds.GetLayerCount()
+        cutline_layer = cutline_ds.GetLayer(0)
+        cutline_layer_name = cutline_layer.GetDescription()
+
+        if layer_count > 1:
+            warnings.warn('Using top layer {} as cutline, ignoring others'.format(cutline_layer_name))
+
+        cutline_ds = cutline_layer = None
+
+        creation_options_list = []
+        if len(creation_options) > 0:
+            for key, value in creation_options.items():
+                creation_options_list.append('{}={}'.format(key.upper(),
+                                                            value.upper()))
+        vrt_dict = dict()
+
+        vrt_dict['cutlineDSName'] = cutline
+        vrt_dict['cutlineLayer'] = cutline_layer_name
+        vrt_dict['cutlineBlend'] = cutline_blend
+        vrt_dict['cropToCutline'] = True
+        vrt_dict['copyMetadata'] = True
+        vrt_dict['creationOptions'] = creation_options_list
+
+        vrt_opt = gdal.WarpOptions(**vrt_dict)
+
+        if return_vrt_opts:
+            return vrt_opt
+        else:
+            if outfile is None:
+                outfile = Handler(self.name).add_to_filename('_clipped')
+
+            vrt_ds = gdal.Warp(outfile, self.name, options=vrt_opt)
+
+            if return_vrt:
+                return vrt_ds
+            else:
+                vrt_ds = None
+                return Raster(outfile)
+
     def reproject(self,
                   outfile=None,
                   out_epsg=None,
@@ -1020,6 +1091,8 @@ class Raster(object):
                   out_format='GTiff',
                   out_nodatavalue=None,
                   verbose=False,
+                  cutline=None,
+                  cutline_blend=0,
                   return_vrt=False,
                   **creation_options):
         """
@@ -1037,6 +1110,8 @@ class Raster(object):
         :param output_bounds: output bounds as (minX, minY, maxX, maxY) in target SRS
         :param out_format: output format ("GTiff", etc...)
         :param verbose: If the steps should be displayed
+        :param cutline: Shapefile, etc. to clip raster
+        :param cutline_blend: blend distance in pixels
         :param return_vrt: If VRT object should be returned instead of raster
         :param creation_options: Creation options to be used while writing the raster
                                 (example for geotiff: 'compress=lzw' , 'bigtiff=yes' )
@@ -1129,6 +1204,8 @@ class Raster(object):
         vrt_dict['outputType'] = out_datatype
 
         vrt_dict['format'] = out_format
+
+
 
         creation_options_list = []
         if len(creation_options) > 0:
