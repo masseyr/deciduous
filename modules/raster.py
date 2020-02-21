@@ -1018,7 +1018,7 @@ class Raster(object):
             self.stats[self.bnames[ib]] = band_stats
 
     def clip(self,
-             cutline=None,
+             cutline_file=None,
              cutline_blend=0,
              outfile=None,
              return_vrt=False,
@@ -1027,7 +1027,7 @@ class Raster(object):
         """
         Method to clip a raster to a given geometry/vector
         This method only supports clipping to the first layer in the datasource
-        :param cutline: Shapefile, etc. to clip raster
+        :param cutline_file: Shapefile, etc. to clip raster
         :param cutline_blend: blend distance in pixels
         :param outfile: Output filename
         :param return_vrt: If a VRT object should be returned instead of raster
@@ -1038,7 +1038,7 @@ class Raster(object):
         valid warp options can be found at:
         (from https://gdal.org/python/osgeo.gdal-module.html#WarpOptions):
         """
-        cutline_ds = ogr.Open(cutline)
+        cutline_ds = ogr.Open(cutline_file)
         layer_count = cutline_ds.GetLayerCount()
         cutline_layer = cutline_ds.GetLayer(0)
         cutline_layer_name = cutline_layer.GetDescription()
@@ -1050,7 +1050,7 @@ class Raster(object):
 
         vrt_dict = dict()
 
-        vrt_dict['cutlineDSName'] = cutline
+        vrt_dict['cutlineDSName'] = cutline_file
         vrt_dict['cutlineLayer'] = cutline_layer_name
         vrt_dict['cutlineBlend'] = cutline_blend
         vrt_dict['cropToCutline'] = True
@@ -1092,7 +1092,7 @@ class Raster(object):
                   out_format='GTiff',
                   out_nodatavalue=None,
                   verbose=False,
-                  cutline=None,
+                  cutline_file=None,
                   cutline_blend=0,
                   return_vrt=False,
                   **creation_options):
@@ -1111,7 +1111,7 @@ class Raster(object):
         :param output_bounds: output bounds as (minX, minY, maxX, maxY) in target SRS
         :param out_format: output format ("GTiff", etc...)
         :param verbose: If the steps should be displayed
-        :param cutline: Shapefile, etc. to clip raster
+        :param cutline_file: Shapefile, etc. to clip raster
         :param cutline_blend: blend distance in pixels
         :param return_vrt: If VRT object should be returned instead of raster
         :param creation_options: Creation options to be used while writing the raster
@@ -1167,8 +1167,8 @@ class Raster(object):
 
         vrt_dict['format'] = out_format
 
-        if cutline is not None:
-            clip_opts = self.clip(cutline,
+        if cutline_file is not None:
+            clip_opts = self.clip(cutline_file,
                                   cutline_blend,
                                   return_vrt_opts=True)
 
