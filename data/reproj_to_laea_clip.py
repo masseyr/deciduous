@@ -1,9 +1,12 @@
-from modules import *
-from sys import argv
-
 if __name__ == '__main__':
+    import sys
+    import os
 
-    script, filename, cutfile, outfolder = argv
+    module_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    sys.path.append(module_path)
+    from modules import *
+
+    script, filename, cutfile, outfolder = sys.argv
 
     # epsg = 3571
     out_proj4 = '+proj=laea +lat_0=90 +lon_0=180 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs '
