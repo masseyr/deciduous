@@ -27,7 +27,7 @@ if __name__ == '__main__':
                   out_nodatavalue=0.0,
                   bigtiff='yes',
                   compress='lzw')
-    '''
+
     temp_ras = Raster(tempfile)
     temp_ras.clip(cutline_file=cutfile,
                   outfile=outfile)
@@ -36,5 +36,5 @@ if __name__ == '__main__':
 
     Raster(outfile).add_overviews(bigtiff='yes',
                                   compress='lzw')
-    '''
+
 
