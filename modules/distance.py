@@ -1,6 +1,6 @@
 import numpy as np
 from scipy import stats, linalg
-from modules import Handler, Opt
+from common import Handler, Opt
 import warnings
 
 __all__ = ['Distance',
