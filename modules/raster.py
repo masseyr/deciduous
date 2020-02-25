@@ -785,13 +785,18 @@ class Raster(object):
                  bands=None,
                  block_coords=None,
                  finite_only=True,
+                 edge_buffer=0,
                  nan_replacement=None):
         """
         Method to get raster numpy array of a tile
         :param bands: bands to get in the array, index starts from one. (default: all)
         :param finite_only:  If only finite values should be returned
+        :param edge_buffer: Number of extra pixels to retrieve further out from the edges (default: 0)
         :param nan_replacement: replacement for NAN values
-        :param block_coords: coordinates of tile to retrieve in image coords (x, y, cols, rows)
+        :param block_coords: coordinates of tile to retrieve in image/array coords
+                             format is (upperleft_x, upperleft_y, tile_cols, tile_rows)
+                             upperleft_x and upperleft_y are array coordinates starting at 0,
+                             cols and rows are number of pixels to retrieve for the tile along x and y respectively
         :return: numpy array
         """
 
@@ -807,19 +812,51 @@ class Raster(object):
         if bands is None:
             bands = list(range(1, self.shape[0] + 1))
 
+        # tile shape param
+        upperleft_x, upperleft_y, tile_rows, tile_cols = block_coords
+
+        # raster shape param
+        ras_rows, ras_cols = self.shape[1], self.shape[2]
+
+        # accounting for number of pixels less than the required size (always >= 0)
+        if edge_buffer > 0:
+
+            # pixel deficit on left, top, right, and bottom edges respectively
+            pixel_deficit = [(edge_buffer - upperleft_x) if (upperleft_x < edge_buffer) else 0,
+
+                             (edge_buffer - upperleft_y) if (upperleft_y < edge_buffer) else 0,
+
+                             (ras_cols - upperleft_x - tile_cols + 1) if
+                             (ras_cols - upperleft_x - tile_cols + 1) < edge_buffer else 0,
+
+                             (ras_rows - upperleft_y - tile_rows + 1) if
+                             (ras_rows - upperleft_y - tile_rows + 1) < edge_buffer else 0]
+        else:
+            pixel_deficit = [0, 0, 0, 0]
+
+        # corners
+        new_upperleft_x = (upperleft_x - edge_buffer) + pixel_deficit[0]
+        new_upperleft_y = (upperleft_y - edge_buffer) + pixel_deficit[1]
+
+        # new block coordinates
+        new_block_coords = [new_upperleft_x,
+                            new_upperleft_y,
+                            tile_rows + (2 * edge_buffer - pixel_deficit[1] + pixel_deficit[3]),
+                            tile_cols + (2 * edge_buffer - pixel_deficit[0] + pixel_deficit[2])]
+
         if len(bands) == 1:
             temp_band = self.datasource.GetRasterBand(bands[0])
-            tile_arr = temp_band.ReadAsArray(*block_coords)
+            tile_arr = temp_band.ReadAsArray(*new_block_coords)
 
         else:
             tile_arr = np.zeros((len(bands),
-                                 block_coords[3],
-                                 block_coords[2]),
+                                 new_block_coords[3],
+                                 new_block_coords[2]),
                                 gdal_array.GDALTypeCodeToNumericTypeCode(self.dtype))
 
             for jj, band in enumerate(bands):
                 temp_band = self.datasource.GetRasterBand(band)
-                tile_arr[jj, :, :] = temp_band.ReadAsArray(*block_coords)
+                tile_arr[jj, :, :] = temp_band.ReadAsArray(*new_block_coords)
 
             if finite_only:
                 if np.isnan(tile_arr).any() or np.isinf(tile_arr).any():
@@ -834,6 +871,7 @@ class Raster(object):
                       bands=None,
                       get_array=True,
                       finite_only=True,
+                      edge_buffer=0,
                       nan_replacement=None):
 
         """
@@ -843,6 +881,7 @@ class Raster(object):
         :param bands: List of bands to extract (default: None, gets all bands; Index starts at 0)
         :param get_array: If raster array should be retrieved as well
         :param finite_only: If only finite values should be returned
+        :param edge_buffer: Number of extra pixels to retrieve further out from the edges (default: 0)
         :param nan_replacement: replacement for NAN values
         :return: Yields tuple: (tiepoint xy tuple, tile numpy array(2d array if only one band, else 3d array)
         """
@@ -864,41 +903,27 @@ class Raster(object):
         elif type(bands) in (int, float):
             bands = [int(bands)]
         elif type(bands) in (list, tuple):
-            bands = [int(ib + 1) for ib in bands]
+            if all(list(isinstance(elem, str) for elem in bands)):
+                bands = [self.bnames.index(elem) for elem in bands]
+            elif all(list(isinstance(elem, int) or isinstance(elem, float) for elem in bands)):
+                bands = [int(ib + 1) for ib in bands]
         else:
             raise ValueError('Unknown/unsupported data type for "bands" keyword')
 
-        ii = 0
-        while ii < self.ntiles:
+        tile_counter = 0
+        while tile_counter < self.ntiles:
             if get_array:
-
-                if len(bands) == 1:
-                    temp_band = self.datasource.GetRasterBand(bands[0])
-                    tile_arr = temp_band.ReadAsArray(*self.tile_grid[ii]['block_coords'])
-
-                else:
-                    tile_arr = np.zeros((len(bands),
-                                         self.tile_grid[ii]['block_coords'][3],
-                                         self.tile_grid[ii]['block_coords'][2]),
-                                        gdal_array.GDALTypeCodeToNumericTypeCode(self.dtype))
-
-                    for jj, band in enumerate(bands):
-                        temp_band = self.datasource.GetRasterBand(band)
-                        tile_arr[jj, :, :] = temp_band.ReadAsArray(*self.tile_grid[ii]['block_coords'])
-
-                if finite_only:
-                    if np.isnan(tile_arr).any() or np.isinf(tile_arr).any():
-                        Opt.cprint('Non-finite values present in tile')
-
-                        tile_arr[np.where(np.isnan(tile_arr))] = nan_replacement
-                        tile_arr[np.where(np.isinf(tile_arr))] = nan_replacement
-
+                tile_arr = self.get_tile(bands=bands,
+                                         block_coords=self.tile_grid[tile_counter]['block_coords'],
+                                         finite_only=finite_only,
+                                         edge_buffer=edge_buffer,
+                                         nan_replacement=nan_replacement)
             else:
                 tile_arr = None
 
-            yield self.tile_grid[ii]['tie_point'], tile_arr
+            yield self.tile_grid[tile_counter]['tie_point'], tile_arr
 
-            ii += 1
+            tile_counter += 1
 
     def extract_geom(self,
                      wkt_strings,
@@ -946,13 +971,15 @@ class Raster(object):
         if geom_id is None:
             geom_id = range(1, len(wkt_strings) + 1)
 
-        for ii, wkt_string in enumerate(wkt_strings):
+        for wkt_str_counter, wkt_string in enumerate(wkt_strings):
             if 'MULTI' in wkt_string:
                 multi_geom = ogr.CreateGeometryFromWkt(wkt_strings)
-                id_geom_list += list(('{}_{}'.format(geom_id[ii], str(jj+1)), multi_geom.GetGeometryRef(jj))
+                id_geom_list += list(('{}_{}'.format(geom_id[wkt_str_counter], str(jj+1)),
+                                      multi_geom.GetGeometryRef(jj))
                                      for jj in range(multi_geom.GetGeometryCount()))
             else:
-                id_geom_list.append(('{}_{}'.format(geom_id[ii], str(1)), ogr.CreateGeometryFromWkt(wkt_string)))
+                id_geom_list.append(('{}_{}'.format(geom_id[wkt_str_counter], str(1)),
+                                     ogr.CreateGeometryFromWkt(wkt_string)))
 
         self.make_tile_grid(*tile_size)
 
@@ -990,8 +1017,8 @@ class Raster(object):
                                                                        self.transform[5]),
                                                                       tile['tie_point']))
 
-                for ii, samp_id in enumerate(samp_ids):
-                    tile_samp_output[samp_id] = (id_geom_list[samp_id][0], samp_values[ii])
+                for id_counter, samp_id in enumerate(samp_ids):
+                    tile_samp_output[samp_id] = (id_geom_list[samp_id][0], samp_values[id_counter])
 
         return tile_samp_output
 
