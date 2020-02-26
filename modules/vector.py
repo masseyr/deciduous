@@ -60,7 +60,6 @@ OGR_GEOM_DEF = {
 }
 
 
-
 class Vector(object):
     """
     Class for vector objects
@@ -903,8 +902,6 @@ class Vector(object):
         temp_vector.spref = self.spref
         temp_vector.layer = temp_layer
         temp_vector.data_source = temp_datasource
-        temp_vector.wkt_list = list()
-        temp_vector.features = list()
 
         layr = self.layer
 
@@ -913,7 +910,7 @@ class Vector(object):
         nfields = feat_defn.GetFieldCount()
         field_defn_list = list(feat_defn.GetFieldDefn(i) for i in range(0, nfields))
 
-        # loop thru all the feature and all the multi-geometries in each feature
+        # loop thru all the features
         for feat in self.features:
 
             geom = feat.GetGeometryRef()
@@ -922,13 +919,12 @@ class Vector(object):
             new_feat = ogr.Feature(feat_defn)
             new_feat.SetGeometry(buffered_geom)
 
-            feat_attr = dict()
             for field in field_defn_list:
                 new_feat.SetField(field.GetName(), feat.GetField(field.GetName()))
 
             temp_vector.layer.CreateFeature(new_feat)
             temp_vector.features.append(new_feat)
-            temp_vector.wkt_list.append(buffered_geom.ExportToWkt())
+            temp_vector.wktlist.append(buffered_geom.ExportToWkt())
 
         if return_vector:
             return temp_vector
@@ -1032,6 +1028,24 @@ class Vector(object):
 
             return temp_vector
 
+    def merge(self):
+        pass
+
+    def union(self,
+              feature,
+              **kwargs):
+        pass
+
+    @staticmethod
+    def intersect(features,
+                  **kwargs):
+        pass
+
+    def clip(self,
+             feature,
+             **kwargs):
+        pass
+
     @classmethod
     def vector_from_string(cls,
                            geom_strings,
@@ -1043,8 +1057,7 @@ class Vector(object):
                            out_epsg=4326,
                            attributes=None,
                            attribute_types=None,
-                           verbose=False,
-                           full=True):
+                           verbose=False):
         """
         Make a vector object from a list of geometries in string (json, wkt, or wkb) format.
         :param geom_strings: Single or a list of geometries in WKT format
@@ -1059,6 +1072,7 @@ class Vector(object):
         :param attribute_types: Dictionary of feature attribute names with their OGR datatypes.
                                 This is the attribute definition dictionary.
                                 This dictionary must match the 'attributes'.
+        :param verbose: Display std output
         :return: Vector object
         """
 
@@ -1159,26 +1173,25 @@ class Vector(object):
         # layer definition with new fields
         temp_layer_definition = temp_layer.GetLayerDefn()
 
-        if full:
+        if verbose:
+            print('Adding geometries...\n')
+
+        for i, geom in enumerate(geoms):
             if verbose:
-                print('Adding geometries...\n')
+                print('geometry {} of {}'.format(str(i+1),
+                                                 str(len(geoms))))
 
-            for i, geom in enumerate(geoms):
-                if verbose:
-                    print('geometry {} of {}'.format(str(i+1),
-                                                     str(len(geoms))))
+            # create new feature using geometry
+            temp_feature = ogr.Feature(temp_layer_definition)
+            temp_feature.SetGeometry(geom)
 
-                # create new feature using geometry
-                temp_feature = ogr.Feature(temp_layer_definition)
-                temp_feature.SetGeometry(geom)
+            # copy attributes to each feature, the order is the order of features
+            for attrname, attrval in attributes[i].items():
+                temp_feature.SetField(attrname, attrval)
 
-                # copy attributes to each feature, the order is the order of features
-                for attrname, attrval in attributes[i].items():
-                    temp_feature.SetField(attrname, attrval)
-
-                # create feature in layer
-                temp_layer.CreateFeature(temp_feature)
-                vector.features.append(temp_feature)
+            # create feature in layer
+            temp_layer.CreateFeature(temp_feature)
+            vector.features.append(temp_feature)
 
         return vector
 
