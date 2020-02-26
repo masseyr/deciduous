@@ -513,9 +513,9 @@ class Vector(object):
 
         self.nfeat += 1
 
-    def merge(self,
-              vector,
-              remove=False):
+    def merge_vector(self,
+                     vector,
+                     remove=False):
 
         """
         Method to merge two alike vectors. This method only works for vectors
@@ -869,6 +869,76 @@ class Vector(object):
         else:
             geoms.Transform(transform_tool)
         return geoms
+
+    def buffer(self,
+               buffer_size=0,
+               outfile=None,
+               return_vector=False):
+
+        """
+        Method to buffer a shapefile
+        :param buffer_size: Distance in shapefile coordinates for the buffer
+        :param outfile: Name of the outputfile, if None, _buffer_{buf}.shp extension is used
+        :param return_vector: If this operation should  return a Vector object
+        :return: None
+        """
+
+        first_geom = self.features[0].GetGeometryRef()
+        out_type = first_geom.GetGeometryType()
+
+        # get driver to write to memory
+        memory_driver = ogr.GetDriverByName('Memory')
+        temp_datasource = memory_driver.CreateDataSource('out')
+        temp_layer = temp_datasource.CreateLayer('temp_layer',
+                                                 srs=self.spref,
+                                                 geom_type=out_type)
+
+        # initialize vector
+        temp_vector = Vector()
+
+        # update features and crs
+        temp_vector.nfeat = self.nfeat
+        temp_vector.type = out_type
+        temp_vector.crs = self.spref
+        temp_vector.spref = self.spref
+        temp_vector.layer = temp_layer
+        temp_vector.data_source = temp_datasource
+        temp_vector.wkt_list = list()
+        temp_vector.features = list()
+
+        layr = self.layer
+
+        # get field (attribute) information
+        feat_defn = layr.GetLayerDefn()
+        nfields = feat_defn.GetFieldCount()
+        field_defn_list = list(feat_defn.GetFieldDefn(i) for i in range(0, nfields))
+
+        # loop thru all the feature and all the multi-geometries in each feature
+        for feat in self.features:
+
+            geom = feat.GetGeometryRef()
+            buffered_geom = geom.Buffer(buffer_size)
+
+            new_feat = ogr.Feature(feat_defn)
+            new_feat.SetGeometry(buffered_geom)
+
+            feat_attr = dict()
+            for field in field_defn_list:
+                new_feat.SetField(field.GetName(), feat.GetField(field.GetName()))
+
+            temp_vector.layer.CreateFeature(new_feat)
+            temp_vector.features.append(new_feat)
+            temp_vector.wkt_list.append(buffered_geom.ExportToWkt())
+
+        if return_vector:
+            return temp_vector
+
+        else:
+            if outfile is None:
+                outfile = Handler(self.filename) \
+                    .add_to_filename('_buffer_{buf}'.format(buf=str(buffer_size).replace('.', '')))
+            temp_vector.write_vector(outfile)
+            return
 
     def split(self):
         """
@@ -1228,4 +1298,6 @@ class Vector(object):
                             ['ALL_TOUCHED=TRUE'])
 
         target_ds = None
+
+
 
