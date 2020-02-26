@@ -875,11 +875,11 @@ class Vector(object):
                return_vector=False):
 
         """
-        Method to buffer a shapefile
+        Method to buffer a geometries in a Vector object
         :param buffer_size: Distance in shapefile coordinates for the buffer
         :param outfile: Name of the outputfile, if None, _buffer_{buf}.shp extension is used
         :param return_vector: If this operation should  return a Vector object
-        :return: None
+        :return: Vector or None (writes file)
         """
 
         # get driver to write to memory
@@ -897,6 +897,7 @@ class Vector(object):
         temp_vector.type = self.type
         temp_vector.crs = self.spref
         temp_vector.spref = self.spref
+        temp_vector.attributes = self.attributes
         temp_vector.layer = temp_layer
         temp_vector.data_source = temp_datasource
 
