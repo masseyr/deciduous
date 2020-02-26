@@ -882,22 +882,19 @@ class Vector(object):
         :return: None
         """
 
-        first_geom = self.features[0].GetGeometryRef()
-        out_type = first_geom.GetGeometryType()
-
         # get driver to write to memory
         memory_driver = ogr.GetDriverByName('Memory')
         temp_datasource = memory_driver.CreateDataSource('out')
         temp_layer = temp_datasource.CreateLayer('temp_layer',
                                                  srs=self.spref,
-                                                 geom_type=out_type)
+                                                 geom_type=self.type)
 
         # initialize vector
         temp_vector = Vector()
 
         # update features and crs
         temp_vector.nfeat = self.nfeat
-        temp_vector.type = out_type
+        temp_vector.type = self.type
         temp_vector.crs = self.spref
         temp_vector.spref = self.spref
         temp_vector.layer = temp_layer
@@ -906,9 +903,9 @@ class Vector(object):
         layr = self.layer
 
         # get field (attribute) information
-        feat_defn = layr.GetLayerDefn()
-        nfields = feat_defn.GetFieldCount()
-        field_defn_list = list(feat_defn.GetFieldDefn(i) for i in range(0, nfields))
+        layr_defn = layr.GetLayerDefn()
+        nfields = layr_defn.GetFieldCount()
+        temp_vector.fields = list(layr_defn.GetFieldDefn(i) for i in range(0, nfields))
 
         # loop thru all the features
         for feat in self.features:
@@ -916,10 +913,10 @@ class Vector(object):
             geom = feat.GetGeometryRef()
             buffered_geom = geom.Buffer(buffer_size)
 
-            new_feat = ogr.Feature(feat_defn)
+            new_feat = ogr.Feature(layr_defn)
             new_feat.SetGeometry(buffered_geom)
 
-            for field in field_defn_list:
+            for field in temp_vector.fields:
                 new_feat.SetField(field.GetName(), feat.GetField(field.GetName()))
 
             temp_vector.layer.CreateFeature(new_feat)
@@ -933,6 +930,7 @@ class Vector(object):
             if outfile is None:
                 outfile = Handler(self.filename) \
                     .add_to_filename('_buffer_{buf}'.format(buf=str(buffer_size).replace('.', '')))
+
             temp_vector.write_vector(outfile)
             return
 
