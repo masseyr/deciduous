@@ -1633,6 +1633,37 @@ class MultiRaster:
         """
 
 
+class Terrain(Raster):
+    def __init__(self,
+                 name,
+                 array=None,
+                 bnames=None,
+                 metadict=None,
+                 dtype=None,
+                 shape=None,
+                 transform=None,
+                 crs_string=None):
+
+        super(Terrain, self).__init__(name,
+                                      array,
+                                      bnames,
+                                      metadict,
+                                      dtype,
+                                      shape,
+                                      transform,
+                                      crs_string)
+
+    def slope(self):
+        pass
+
+    def aspect(self):
+        pass
+
+    def concavity(self):
+        pass
+
+    def max_slope(self):
+        pass
 
 
 
