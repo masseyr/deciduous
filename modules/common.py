@@ -353,6 +353,110 @@ class Sublist(list):
                 out_list += list(list_dicts[jj] for jj in out_indices.tolist())
 
             return out_list
+    '''
+    @staticmethod
+    def moving_average(arr,
+                       n=3):
+        """
+        Method to smooth an array of numbers using moving array method
+        :param arr: Input array
+        :param n: Number of elements to consider for moving average (default: 3)
+        :return: smoothed array
+        """
+        if type(arr) in (list, tuple, dict, set):
+            arr_copy = np.array(list(Opt.__copy__(arr)))
+        elif type(arr) == np.ndarray:
+            arr_copy = arr.copy()
+        else:
+            raise ValueError("Input array type not understood")
+
+        if n < 1:
+            n = 1
+
+        ret = np.cumsum(arr_copy,
+                        dtype=np.float32)
+
+        ret[n:] = ret[n:] - ret[:-n]
+        tail = (n - 1) / 2 if (n % 2 == 1) else n / 2
+
+        if tail == 0:
+            out_arr = arr_copy
+        else:
+            out_arr = np.concatenate([np.array(arr_copy)[0:tail], ret[n - 1:] / n, np.array(arr_copy[-tail:])])
+
+        if type(arr) in (list, tuple, dict, set):
+            return out_arr.tolist()
+        else:
+            return out_arr
+    '''
+
+    @staticmethod
+    def calc_parabola_param(pt1, pt2, pt3):
+        """
+        define a parabola using three points
+        """
+        x1, y1 = pt1
+        x2, y2 = pt2
+        x3, y3 = pt3
+
+        _m_ = (x1 - x2) * (x1 - x3) * (x2 - x3)
+        a_param = (x3 * (y2 - y1) + x2 * (y1 - y3) + x1 * (y3 - y2)) / _m_
+        b_param = (x3 * x3 * (y1 - y2) + x2 * x2 * (y3 - y1) + x1 * x1 * (y2 - y3)) / _m_
+        c_param = (x2 * x3 * (x2 - x3) * y1 + x3 * x1 * (x3 - x1) * y2 + x1 * x2 * (x1 - x2) * y3) / _m_
+
+        return a_param, b_param, c_param
+
+    @staticmethod
+    def moving_average(arr,
+                       n=3,
+                       cascaded=False):
+        """
+        Method to smooth an array of numbers using moving array method
+        :param arr: Input array
+        :param n: Number of elements to consider for moving average. Must be an odd number (default: 3)
+        :param cascaded: If the smoothing should be cascaded from the specified moving average to the lowest(1)
+        :return: smoothed array
+        """
+        if type(arr) in (list, tuple, dict, set):
+            arr_copy = np.array(list(copy.deepcopy(arr)))
+        elif type(arr) == np.ndarray:
+            arr_copy = arr.copy()
+        else:
+            raise ValueError("Input array type not understood")
+
+        dtype = arr_copy.dtype
+
+        if n < 3:
+            raise ValueError('n cannot be less than 3')
+
+        if cascaded:
+            ker_list = list(ker_size for ker_size in reversed(range(n + 1)) if ker_size % 2 == 1)
+            if ker_list[-1] == 0:
+                ker_list = ker_list[:-1]
+        else:
+            if n % 2 == 0:
+                raise ValueError('n cannot be an even number')
+            ker_list = [n]
+
+        for ker_size in ker_list:
+            if ker_size > 1:
+                tail = (ker_size - 1) / 2
+
+                ret = np.cumsum(np.concatenate([arr_copy[0:tail],
+                                                arr_copy,
+                                                arr_copy[-tail:]]),
+                                dtype=np.float32)
+
+                ret[ker_size:] = ret[ker_size:] - ret[:-ker_size]
+
+                arr_copy = ret[ker_size - 1:] / ker_size
+
+        arr_copy = arr_copy.astype(dtype)
+
+        if type(arr) in (list, tuple, dict, set):
+            return arr_copy.tolist()
+        else:
+            return arr_copy
 
     def count_in_range(self,
                        llim,
