@@ -858,15 +858,21 @@ class RFRegressor(_Regressor):
 
         # List of index of bands to be used for regression
         if 'feature_index' in kwargs:
-            feature_index = kwargs['feature_index']
+            feature_index = np.array(kwargs['feature_index'])
         elif self.feature_index is not None:
-            feature_index = self.feature_index
+            feature_index = np.array(self.feature_index)
         else:
             feature_index = np.array(range(0, arr.shape[0]))
 
+        band_multipliers = np.repeat(1.0, feature_index.shape[0]) if 'band_multipliers' not in kwargs \
+            else kwargs['band_multipliers']
+
+        band_additives = np.repeat(0.0, feature_index.shape[0]) if 'band_additives' not in kwargs \
+            else kwargs['band_additives']
+
         feat_arr = arr[tile_start:tile_end, feature_index] * \
-            kwargs['band_multipliers'][feature_index] + \
-            kwargs['band_additives'][feature_index]
+            band_multipliers[feature_index] + \
+            band_additives[feature_index]
 
         if nodatavalue is not None:
             mask_arr = np.apply_along_axis(lambda x: 0
