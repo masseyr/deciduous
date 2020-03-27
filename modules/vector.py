@@ -1274,6 +1274,9 @@ class Vector(object):
         :param pixel_size: Pixel size (x, y) in output spatial ref units [default: (1,1)]
         :param out_dtype: Output data type: gdal.GDT_Byte or 1, etc.
         :param nodatavalue: No data Value
+        :param crs_string: Coordinate ref string for the output raster
+        :param crs_string_type: Type of CRS format. Valid: wkt, proj4, epsg (default:wkt)
+                                For epsg, enter the epsg number only
         :param extent: Extent in spatial ref units (x_min, x_max, y_min, y_max)
         :param bands: list of band numbers to burn values on, list starts from 1. default [1]
         :param attribute: vector attribute to use while burning the values on raster
