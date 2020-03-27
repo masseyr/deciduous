@@ -1252,7 +1252,7 @@ class Vector(object):
             return geom_list
 
     def rasterize(self,
-                  format='GTiff',
+                  out_format='GTiff',
                   outfile=None,
                   pixel_size=None,
                   out_dtype=gdal.GDT_Int16,
@@ -1267,6 +1267,7 @@ class Vector(object):
 
         """
         Method to rasterize a vector layer
+        :param out_format: Format of the output raster
         :param outfile: Output file name
         :param pixel_size: Pixel size (x, y) in spatial ref units [default: (1,1)]
         :param out_dtype: Output data type: gdal.GDT_Byte or 1, etc.
@@ -1310,11 +1311,11 @@ class Vector(object):
         rows = int(math.ceil((y_max - y_min) / pixel_size[0]))
 
         target_ds_srs = self.spref
-        target_ds = gdal.GetDriverByName(format).Create(outfile,
-                                                        cols,
-                                                        rows,
-                                                        len(bands),
-                                                        out_dtype)
+        target_ds = gdal.GetDriverByName(out_format).Create(outfile,
+                                                            cols,
+                                                            rows,
+                                                            len(bands),
+                                                            out_dtype)
 
         target_ds.SetGeoTransform((x_min,
                                   pixel_size[0],
