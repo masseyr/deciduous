@@ -1298,15 +1298,11 @@ class Vector(object):
         if outfile is None:
             raise ValueError('Output file name must be supplied')
 
-        if attribute is not None:
-            creation_options.update({'attribute': attribute})
-
         if extent is None:
             x_min, x_max, y_min, y_max = self.layer.GetExtent()
         else:
             x_min, x_max, y_min, y_max = extent
 
-        creation_options.update({'all_touched': all_touched})
         creation_list = ['{}={}'.format(str(k).upper(), str(v).upper())
                          for k, v in creation_options.items()]
 
@@ -1318,7 +1314,8 @@ class Vector(object):
                                                             cols,
                                                             rows,
                                                             len(bands),
-                                                            out_dtype)
+                                                            out_dtype,
+                                                            creation_list)
 
         target_ds.SetGeoTransform((x_min,
                                   pixel_size[0],
@@ -1328,6 +1325,10 @@ class Vector(object):
                                   -1.0*pixel_size[1]))
        
         target_ds.SetProjection(target_ds_srs.ExportToWkt())
+
+        if attribute is not None:
+            creation_options.update({'attribute': attribute})
+        creation_options.update({'all_touched': all_touched})
 
         for band in bands:
             band = target_ds.GetRasterBand(band)
