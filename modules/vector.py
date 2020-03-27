@@ -1263,7 +1263,7 @@ class Vector(object):
                   burn_values=None,
                   all_touched=True,
                   init_value=None,
-                  **creationOptions):
+                  **creation_options):
 
         """
         Method to rasterize a vector layer
@@ -1273,6 +1273,16 @@ class Vector(object):
         :param out_dtype: Output data type: gdal.GDT_Byte or 1, etc.
         :param nodatavalue: No data Value
         :param extent: Extent in spatial ref units (x_min, x_max, y_min, y_max)
+        :param bands: list of band numbers to burn values on, list starts from 1. default [1]
+        :param attribute: vector attribute to use while burning the values on raster
+        :param burn_values: List of values to burn on bands.
+                            Number of elements in list must be equal to number of bands
+        :param all_touched: If the pixels where geometries touch anywhere should be burned. If false,
+                            only the pixels where geometries cross midpoint are burnt
+        :param init_value: Value to initialize the bands with
+        :param creation_options: Options such as: compress=lzw
+                                                 bigtiff=yes
+
         :return: None
 
         RasterizeOptions(options=[], format=None, outputType=GDT_Unknown,
@@ -1298,14 +1308,14 @@ class Vector(object):
             raise ValueError('Output file name must be supplied')
 
         if attribute is not None:
-            creationOptions.update({'attribute': attribute})
+            creation_options.update({'attribute': attribute})
 
         if extent is None:
             x_min, x_max, y_min, y_max = self.layer.GetExtent()
         else:
             x_min, x_max, y_min, y_max = extent
 
-        creationOptions.update({'all_touched': all_touched})
+        creation_options.update({'all_touched': all_touched})
 
         cols = int(math.ceil((x_max - x_min) / pixel_size[1]))
         rows = int(math.ceil((y_max - y_min) / pixel_size[0]))
@@ -1335,7 +1345,7 @@ class Vector(object):
                                 init_value, 0, 0)
 
         creation_list = ['{}={}'.format(str(k).upper(), str(v).upper())
-                         for k, v in creationOptions.items()]
+                         for k, v in creation_options.items()]
 
         print (creation_list)
 
