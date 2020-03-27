@@ -1347,22 +1347,12 @@ class Vector(object):
         creation_list = ['{}={}'.format(str(k).upper(), str(v).upper())
                          for k, v in creation_options.items()]
 
-        print (creation_list)
-
-        if attribute is not None:
-            gdal.RasterizeLayer(target_ds,
-                                bands,
-                                self.layer,
-                                None,  # transformer
-                                None,  # transform
-                                creation_list)
-        else:
-            gdal.RasterizeLayer(target_ds,
-                                bands,
-                                self.layer,
-                                None,  # transformer
-                                None,  # transform
-                                burn_values,
-                                creation_list)
+        gdal.RasterizeLayer(target_ds,
+                            bands,
+                            self.layer,
+                            None,  # transformer
+                            None,  # transform
+                            burn_values,
+                            creation_list)
 
         target_ds = None
