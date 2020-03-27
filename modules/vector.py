@@ -1257,6 +1257,8 @@ class Vector(object):
                   pixel_size=None,
                   out_dtype=gdal.GDT_Int16,
                   nodatavalue=0,
+                  crs_string=None,
+                  crs_string_type='wkt',
                   extent=None,
                   bands=None,
                   attribute=None,
@@ -1269,7 +1271,7 @@ class Vector(object):
         Method to rasterize a vector layer
         :param out_format: Format of the output raster
         :param outfile: Output file name
-        :param pixel_size: Pixel size (x, y) in spatial ref units [default: (1,1)]
+        :param pixel_size: Pixel size (x, y) in output spatial ref units [default: (1,1)]
         :param out_dtype: Output data type: gdal.GDT_Byte or 1, etc.
         :param nodatavalue: No data Value
         :param extent: Extent in spatial ref units (x_min, x_max, y_min, y_max)
@@ -1282,9 +1284,25 @@ class Vector(object):
         :param init_value: Value to initialize the bands with
         :param creation_options: Options such as: compress=lzw
                                                   bigtiff=yes
-
         :return: None
         """
+
+        out_spref = osr.SpatialReference()
+        if crs_string_type == 'wkt':
+            out_spref.ImportFromWkt(crs_string)
+        elif crs_string_type == 'proj4':
+            out_spref.ImportFromProj4(crs_string)
+        elif crs_string_type == 'epsg':
+            out_spref.ImportFromEPSG(crs_string)
+        else:
+            warnings.warn('Unsupported spatial reference format. Spatial reference of vector file will be used')
+            out_spref.ImportFromWkt(self.spref_str)
+
+        if not out_spref.IsSame(self.spref):
+            temp_vector = self.reproject(destination_spatial_ref=out_spref,
+                                         return_vector=True)
+        else:
+            temp_vector = self
 
         if pixel_size is None:
             pixel_size = (1, 1)
@@ -1299,7 +1317,7 @@ class Vector(object):
             raise ValueError('Output file name must be supplied')
 
         if extent is None:
-            x_min, x_max, y_min, y_max = self.layer.GetExtent()
+            x_min, x_max, y_min, y_max = temp_vector.layer.GetExtent()
         else:
             x_min, x_max, y_min, y_max = extent
 
@@ -1309,7 +1327,7 @@ class Vector(object):
         cols = int(math.ceil((x_max - x_min) / pixel_size[1]))
         rows = int(math.ceil((y_max - y_min) / pixel_size[0]))
 
-        target_ds_srs = self.spref
+        target_ds_srs = out_spref
         target_ds = gdal.GetDriverByName(out_format).Create(outfile,
                                                             cols,
                                                             rows,
@@ -1340,7 +1358,7 @@ class Vector(object):
         try:
             gdal.RasterizeLayer(target_ds,
                                 bands,
-                                self.layer,
+                                temp_vector.layer,
                                 None,  # transformer
                                 None,  # transform
                                 burn_values,
