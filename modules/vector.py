@@ -1349,7 +1349,7 @@ class Vector(object):
 
         print (creation_list)
 
-        if attribute is None:
+        if attribute is not None:
             gdal.RasterizeLayer(target_ds,
                                 bands,
                                 self.layer,
