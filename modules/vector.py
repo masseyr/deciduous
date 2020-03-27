@@ -1307,6 +1307,8 @@ class Vector(object):
             x_min, x_max, y_min, y_max = extent
 
         creation_options.update({'all_touched': all_touched})
+        creation_list = ['{}={}'.format(str(k).upper(), str(v).upper())
+                         for k, v in creation_options.items()]
 
         cols = int(math.ceil((x_max - x_min) / pixel_size[1]))
         rows = int(math.ceil((y_max - y_min) / pixel_size[0]))
@@ -1334,9 +1336,6 @@ class Vector(object):
                 band.WriteArray(np.array((rows, cols),
                                          dtype=gdal_array.GDALTypeCodeToNumericTypeCode(out_dtype))*0 +
                                 init_value, 0, 0)
-
-        creation_list = ['{}={}'.format(str(k).upper(), str(v).upper())
-                         for k, v in creation_options.items()]
 
         gdal.RasterizeLayer(target_ds,
                             bands,
