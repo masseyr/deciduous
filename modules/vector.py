@@ -1281,7 +1281,7 @@ class Vector(object):
                             only the pixels where geometries cross midpoint are burnt
         :param init_value: Value to initialize the bands with
         :param creation_options: Options such as: compress=lzw
-                                                 bigtiff=yes
+                                                  bigtiff=yes
 
         :return: None
 
