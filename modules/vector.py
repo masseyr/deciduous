@@ -1314,10 +1314,10 @@ class Vector(object):
 
         target_ds_srs = self.spref
         target_ds = gdal.GetDriverByName(format).Create(outfile,
-                                                         cols,
-                                                         rows,
-                                                         len(bands),
-                                                         out_dtype)
+                                                        cols,
+                                                        rows,
+                                                        len(bands),
+                                                        out_dtype)
 
         target_ds.SetGeoTransform((x_min,
                                   pixel_size[0],
