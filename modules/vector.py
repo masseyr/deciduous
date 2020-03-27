@@ -1126,6 +1126,7 @@ class Vector(object):
                 res = spref.ImportFromEPSG(out_epsg)
 
         vector.spref = spref
+        vector.spref_str = spref.ExportToWkt()
 
         vector.attribute_def = attribute_types
         vector.attributes = attributes
@@ -1290,22 +1291,22 @@ class Vector(object):
         :return: None
         """
 
-        out_spref = osr.SpatialReference()
-        if crs_string_type == 'wkt':
-            out_spref.ImportFromWkt(crs_string)
-        elif crs_string_type == 'proj4':
-            out_spref.ImportFromProj4(crs_string)
-        elif crs_string_type == 'epsg':
-            out_spref.ImportFromEPSG(crs_string)
+        if crs_string is not None:
+            out_spref = osr.SpatialReference()
+            if crs_string_type == 'wkt':
+                out_spref.ImportFromWkt(crs_string)
+            elif crs_string_type == 'proj4':
+                out_spref.ImportFromProj4(crs_string)
+            elif crs_string_type == 'epsg':
+                out_spref.ImportFromEPSG(crs_string)
+            else:
+                warnings.warn('Unsupported spatial reference format. Spatial reference of vector file will be used')
+                out_spref.ImportFromWkt(self.spref_str)
         else:
-            warnings.warn('Unsupported spatial reference format. Spatial reference of vector file will be used')
-            out_spref.ImportFromWkt(self.spref_str)
+            out_spref = self.spref
 
         if not out_spref.IsSame(self.spref):
-            temp_vector = self.reproject(destination_spatial_ref=out_spref,
-                                         return_vector=True)
-        else:
-            temp_vector = self
+            self.reproject(destination_spatial_ref=out_spref)
 
         if pixel_size is None:
             pixel_size = (1, 1)
@@ -1320,7 +1321,7 @@ class Vector(object):
             raise ValueError('Output file name must be supplied')
 
         if extent is None:
-            x_min, x_max, y_min, y_max = temp_vector.layer.GetExtent()
+            x_min, x_max, y_min, y_max = self.layer.GetExtent()
         else:
             x_min, x_max, y_min, y_max = extent
 
@@ -1361,7 +1362,7 @@ class Vector(object):
         try:
             gdal.RasterizeLayer(target_ds,
                                 bands,
-                                temp_vector.layer,
+                                self.layer,
                                 None,  # transformer
                                 None,  # transform
                                 burn_values,
