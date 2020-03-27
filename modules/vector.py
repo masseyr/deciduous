@@ -1,10 +1,11 @@
-from osgeo import ogr, osr, gdal
+from osgeo import ogr, osr, gdal, gdal_array
 import math
 import sys
 import os
 import warnings
 from common import Handler, Sublist, Opt
 from gdaldefs import *
+import numpy as np
 
 __all__ = ['Vector']
 
@@ -1131,8 +1132,7 @@ class Vector(object):
 
         # get driver to write to memory
         memory_driver = ogr.GetDriverByName('Memory')
-        temp_datasource = memory_driver.CreateDataSource('out')
-        vector.data_source = temp_datasource
+        vector.datasource = memory_driver.CreateDataSource('out')
 
         if vector_type is None:
             geom_type = geoms[0].GetGeometryType()
@@ -1147,9 +1147,9 @@ class Vector(object):
         vector.type = geom_type
 
         # create layer in memory
-        temp_layer = temp_datasource.CreateLayer('temp_layer',
-                                                 srs=spref,
-                                                 geom_type=geom_type)
+        temp_layer = vector.datasource.CreateLayer('temp_layer',
+                                                   srs=spref,
+                                                   geom_type=geom_type)
         vector.layer = temp_layer
         vector.fields = list()
 
@@ -1252,41 +1252,72 @@ class Vector(object):
             return geom_list
 
     def rasterize(self,
+                  format='GTiff',
                   outfile=None,
                   pixel_size=None,
-                  out_type=gdal.GDT_Byte,
+                  out_dtype=gdal.GDT_Int16,
                   nodatavalue=0,
-                  extent=None):
+                  extent=None,
+                  bands=None,
+                  attribute=None,
+                  burn_values=None,
+                  all_touched=True,
+                  init_value=None,
+                  sql=None,
+                  raster_datasource=None,
+                  sql_dialect=None,
+                  **creationOptions):
 
         """
         Method to rasterize a vector layer
         :param outfile: Output file name
-        :param pixel_size: Pixel size (x, y) in spatial ref units
-        :param out_type: Output data type: gdal.GDT_Byte or 1, etc.
+        :param pixel_size: Pixel size (x, y) in spatial ref units [default: (1,1)]
+        :param out_dtype: Output data type: gdal.GDT_Byte or 1, etc.
         :param nodatavalue: No data Value
         :param extent: Extent in spatial ref units (x_min, x_max, y_min, y_max)
         :return: None
+
+        RasterizeOptions(options=[], format=None, outputType=GDT_Unknown,
+        creationOptions=None, noData=None, initValues=None,
+        outputBounds=None, outputSRS=None, transformerOptions=None,
+        width=None, height=None, xRes=None, yRes=None,
+         targetAlignedPixels=False, bands=None, inverse=False,
+         allTouched=False, burnValues=None, attribute=None,
+         useZ=False, layers=None, SQLStatement=None,
+         SQLDialect=None, where=None, optim=None, callback=None, callback_data=None)
         """
 
         if pixel_size is None:
-            pixel_size = (30, 30)
+            pixel_size = (1, 1)
+
+        if bands is None:
+            bands = [1]
+
+        if burn_values is None:
+            burn_values = [1 for _ in range(len(bands))]
 
         if outfile is None:
-            outfile = self.filename.split('.')[0] + '_.tif'
+            raise ValueError('Output file name must be supplied')
+
+        if attribute is not None:
+            creationOptions.update({'attribute': attribute})
 
         if extent is None:
             x_min, x_max, y_min, y_max = self.layer.GetExtent()
         else:
             x_min, x_max, y_min, y_max = extent
 
+        creationOptions.update({'all_touched': all_touched})
+
         cols = int(math.ceil((x_max - x_min) / pixel_size[1]))
         rows = int(math.ceil((y_max - y_min) / pixel_size[0]))
 
+        target_ds_srs = self.spref
         target_ds = gdal.GetDriverByName('GTiff').Create(outfile,
                                                          cols,
                                                          rows,
-                                                         1,
-                                                         out_type)
+                                                         len(bands),
+                                                         out_dtype)
 
         target_ds.SetGeoTransform((x_min,
                                   pixel_size[0],
@@ -1294,22 +1325,36 @@ class Vector(object):
                                   y_max,
                                   0,
                                   -1.0*pixel_size[1]))
-
-        target_ds_srs = self.spref
+       
         target_ds.SetProjection(target_ds_srs.ExportToWkt())
 
-        band = target_ds.GetRasterBand(1)
-        band.SetNoDataValue(nodatavalue)
+        for band in bands:
+            band = target_ds.GetRasterBand(band)
+            band.SetNoDataValue(nodatavalue)
+            if init_value is not None:
+                band.WriteArray(np.array((rows, cols),
+                                         dtype=gdal_array.GDALTypeCodeToNumericTypeCode(out_dtype))*0 +
+                                init_value, 0, 0)
 
-        gdal.RasterizeLayer(target_ds,
-                            [1],
-                            self.layer,
-                            None,
-                            None,
-                            [1],
-                            ['ALL_TOUCHED=TRUE'])
+        creation_list = ['{}={}'.format(str(k).upper(), str(v).upper())
+                         for k, v in creationOptions.items()]
+
+        print (creation_list)
+
+        if attribute is None:
+            gdal.RasterizeLayer(target_ds,
+                                bands,
+                                self.layer,
+                                None,  # transformer
+                                None,  # transform
+                                creation_list)
+        else:
+            gdal.RasterizeLayer(target_ds,
+                                bands,
+                                self.layer,
+                                None,  # transformer
+                                None,  # transform
+                                burn_values,
+                                creation_list)
 
         target_ds = None
-
-
-
