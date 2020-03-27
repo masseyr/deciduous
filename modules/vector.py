@@ -1263,9 +1263,6 @@ class Vector(object):
                   burn_values=None,
                   all_touched=True,
                   init_value=None,
-                  sql=None,
-                  raster_datasource=None,
-                  sql_dialect=None,
                   **creationOptions):
 
         """
