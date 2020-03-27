@@ -1284,15 +1284,6 @@ class Vector(object):
                                                   bigtiff=yes
 
         :return: None
-
-        RasterizeOptions(options=[], format=None, outputType=GDT_Unknown,
-        creationOptions=None, noData=None, initValues=None,
-        outputBounds=None, outputSRS=None, transformerOptions=None,
-        width=None, height=None, xRes=None, yRes=None,
-         targetAlignedPixels=False, bands=None, inverse=False,
-         allTouched=False, burnValues=None, attribute=None,
-         useZ=False, layers=None, SQLStatement=None,
-         SQLDialect=None, where=None, optim=None, callback=None, callback_data=None)
         """
 
         if pixel_size is None:
