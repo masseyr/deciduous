@@ -1336,13 +1336,16 @@ class Vector(object):
                 band.WriteArray(np.array((rows, cols),
                                          dtype=gdal_array.GDALTypeCodeToNumericTypeCode(out_dtype))*0 +
                                 init_value, 0, 0)
-
-        gdal.RasterizeLayer(target_ds,
-                            bands,
-                            self.layer,
-                            None,  # transformer
-                            None,  # transform
-                            burn_values,
-                            creation_list)
-
-        target_ds = None
+        try:
+            gdal.RasterizeLayer(target_ds,
+                                bands,
+                                self.layer,
+                                None,  # transformer
+                                None,  # transform
+                                burn_values,
+                                creation_list)
+            target_ds = None
+            return 0
+        except Exception as e:
+            sys.stdout.write(e.message)
+            return 1
