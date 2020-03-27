@@ -1313,7 +1313,7 @@ class Vector(object):
         rows = int(math.ceil((y_max - y_min) / pixel_size[0]))
 
         target_ds_srs = self.spref
-        target_ds = gdal.GetDriverByName('GTiff').Create(outfile,
+        target_ds = gdal.GetDriverByName(format).Create(outfile,
                                                          cols,
                                                          rows,
                                                          len(bands),
