@@ -7,7 +7,7 @@ if __name__ == '__main__':
 
     start_year = 2000
     end_year = 2017
-    pixel_size = 0.0021  # 250m MODIS resplution
+    pixel_size = 0.0021  # 250m MODIS resolution
 
     fire_year_col = 'FireYear'
     fire_id_col = 'FIREID'
