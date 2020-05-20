@@ -1,4 +1,4 @@
-from modules import Vector, Handler
+from geosoup import Vector, Handler
 import pandas as pd
 import json
 from osgeo import ogr
@@ -6,6 +6,66 @@ import numpy as np
 
 
 if __name__ == '__main__':
+
+    infilename = "D:/Shared/Dropbox/projects/NAU/landsat_deciduous/data/samples/CAN_PSP/" \
+        "CAN_PSPs_Hember-20180207T213138Z-001/CAN_PSPs_Hember/NAFP_L4_SL_ByJur_R16d_ForBrendanRogers1.csv"
+    outfilename = "D:/Shared/Dropbox/projects/NAU/landsat_deciduous/data/samples/CAN_PSP/" \
+        "CAN_PSPs_Hember-20180207T213138Z-001/CAN_PSPs_Hember/NAFP_L4_SL_ByJur_R16d_ForBrendanRogers1_lat52_ABoVE.shp"
+
+    bounds = "D:/Shared/Dropbox/projects/NAU/landsat_deciduous/data/STUDY_AREA/ABoVE_Study_Domain_geo.shp"
+
+    bounds_vec = Vector(bounds)
+    bounds_geom = bounds_vec.features[0].GetGeometryRef()
+
+    attr = {'ID_Plot': 'str',
+            'Lat': 'float',
+            'Lon': 'float'}
+
+    samp_data = Handler(infilename).read_from_csv(return_dicts=True)
+
+    wkt_list = list()
+    attr_list = list()
+
+    spref_str = '+proj=longlat +datum=WGS84'
+    latlon = list()
+    count = 0
+    for row in samp_data:
+        print('Reading elem: {}'.format(str(count + 1)))
+
+        elem = dict()
+        for header in list(attr):
+            elem[header] = row[header]
+
+        samp_geom = Vector.get_osgeo_geom(Vector.wkt_from_coords([row['Lon'], row['Lat']]))
+
+        latlon.append([row['Lon'], row['Lat']])
+
+        if elem['Lat'] < 52.0 and samp_geom.Intersects(bounds_geom):
+            wkt_list.append(Vector.wkt_from_coords([row['Lon'], row['Lat']]))
+
+            attr_list.append(elem)
+
+        count += 1
+
+    uniq, indices, inverse, count = np.unique(ar=latlon,
+                                              axis=0,
+                                              return_index=True,
+                                              return_counts=True,
+                                              return_inverse=True)
+
+    print(uniq.shape)
+    exit()
+    vector = Vector.vector_from_string(wkt_list,
+                                       spref_string=spref_str,
+                                       spref_string_type='proj4',
+                                       vector_type='point',
+                                       attributes=attr_list,
+                                       attribute_types=attr,
+                                       verbose=True)
+
+
+    print(vector)
+    vector.write_vector(outfilename)
 
 
 
@@ -101,7 +161,7 @@ if __name__ == '__main__':
     print(vector)
     vector.write_vector(outfilename)
 
-    '''
+
 
 
 
@@ -142,11 +202,12 @@ if __name__ == '__main__':
                                        attribute_types=attr,
                                        verbose=True)
 
+
     print(vector)
     vector.write_vector(outfilename)
 
 
-    '''
+
 
     
     folder = "D:/Shared/Dropbox/projects/NAU/landsat_deciduous/data/SAMPLES/gee_extract/"
