@@ -1,4 +1,5 @@
-from modules import *
+from geosoup import Vector, Handler, Sublist
+from geosoupML import Euclidean
 import numpy as np
 import scipy.stats as stats
 '''
@@ -36,6 +37,7 @@ if __name__ == '__main__':
 
     # input file directory
     infile = outdir + "all_samp_pre_v1.csv"
+    ini_outfile = outdir + "all_samp_pre_v1.shp"
     outfile = outdir + "all_samp_postbin_v{}.csv".format(version)
     outshpfile = outdir + "all_samp_postbin_v{}.shp".format(version)
 
@@ -75,7 +77,7 @@ if __name__ == '__main__':
         samp_count = 0
         site_ids = list(set(list(attr_dict['site'] for attr_dict in samp_list)))
 
-        for site_id in site_ids:
+        for site_id in site_ids[0:100]:
             same_site_samp_list = list(samp for samp in samp_list if samp['site'] == site_id)
 
             lat = same_site_samp_list[0]['Latitude']
@@ -107,6 +109,38 @@ if __name__ == '__main__':
             decid_frac_samp.append(elem)
 
     print('Reduced samples: {}'.format(str(len(decid_frac_samp))))
+
+    print(decid_frac_samp[0])
+
+    attribute_types = {'site': 'str',
+                       'year': 'int',
+                       'decid_frac': 'float'}
+
+    wkt_list = list()
+    attr_list = list()
+
+    for i, row in enumerate(decid_frac_samp):
+        elem = dict()
+        for header in list(attribute_types):
+            elem[header] = row[header]
+
+        wkt = Vector.wkt_from_coords([row['longitude'], row['latitude']],
+                                     geom_type='point')
+
+        wkt_list.append(wkt)
+        attr_list.append(elem)
+
+    vector = Vector.vector_from_string(wkt_list,
+                                       out_epsg=4326,
+                                       vector_type='point',
+                                       attributes=attr_list,
+                                       attribute_types=attribute_types,
+                                       verbose=True)
+
+    print(vector)
+    vector.write_vector(ini_outfile)
+
+    exit()
 
     # extract all decid frac values for calculating histogram
     decid_frac_list = list(samp['decid_frac'] for samp in decid_frac_samp)

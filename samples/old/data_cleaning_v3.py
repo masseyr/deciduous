@@ -1,4 +1,5 @@
-from modules import *
+from geosoup import Vector, Handler, Sublist
+from geosoupML import Euclidean
 import numpy as np
 import scipy.stats as stats
 '''
@@ -36,12 +37,12 @@ if __name__ == '__main__':
 
     # input file directory
     infile = outdir + "all_samp_pre_v1.csv"
+    ini_outfile = outdir + "all_samp_pre_v1.shp"
+    outfile = outdir + "all_samp_postbin_v{}.csv".format(version)
+    outshpfile = outdir + "all_samp_postbin_v{}.shp".format(version)
 
-    outfile_east = outdir + "all_samp_postbin_east_v{}.csv".format(version)
-    outshpfile_east = outdir + "all_samp_postbin_east_v{}.shp".format(version)
-
-    trn_outfile_east = outdir + "all_samp_post_v{}_trn_samp_east.shp".format(version)
-    val_outfile_east = outdir + "all_samp_post_v{}_val_samp_east.shp".format(version)
+    trn_outfile = outdir + "all_samp_post_v{}_trn_samp.shp".format(version)
+    val_outfile = outdir + "all_samp_post_v{}_val_samp.shp".format(version)
 
     boreal_bounds = "D:/shared/Dropbox/projects/NAU/landsat_deciduous/data/STUDY_AREA/boreal/" \
                     "NABoreal_simple_10km_buffer_geo.shp"
@@ -76,7 +77,7 @@ if __name__ == '__main__':
         samp_count = 0
         site_ids = list(set(list(attr_dict['site'] for attr_dict in samp_list)))
 
-        for site_id in site_ids:
+        for site_id in site_ids[0:100]:
             same_site_samp_list = list(samp for samp in samp_list if samp['site'] == site_id)
 
             lat = same_site_samp_list[0]['Latitude']
@@ -108,6 +109,38 @@ if __name__ == '__main__':
             decid_frac_samp.append(elem)
 
     print('Reduced samples: {}'.format(str(len(decid_frac_samp))))
+
+    print(decid_frac_samp[0])
+
+    attribute_types = {'site': 'str',
+                       'year': 'int',
+                       'decid_frac': 'float'}
+
+    wkt_list = list()
+    attr_list = list()
+
+    for i, row in enumerate(decid_frac_samp):
+        elem = dict()
+        for header in list(attribute_types):
+            elem[header] = row[header]
+
+        wkt = Vector.wkt_from_coords([row['longitude'], row['latitude']],
+                                     geom_type='point')
+
+        wkt_list.append(wkt)
+        attr_list.append(elem)
+
+    vector = Vector.vector_from_string(wkt_list,
+                                       out_epsg=4326,
+                                       vector_type='point',
+                                       attributes=attr_list,
+                                       attribute_types=attribute_types,
+                                       verbose=True)
+
+    print(vector)
+    vector.write_vector(ini_outfile)
+
+    exit()
 
     # extract all decid frac values for calculating histogram
     decid_frac_list = list(samp['decid_frac'] for samp in decid_frac_samp)
@@ -174,8 +207,6 @@ if __name__ == '__main__':
     east_count = 0
     west_index = list()
     east_index = list()
-    east_index_out = list()
-
     for i, elem in enumerate(out_decid_frac_samp):
         if elem['longitude'] <= divider_lon:
             west_count += 1
@@ -187,20 +218,125 @@ if __name__ == '__main__':
     print('West count:  {}'.format(west_count))
     print('East count:  {}'.format(east_count))
 
-    east_index_out = Sublist(east_index).copy()
-    east_samp_out = list(out_decid_frac_samp[i] for i in east_index)
+    # if more samples in the east, randomly select same number or a fraction of samples as west
+    if east_count > west_count:
+        east_index = Sublist(east_index).random_selection(int(west_count * divid_multiplier))
 
-    east_samp_out = Euclidean(samples=east_samp_out,
-                              names=['longitude', 'latitude']).apply_proximity_filter(thresh=thresh)
+    east_samp = list(out_decid_frac_samp[i] for i in east_index)
 
-    out_samp_index = list(range(len(east_samp_out)))
+    east_eu = Euclidean(samples=east_samp,
+                        names=['longitude', 'latitude'])
+    east_eu.calc_dist_matrix()
+    east_eu.proximity_filter(thresh=thresh)
+
+    east_samp = east_eu.samples
+    east_index = list(range(len(east_samp)))
+
+    print('East count after processing: {}'.format(len(east_index)))
+
+    indices = east_index + west_index
+
+    out_decid_frac_samp = list(out_decid_frac_samp[i] for i in west_index) + \
+        list(east_samp[i] for i in east_index)
+
+    print('Total count after processing: {}'.format(len(out_decid_frac_samp)))
+
+    out_decid_frac_list = list(samp['decid_frac'] for samp in out_decid_frac_samp)
+    # ----------------------
+
+    # fint uniform distribution for the given distribution
+    resp, fit_stats = stats.probplot(np.array(decid_frac_list),
+                                     dist='uniform')
+
+    # calculate quantiles for QQ plot
+    theo_quantiles = list(np.quantile(resp[0], q) for q in Sublist.frange(0.0, 1.0, step))
+    actual_quantiles = list(np.quantile(resp[1], q) for q in Sublist.frange(0.0, 1.0, step))
+
+    print('R-sq before removal: {}'.format(str(fit_stats[2] ** 2 * 100.0)))
+    resp2, fit_stats2 = stats.probplot(np.array(out_decid_frac_list),
+                                       dist='uniform')
+    theo_quantiles2 = list(np.quantile(resp2[0], q) for q in Sublist.frange(0.0, 1.0, step))
+    actual_quantiles2 = list(np.quantile(resp2[1], q) for q in Sublist.frange(0.0, 1.0, step))
+
+    print('R-sq after removal: {}'.format(str(fit_stats2[2] ** 2 * 100.0)))
+
+    '''
+    fig1, ax1 = plt.subplots()
+
+    ax1.plot(theo_quantiles, actual_quantiles, '.', markersize=15, markerfacecolor='none', markeredgecolor='#0C92CA')
+    ax1.plot((0.0, 1.0), (0.0, 1.0), '-', color='red')
+    fig1.savefig(outdir + '/unitary_pre_qq_plot_v{}.png'.format(version), bbox_inches='tight')
+
+    fig2, ax1 = plt.subplots()
+
+    ax1.plot(theo_quantiles2, actual_quantiles2, '.', markersize=15, markerfacecolor='none', markeredgecolor='#0C92CA')
+    ax1.plot((0.0, 1.0), (0.0, 1.0), '-', color='red')
+    fig2.savefig(outdir + '/unitary_post_qq_plot_v{}.png'.format(version), bbox_inches='tight')
+
+    perc_out = 100.0 * (float(len(decid_frac_list) - len(out_decid_frac_list)) / float(len(decid_frac_list)))
+    print('Percentage of samples removed: {} %'.format(str(perc_out)))
+    print('Final number of samples: {}'.format(str(len(out_decid_frac_list))))
+
+    fig3, axes = plt.subplots(nrows=1, figsize=(7, 15))
+
+    ax1 = axes
+    divider = make_axes_locatable(ax1)
+    ax2 = divider.new_vertical(size='25%', pad=0.4)
+    fig3.add_axes(ax2)
+
+    # matplotlib histogram
+    res1 = ax1.hist(decid_frac_list,
+                    color='#0C92CA',
+                    edgecolor='black',
+                    bins=int(nbins))
+
+    ax1.set_ylim(0, 5000)
+    # ax1.tick_params(axis='y', pad=0.2)
+    ax1.spines['top'].set_visible(False)
+
+    
+    ax1.axhline(med,
+                color='Red',
+                linestyle='dashed',
+                linewidth=2)
+    
+
+    res2 = ax2.hist(decid_frac_list,
+                    color='#0C92CA',
+                    edgecolor='black',
+                    bins=int(nbins))
+
+    ax2.set_ylim(20000, 21000)
+    ax2.tick_params(bottom="off", labelbottom='off')
+    ax2.spines['bottom'].set_visible(False)
+
+    # From https://matplotlib.org/examples/pylab_examples/broken_axis.html
+    d = .015  # how big to make the diagonal lines in axes coordinates
+    # arguments to pass to plot, just so we don't keep repeating them
+    kwargs = dict(transform=ax2.transAxes, color='k', clip_on=False)
+    ax2.plot((-d, +d), (-4.0 * d, +4.0 * d), **kwargs)  # top-left diagonal
+    ax2.plot((1 - d, 1 + d), (-4.0 * d, +4.0 * d), **kwargs)  # top-right diagonal
+
+    kwargs.update(transform=ax1.transAxes)  # switch to the bottom axes
+    ax1.plot((-d, +d), (1 - d, 1 + d), **kwargs)  # bottom-left diagonal
+    ax1.plot((1 - d, 1 + d), (1 - d, 1 + d), **kwargs)  # bottom-right diagonal
+
+    res3 = ax1.hist(out_decid_frac_list,
+                    color='#FFA500',
+                    edgecolor='black',
+                    bins=int(nbins))
+
+    # save plot
+    fig3.savefig(outdir + '/sample_distribution_plot_v{}.png'.format(version), bbox_inches='tight')
+    '''
+    out_samp_index = list(range(len(out_decid_frac_samp)))
     np.random.shuffle(out_samp_index)
 
-    out_decid_frac_samp_east = list(east_samp_out[i] for i in out_samp_index)
+    out_decid_frac_samp = list(out_decid_frac_samp[i] for i in out_samp_index)
 
     # write csv file
-    Handler.write_to_csv(out_decid_frac_samp_east,
-                         outfile_east)
+    Handler.write_to_csv(out_decid_frac_samp,
+                         outfile)
 
     # write shp file---------
     attribute_types = {'site': 'str',
@@ -209,16 +345,16 @@ if __name__ == '__main__':
 
     trn_data = list()
 
-    print('Total {} sites'.format(str(len(out_decid_frac_samp_east))))
+    print('Total {} sites'.format(str(len(out_decid_frac_samp))))
 
-    ntrn = int((trn_perc * len(out_decid_frac_samp_east))/100.0)
-    nval = len(out_decid_frac_samp_east) - ntrn
+    ntrn = int((trn_perc * len(out_decid_frac_samp))/100.0)
+    nval = len(out_decid_frac_samp) - ntrn
 
     # randomly select training samples based on number
-    trn_sites = Sublist(range(len(out_decid_frac_samp_east))).random_selection(ntrn)
+    trn_sites = Sublist(range(len(out_decid_frac_samp))).random_selection(ntrn)
 
     # get the rest of samples as validation samples
-    val_sites = Sublist(range(len(out_decid_frac_samp_east))).remove(trn_sites)
+    val_sites = Sublist(range(len(out_decid_frac_samp))).remove(trn_sites)
 
     # print IDs
     print(len(trn_sites))
@@ -233,7 +369,7 @@ if __name__ == '__main__':
     val_wkt_list = list()
     val_attr_list = list()
 
-    for i, row in enumerate(out_decid_frac_samp_east):
+    for i, row in enumerate(out_decid_frac_samp):
         elem = dict()
         for header in list(attribute_types):
             elem[header] = row[header]
@@ -260,7 +396,7 @@ if __name__ == '__main__':
                                        full=False)
 
     print(vector)
-    vector.write_vector(outshpfile_east)
+    vector.write_vector(outshpfile)
 
     trn_vec = Vector.vector_from_string(trn_wkt_list,
                                         out_epsg=4326,
@@ -270,7 +406,7 @@ if __name__ == '__main__':
                                         verbose=True,
                                         full=False)
     print(trn_vec)
-    trn_vec.write_vector(trn_outfile_east)
+    trn_vec.write_vector(trn_outfile)
 
     val_vec = Vector.vector_from_string(val_wkt_list,
                                         out_epsg=4326,
@@ -280,7 +416,7 @@ if __name__ == '__main__':
                                         verbose=True,
                                         full=False)
     print(val_vec)
-    val_vec.write_vector(val_outfile_east)
+    val_vec.write_vector(val_outfile)
     # write shp file: end---------
 
     print('Done!')

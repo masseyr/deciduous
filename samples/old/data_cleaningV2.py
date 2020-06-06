@@ -1,4 +1,5 @@
-from modules import *
+from geosoup import Handler, Sublist
+from geosoupML.distance import Mahalanobis
 import numpy as np
 import pandas as pd
 import random
